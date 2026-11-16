@@ -1,0 +1,8 @@
+# secondPrj (가칭)
+
+Daeun.dev의 두 번째 모바일 게임. 이동 중에 잠깐씩 하는 방치형 / 라인 디펜스 게임을 기획하고 있습니다.
+
+- 작업 규칙: [AGENTS.md](AGENTS.md)
+- 결정 기록: [docs/DECISIONS.md](docs/DECISIONS.md)
+- 최신 상태: [docs/HANDOFF.md](docs/HANDOFF.md)
+- 할 일: [docs/TODO.md](docs/TODO.md)

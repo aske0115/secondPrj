@@ -1,6 +1,6 @@
 # secondPrj (가칭)
 
-Daeun.dev의 두 번째 모바일 게임. 이동 중에 잠깐씩 하는 작은 방 디오라마 복원 게임을 기획하고 있습니다.
+Daeun.dev의 두 번째 모바일 게임 실험. 작은 방 디오라마 복원 게임을 프로토타입까지 만들었다가 **중단**했습니다(2026-11-16, [결정 018](docs/DECISIONS.md)). 다음 게임의 골격과 아이디어 선정 기준으로 남겨 둡니다.
 
 - 작업 규칙: [AGENTS.md](AGENTS.md)
 - 결정 기록: [docs/DECISIONS.md](docs/DECISIONS.md)

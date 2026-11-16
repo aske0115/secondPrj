@@ -6,8 +6,9 @@ import { runCatch, modsFor, type CatchResult } from './play/catch';
 import decor from '../content/fortune/decor.json';
 import messages from '../content/fortune/messages.json';
 import tarot from '../content/fortune/tarot.json';
+import sajuText from '../content/fortune/saju.json';
 import {
-  HANGUL, ELEMENTS, dailyFortune, dayKey, luckyElement, sajuProfile, tarotProfile, hash,
+  HANGUL, ELEMENTS, dailyFortune, dayKey, luckyElement, sajuProfile, tarotProfile, hash, tenGod, birthClocks, GAN_EL, ZHI_EL,
   type DailyFortune, type Element, type Profile,
 } from './fortune/saju';
 
@@ -33,6 +34,8 @@ interface Save {
   playsDay: string | null;
   playsUsed: number;
   decor: string[];
+  /** 타로: 오늘의 카드를 뒤집은 날 */
+  revealedDay: string | null;
 }
 const PLAYS_PER_DAY = 3;
 const KEY = 'fortunePet.v1';
@@ -48,7 +51,7 @@ function loadSave(): Save {
 function fresh(): Save {
   return {
     profile: null, coins: 0, streak: 0, checkins: 0, lastDay: null, pettedDay: null,
-    ki: { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }, kiTotal: 0, playsDay: null, playsUsed: 0, decor: [],
+    ki: { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }, kiTotal: 0, playsDay: null, playsUsed: 0, decor: [], revealedDay: null,
   };
 }
 function playsLeft() {
@@ -60,6 +63,8 @@ function stageOf(total: number) {
   return i;
 }
 let save = loadSave();
+// 결정 029 이전에 타로로 시작한 저장에는 일주가 없어 운명 카드로 다시 만든다
+if (save.profile?.source === 'tarot' && !save.profile.dayGan) save.profile = { ...tarotProfile(save.profile.card!, save.profile.self), createdAt: save.profile.createdAt };
 function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(save));
@@ -163,16 +168,24 @@ function reveal(card: number) {
   $('go').onclick = born;
 }
 
-// ── 화면: 펫 탄생(내 기운 보기)
+// ── 화면: 펫 탄생·내 운명
+const GODS = sajuText.gods as Record<string, { name: { ko: string; en: string; hanja: string }; meaning: { ko: string; en: string }; summary: { ko: string; en: string }[]; love: { ko: string; en: string }; money: { ko: string; en: string }; work: { ko: string; en: string }; health: { ko: string; en: string }; advice: { ko: string; en: string } }>;
+const godName = (g: string) => (lang === 'ko' ? `${GODS[g].name.ko}(${GODS[g].name.hanja})` : GODS[g].name.en);
+
 function pillarsHtml(p: Profile) {
-  const labels = lang === 'ko' ? ['년', '월', '일', '시'] : ['Year', 'Month', 'Day', 'Hour'];
-  const GAN_EL: Record<string, Element> = { 甲: 'wood', 乙: 'wood', 丙: 'fire', 丁: 'fire', 戊: 'earth', 己: 'earth', 庚: 'metal', 辛: 'metal', 壬: 'water', 癸: 'water' };
-  const ZHI_EL: Record<string, Element> = { 寅: 'wood', 卯: 'wood', 巳: 'fire', 午: 'fire', 辰: 'earth', 戌: 'earth', 丑: 'earth', 未: 'earth', 申: 'metal', 酉: 'metal', 亥: 'water', 子: 'water' };
-  const ch = (c: string, e: Element) => `<div class="ch" style="background:${elColor(e)}">${c}<small>${HANGUL[c]}</small></div>`;
-  // 오른쪽부터 년·월·일·시로 읽는 전통 배치 대신, 처음 보는 사람도 읽기 쉽게 왼쪽부터
-  return `<div class="pillars">${p.pillars!.map((x, i) => `<div class="pillar"><div class="lbl">${labels[i]}</div>${
-    x ? ch(x.gan, GAN_EL[x.gan]) + ch(x.zhi, ZHI_EL[x.zhi]) : '<div class="ch none">?<small>&nbsp;</small></div><div class="ch none">?<small>&nbsp;</small></div>'
-  }</div>`).join('')}</div>`;
+  // 만세력 관례대로 오른쪽부터 년·월·일·시. 일간(나)은 테두리로 표시하고, 나머지 글자에는 나와의 관계(십신)를 단다
+  const labels = lang === 'ko' ? ['년주', '월주', '일주', '시주'] : ['Year', 'Month', 'Day', 'Hour'];
+  const ch = (c: string, e: Element, god: string | null) =>
+    `<div class="ch${god === null ? ' me' : ''}" style="background:${elColor(e)}">${c}<small>${HANGUL[c]}</small></div><div class="god">${god === null ? L('나', 'Me') : godName(god).replace(/\(.+\)/, '')}</div>`;
+  // 타로 입구는 운명 카드가 정한 일주 한 기둥만 있다
+  const only = p.source === 'tarot' ? [2] : [0, 1, 2, 3];
+  const cols = p.pillars!.map((x, i) => `<div class="pillar"><div class="lbl">${labels[i]}</div>${
+    x
+      ? ch(x.gan, GAN_EL[x.gan], i === 2 ? null : tenGod(p.dayGan!, x.gan)) + ch(x.zhi, ZHI_EL[x.zhi], tenGod(p.dayGan!, x.zhi))
+      : `<div class="ch none">?<small>&nbsp;</small></div><div class="god">${L('모름', 'Unknown')}</div><div class="ch none">?<small>&nbsp;</small></div><div class="god">&nbsp;</div>`
+  }</div>`);
+  const shown = cols.filter((_, i) => only.includes(i));
+  return `<div class="pillars${only.length === 1 ? ' one' : ''}">${shown.reverse().join('')}</div>`;
 }
 
 function barsHtml(p: Profile) {
@@ -183,22 +196,87 @@ function barsHtml(p: Profile) {
 function born() {
   const p = save.profile!;
   const pet = EL[p.self].pet;
-  const lucky = luckyElement(p);
+  let body: string;
+  if (p.source === 'saju') {
+    const most = ELEMENTS.reduce((a, b) => (p.counts[b] > p.counts[a] ? b : a));
+    const few = luckyElement(p);
+    const corr = p.birth!.h === null ? null : birthClocks(p.birth!.y, p.birth!.m, p.birth!.d, p.birth!.h, p.birth!.mi).correctionMin;
+    const ET = sajuText.elements as Record<Element, { many: { ko: string; en: string }; few: { ko: string; en: string } }>;
+    body = `<h2>${L('나의 사주팔자', 'My four pillars')}</h2>${pillarsHtml(p)}
+      <div class="note">${p.birth!.y}.${p.birth!.m}.${p.birth!.d} ${p.birth!.h === null ? L('시각 모름', 'time unknown') : `${String(p.birth!.h).padStart(2, '0')}:${String(p.birth!.mi).padStart(2, '0')}`}${corr ? L(` · 서울 기준 태양시 보정 ${corr}분`, ` · solar time ${corr} min`) : ''}</div>
+      <h2 style="margin-top:16px">${L(`나는 ${p.dayGan}(${HANGUL[p.dayGan!]}) — ${EL[p.self].ko}의 사람`, `Day master ${p.dayGan} — ${EL[p.self].en}`)}</h2>
+      <p class="read">${T((sajuText.days as Record<string, { ko: string; en: string }>)[p.dayGan!])}</p>
+      <h2 style="margin-top:16px">${L('다섯 기운의 균형', 'Balance of five elements')}</h2>${barsHtml(p)}
+      <p class="read" style="margin-top:26px">${T(ET[most].many)}</p>
+      <p class="read">${T(ET[few].few)}</p>`;
+  } else {
+    const c = tarot.cards[p.card!];
+    body = `<h2>${L('나의 운명 카드', 'My fate card')}</h2>
+      <div class="face" style="animation:none">${cardFaceSvg(p.card!, c.el as Element, lang === 'ko' ? c.ko : c.en, 150)}</div>
+      <p class="read"><b>${T(c.kw)}</b></p>
+      <p class="read">${T(c.fate)}</p>
+      <h2 style="margin-top:16px">${L('이 카드가 정한 나의 일주', 'Your day pillar, set by this card')}</h2>
+      ${pillarsHtml(p)}
+      <h2 style="margin-top:12px">${L(`나는 ${p.dayGan}(${HANGUL[p.dayGan!]}) — ${EL[p.self].ko}의 사람`, `Day master ${p.dayGan} — ${EL[p.self].en}`)}</h2>
+      <p class="read">${T((sajuText.days as Record<string, { ko: string; en: string }>)[p.dayGan!])}</p>
+      <div class="note">${L('생년월일 대신 이 일주로 매일의 사주 운세를 봐요.', 'Your daily Saju fortune is read from this day pillar instead of a birth date.')}</div>`;
+  }
   app.innerHTML = `
-    <h1>${L('펫이 태어났어요!', 'Your pet hatched!')}</h1>
-    <div class="stage"><div class="glow" style="background:${elColor(p.self)}"></div><div class="pet hatch">${petSvg(p.self, 190)}</div></div>
+    <div class="topbar"><button class="link" id="back">← ${L('펫에게', 'Back')}</button><span></span></div>
+    <div class="stage"><div class="glow" style="background:${elColor(p.self)}"></div><div class="pet hatch">${petSvg(p.self, 170)}</div></div>
     <div class="petname"><b>${T(pet)}</b> · ${T(pet.trait)}</div>
-    <div class="paper">
-      ${p.source === 'saju'
-        ? `<h2>${L('나의 사주', 'My four pillars')}</h2>${pillarsHtml(p)}
-           <div class="note">${L(`나를 나타내는 글자(일간)는 <b>${p.dayGan}(${HANGUL[p.dayGan!]})</b>, ${EL[p.self].ko}의 기운이에요.`, `Your self character is <b>${p.dayGan}</b>, the ${EL[p.self].en} element.`)}</div>`
-        : `<h2>${L('나의 운명 카드', 'My fate card')}</h2><div class="note">${L(`<b>${tarot.cards[p.card!].ko}</b> — ${EL[p.self].ko}의 기운`, `<b>${tarot.cards[p.card!].en}</b> — ${EL[p.self].en} energy`)}</div>`}
-      <h2 style="margin-top:14px">${L('다섯 기운', 'Five elements')}</h2>${barsHtml(p)}
-      <div class="note" style="margin-top:24px">${L(`가장 부족한 기운은 <b>${EL[lucky].ko}</b>. 이 기운이 들어오는 날이 행운의 날이에요.`, `Your missing piece is <b>${EL[lucky].en}</b>. Days carrying it are your lucky days.`)}</div>
-    </div>
-    <button class="btn gold" id="go">${L('오늘의 운세 보기', 'See today’s fortune')}</button>`;
+    <div class="paper">${body}</div>
+    <button class="btn gold" id="go">${L('오늘의 운세 보기', 'See today’s fortune')}</button>
+    ${disclaimer()}`;
   sfx.finale();
   $('go').onclick = home;
+  $('back').onclick = home;
+}
+
+/** 행운의 기운: 사주는 가장 모자란 오행, 타로는 오늘 카드의 원소 */
+const luckyFor = (p: Profile, f: DailyFortune) => (p.dayGan ? luckyElement(p) : f.todayElement);
+
+/** 오늘의 운세 전문 */
+function reading() {
+  const p = save.profile!;
+  const f = fortune;
+  const lucky = luckyFor(p, f);
+  const LUCK = (sajuText.luck as Record<Element, { dir: { ko: string; en: string }; time: { ko: string; en: string }; item: { ko: string; en: string } }>)[lucky];
+  const sec = (icon: string, title: string, text: string) => `<div class="sec"><b>${icon} ${title}</b><p>${esc(text)}</p></div>`;
+  let head: string, total: string, parts: string;
+  if (false) {
+    const c = tarot.cards[f.todayCard!];
+    const fate = tarot.cards[p.card!];
+    head = `<div class="face${f.reversed ? ' rev' : ''}">${cardFaceSvg(f.todayCard!, c.el as Element, lang === 'ko' ? c.ko : c.en, 170)}</div>
+      <h2 style="text-align:center;margin:4px 0">${lang === 'ko' ? c.ko : c.en} · ${f.reversed ? L('역방향', 'Reversed') : L('정방향', 'Upright')}</h2>
+      <div class="note" style="text-align:center">${T(c.kw)}</div>`;
+    // 역방향은 주의점을 먼저 말하고, 카드 본래의 기운은 '약하게 흐른다'고 이어 붙인다
+    total = f.reversed ? `${T(c.rev)} ${L('그래도 이 카드 본래의 기운은 약하게나마 흐르고 있어요 —', 'Still, the card’s original energy flows faintly —')} ${T(c.up.general)}` : T(c.up.general);
+    parts = sec('💗', L('애정', 'Love'), T(c.up.love)) + sec('💰', L('금전', 'Money'), T(c.up.money)) + sec('💼', L('일·공부', 'Work'), T(c.up.work)) + sec('🌙', L('오늘의 조언', 'Advice'), T(c.up.advice))
+      + sec('🔮', L('나의 운명 카드와', 'With your fate card'), L(`운명 카드 「${fate.ko}」(${EL[p.self].ko})에게 오늘 카드 「${c.ko}」(${EL[f.todayElement].ko})는 「${T(CAT[f.category].title)}」의 기운이에요.`, `For your fate card ${fate.en} (${EL[p.self].en}), today's ${c.en} (${EL[f.todayElement].en}) brings “${T(CAT[f.category].title)}”.`));
+  } else {
+    const g = GODS[f.god];
+    head = `<div class="godhead"><span class="gz">${f.todayGanZhi}</span><div><b>${L(`오늘은 ${godName(f.god)}의 날`, `A ${GODS[f.god].name.en} day`)}</b><br><small>${T(g.meaning)}</small></div></div>`;
+    total = T(g.summary[f.seed % g.summary.length]);
+    const br = f.branch ? T((sajuText.branch as Record<string, { ko: string; en: string }>)[f.branch]) : '';
+    parts = (br ? sec(f.branch === 'clash' ? '⚡' : '🤝', f.branch === 'clash' ? L('충(沖)', 'Clash') : L('합(合)', 'Harmony'), br) : '')
+      + sec('💗', L('애정', 'Love'), T(g.love)) + sec('💰', L('금전', 'Money'), T(g.money)) + sec('💼', L('일·공부', 'Work'), T(g.work)) + sec('🍀', L('건강', 'Health'), T(g.health)) + sec('🌙', L('오늘의 조언', 'Advice'), T(g.advice));
+  }
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet reading';
+  sheet.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><span class="stars" style="color:var(--gold);font-size:20px">${'★'.repeat(f.score)}${'☆'.repeat(5 - f.score)}</span><button class="link" id="rd-close" style="color:#8a7a62">${L('닫기', 'Close')}</button></div>
+    ${head}
+    ${sec('✨', L('총운', 'Overall'), total)}
+    ${parts}
+    <div class="lucky lucky3">
+      <div><span class="swatch" style="background:${EL[lucky].color.hex}"></span>${L('색', 'Color')}<br><b>${T(EL[lucky].color)}</b></div>
+      <div>${L('숫자', 'Numbers')}<br><b>${EL[lucky].numbers.join(' · ')}</b></div>
+      <div>${L('방향', 'Direction')}<br><b>${T(LUCK.dir)}</b></div>
+      <div>${L('시간', 'Time')}<br><b>${T(LUCK.time)}</b></div>
+      <div>${L('물건', 'Item')}<br><b>${T(LUCK.item)}</b></div>
+    </div>`;
+  document.body.appendChild(sheet);
+  sheet.querySelector('#rd-close')!.addEventListener('click', () => sheet.remove());
 }
 
 // ── 화면: 홈(오늘의 운세와 펫)
@@ -216,8 +294,13 @@ function checkIn() {
 }
 
 function fortuneLine(f: DailyFortune) {
-  const lines = CAT[f.category].lines;
-  return T(lines[f.seed % lines.length]);
+  const p = save.profile!;
+  if (!p.dayGan) {
+    const c = tarot.cards[f.todayCard!];
+    return f.reversed ? T(c.rev) : T(c.up.general).split(/(?<=[.!?。])\s/)[0];
+  }
+  const g = GODS[f.god];
+  return T(g.summary[f.seed % g.summary.length]).split(/(?<=[.!?。])\s/)[0];
 }
 
 function home() {
@@ -225,7 +308,7 @@ function home() {
   fortune = dailyFortune(p, new Date(), TAROT_EL);
   const first = checkIn();
   const pet = EL[p.self].pet;
-  const lucky = luckyElement(p);
+  const lucky = luckyFor(p, fortune);
   const stage = stageOf(save.kiTotal);
   const st = decor.stages[stage];
   const nextSt = decor.stages[stage + 1];
@@ -234,12 +317,13 @@ function home() {
   const SLOTS: [number, number, boolean][] = [[9, 100, false], [25, 116, false], [8, 6, true], [23, -2, true], [37, -10, true], [63, -10, true], [77, -2, true], [92, 6, true], [75, 116, false], [91, 100, false]];
   const d = new Date();
   const dateText = lang === 'ko' ? `${d.getMonth() + 1}월 ${d.getDate()}일` : d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
-  const todayText = p.source === 'saju'
+  const todayText = p.dayGan
     ? `${fortune.todayGanZhi}(${HANGUL[fortune.todayGanZhi![0]]}${HANGUL[fortune.todayGanZhi![1]]})${L('일', ' day')}`
-    : `${L('오늘의 카드', 'Card')}: ${lang === 'ko' ? tarot.cards[fortune.todayCard!].ko : tarot.cards[fortune.todayCard!].en}`;
-  const tag = p.source === 'saju'
-    ? L(`오늘은 ${fortune.shiShen!.ko}의 날`, `${fortune.shiShen!.en} day`)
-    : L(`${EL[fortune.todayElement].ko}의 기운이 오는 날`, `${EL[fortune.todayElement].en} day`);
+    : L('오늘의 타로', 'Daily tarot');
+  const tag = p.dayGan
+    ? L(`오늘은 ${godName(fortune.god)}의 날`, `${GODS[fortune.god].name.en} day`)
+    : `${lang === 'ko' ? tarot.cards[fortune.todayCard!].ko : tarot.cards[fortune.todayCard!].en} · ${fortune.reversed ? L('역방향', 'Reversed') : L('정방향', 'Upright')}`;
+  const hidden = false; // 결정 029: 매일 따로 뒤집는 타로 운세는 없앰(모두 사주 운세)
   app.innerHTML = `
     <div class="topbar"><span>${dateText} · ${todayText}</span><span><button class="link" id="mine">${L('내 운명', 'My fate')}</button><button class="link" id="lang">${lang === 'ko' ? 'EN' : '한'}</button></span></div>
     <div class="stage" id="stage"><div class="glow" style="background:${elColor(p.self)}"></div>
@@ -252,15 +336,17 @@ function home() {
       <div class="pet" id="pet">${petSvg(p.self, Math.round(170 * st.scale))}</div>
       <div class="say">${T(CAT[fortune.category].pet)}</div></div>
     <div class="petname"><b>${T(pet)}</b> · ${T(st)}${nextSt ? `<div class="grow"><b style="width:${growPct}%"></b></div><small>${L(`다음 단계 ${T(nextSt)}까지 기운 ${nextSt.need - save.kiTotal}`, `${nextSt.need - save.kiTotal} energy to ${T(nextSt)}`)}</small>` : ''}</div>
-    <div class="paper today">
-      <div class="head"><h2 style="margin:0">${T(CAT[fortune.category].title)}</h2><span class="stars">${'★'.repeat(fortune.score)}${'☆'.repeat(5 - fortune.score)}</span></div>
-      <div class="cat">${tag}</div>
+    ${hidden
+      ? `<div class="paper today flipbox"><div class="mini">${cardBackSvg(70)}</div><div><h2 style="margin:0 0 4px">${L('오늘의 카드가 기다려요', 'Today’s card awaits')}</h2>
+          <div class="note">${L('마음을 가다듬고 카드를 뒤집어 보세요.', 'Take a breath and turn the card.')}</div>
+          <button class="btn gold" id="flip" style="margin:10px 0 0;padding:12px">${L('카드 뒤집기', 'Turn the card')}</button></div></div>`
+      : `<div class="paper today" id="today">
+      ${!p.dayGan ? `<div class="mini${fortune.reversed ? ' rev' : ''}" style="float:right;margin-left:10px">${cardFaceSvg(fortune.todayCard!, fortune.todayElement, '', 56)}</div>` : ''}
+      <div class="head"><h2 style="margin:0">${T(CAT[fortune.category].title)}</h2></div>
+      <div class="cat">${tag} · <span class="stars" style="font-size:14px">${'★'.repeat(fortune.score)}${'☆'.repeat(5 - fortune.score)}</span></div>
       <div class="line">${esc(fortuneLine(fortune))}</div>
-      <div class="lucky">
-        <div><span class="swatch" style="background:${EL[lucky].color.hex}"></span>${L('행운의 색', 'Lucky color')}<br><b>${T(EL[lucky].color)}</b></div>
-        <div>${L('행운의 숫자', 'Lucky numbers')}<br><b>${EL[lucky].numbers.join(' · ')}</b></div>
-      </div>
-    </div>
+      <button class="btn" id="more" style="margin:4px 0 0;padding:11px;background:#efe5cf;box-shadow:none;clear:both">${L('오늘의 운세 자세히 보기 ›', 'Read today’s full fortune ›')}</button>
+    </div>`}
     <div class="stats"><span>🪙 <b>${save.coins}</b></span><span>🔥 <b>${save.streak}</b>${L('일 연속', '-day streak')}</span><span>📅 <b>${save.checkins}</b>${L('일', save.checkins === 1 ? ' day' : ' days')}</span></div>
     <div class="ki">${ELEMENTS.map((e) => `<span><i style="background:${elColor(e)};color:${elColor(e)}"></i>${save.ki[e]}</span>`).join('')}</div>
     <button class="btn gold" id="play" ${playsLeft() ? '' : 'disabled'}>${L('오늘의 기운 모으기', 'Gather today’s energy')}<span class="badge">${playsLeft()}/${PLAYS_PER_DAY}</span>
@@ -273,6 +359,16 @@ function home() {
   $('play').onclick = startCatch;
   $('shop').onclick = shopSheet;
   $('pet').onclick = (e) => petTap(e as MouseEvent);
+  if (hidden)
+    $('flip').onclick = () => {
+      save.revealedDay = dayKey(new Date());
+      persist();
+      sfx.sparkle();
+      sfx.buzz(20);
+      home();
+      reading();
+    };
+  else $('more').onclick = reading;
   if (first) setTimeout(() => toast(L(`오늘 출석! 🪙 +${fortune.category === 'wealth' ? 20 : 10}`, `Checked in! 🪙 +${fortune.category === 'wealth' ? 20 : 10}`)), 400);
 }
 
@@ -281,7 +377,7 @@ async function startCatch() {
   sfx.unlockAudio();
   const p = save.profile!;
   const img = await svgImage(petSvg(p.self, 240));
-  runCatch({ lucky: luckyElement(p), category: fortune.category, pet: img, L, onEnd: (r) => catchResult(r) });
+  runCatch({ lucky: luckyFor(p, fortune), category: fortune.category, pet: img, L, onEnd: (r) => catchResult(r) });
 }
 
 function catchResult(r: CatchResult) {
@@ -373,7 +469,7 @@ function petTap(e: MouseEvent) {
 async function shareCard() {
   const p = save.profile!;
   const pet = EL[p.self].pet;
-  const lucky = luckyElement(p);
+  const lucky = luckyFor(p, fortune);
   const W = 1080, H = 1350;
   const cv = document.createElement('canvas');
   cv.width = W;

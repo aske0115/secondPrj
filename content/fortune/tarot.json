@@ -1,5 +1,5 @@
 {
-  "_note": "메이저 아르카나 22장. 원소는 골든 던 체계(불·물·흙·공기)를 오행으로 옮겼다. 공기는 바람(손괘=목)의 성장 기운이면 wood, 판단·지성이면 metal. 다섯 기운이 고르게 나오도록 수레바퀴(목성의 확장)는 wood, 은둔자(분별·지성)는 metal로 둔다.",
+  "_note": "메이저 아르카나 22장. 원소는 골든 던 체계(불·물·흙·공기)를 오행으로 옮겼다. 공기는 바람(손괘=목)의 성장 기운이면 wood, 판단·지성이면 metal. 다섯 기운이 고르게 나오도록 수레바퀴(목성의 확장)는 wood, 은둔자(분별·지성)는 metal로 둔다. fate = 운명 카드로 뽑았을 때의 성향, up = 정방향 하루 풀이(총운·애정·금전·일·조언), rev = 역방향 한마디.",
   "cards": [
     {
       "n": 0,
@@ -9,6 +9,36 @@
       "kw": {
         "ko": "새 출발, 자유",
         "en": "New beginnings, freedom"
+      },
+      "fate": {
+        "ko": "자유로운 모험가예요. 틀에 얽매이지 않고 새로운 길로 먼저 뛰어드는 용기가 있어요. 계산보다 마음이 먼저 움직이는 사람이라 주변에 신선한 바람을 불어넣어요.",
+        "en": "A free-spirited adventurer. You leap into new paths before others dare. Your heart moves before your head, bringing fresh air to those around you."
+      },
+      "up": {
+        "general": {
+          "ko": "새로운 시작의 기운이 가득한 날이에요. 익숙한 길 대신 처음 가 보는 길을 택하면 뜻밖의 즐거움을 만나요. 완벽하게 준비되지 않았어도 괜찮아요. 일단 한 걸음 내딛는 것이 오늘의 열쇠예요.",
+          "en": "A day full of fresh starts. Take an unfamiliar path and you'll find unexpected joy. You don't need to be fully prepared; the first step is today's key."
+        },
+        "love": {
+          "ko": "가벼운 마음의 만남이 설렘으로 이어져요. 계산하지 말고 솔직하게 다가가 보세요.",
+          "en": "A light-hearted meeting turns into a flutter. Be open, don't calculate."
+        },
+        "money": {
+          "ko": "즉흥적인 지출을 조심하세요. 새로운 수입 아이디어는 메모해 두면 좋아요.",
+          "en": "Watch impulse spending. Note down any new income ideas."
+        },
+        "work": {
+          "ko": "새 프로젝트나 낯선 업무에 도전하기 좋아요. 실수도 배움이 돼요.",
+          "en": "Good for a new project or unfamiliar task. Mistakes become lessons."
+        },
+        "advice": {
+          "ko": "계획표를 잠시 내려놓고 오늘 끌리는 것 하나를 해 보세요.",
+          "en": "Put the plan aside and do one thing that calls to you."
+        }
+      },
+      "rev": {
+        "ko": "준비 없이 뛰어들다 넘어지기 쉬운 날이에요. 출발 전에 한 번만 주변을 살펴보세요.",
+        "en": "You may trip by leaping without looking. Check around once before you go."
       }
     },
     {
@@ -19,6 +49,36 @@
       "kw": {
         "ko": "재능, 실행력",
         "en": "Skill, willpower"
+      },
+      "fate": {
+        "ko": "재주 많은 실행가예요. 머릿속 생각을 현실로 바꾸는 능력이 뛰어나고, 필요한 도구를 잘 찾아 써요. 말과 행동에 자신감이 있어 사람들을 움직여요.",
+        "en": "A skilled doer. You turn ideas into reality and know how to use the right tools. Your confident words and actions move people."
+      },
+      "up": {
+        "general": {
+          "ko": "가진 재능과 자원을 모두 쓸 수 있는 날이에요. 미뤄 둔 일을 시작하면 손이 척척 맞아떨어져요. 말에 힘이 실리니 부탁이나 제안을 하기에도 좋아요.",
+          "en": "You can use every talent and resource you have. Start what you've delayed and things click. Your words carry power, so make requests and proposals."
+        },
+        "love": {
+          "ko": "먼저 다가가면 좋은 반응이 와요. 재치 있는 대화가 매력이 돼요.",
+          "en": "Make the first move and get a warm response. Witty talk is your charm."
+        },
+        "money": {
+          "ko": "능력으로 버는 돈에 운이 있어요. 작은 부업 아이디어를 시험해 보세요.",
+          "en": "Luck favors money earned by skill. Test a small side idea."
+        },
+        "work": {
+          "ko": "발표·협상·기획에 강해요. 오늘 시작한 일은 잘 굴러가요.",
+          "en": "Strong in presentations, negotiation and planning. What you start today rolls well."
+        },
+        "advice": {
+          "ko": "생각만 하던 일을 오늘 직접 해 보세요. 이미 필요한 건 다 갖고 있어요.",
+          "en": "Do the thing you've only thought about. You already have what you need."
+        }
+      },
+      "rev": {
+        "ko": "말만 앞서고 실행이 따라가지 못할 수 있어요. 약속은 지킬 수 있는 만큼만 하세요.",
+        "en": "Talk may outrun action. Promise only what you can deliver."
       }
     },
     {
@@ -29,6 +89,36 @@
       "kw": {
         "ko": "직관, 비밀",
         "en": "Intuition, mystery"
+      },
+      "fate": {
+        "ko": "조용한 직관의 사람이에요. 말하지 않아도 분위기와 마음을 읽고, 겉보다 속을 보는 눈이 있어요. 혼자만의 시간에서 지혜를 길어 올려요.",
+        "en": "A person of quiet intuition. You read moods without words and see beneath the surface. You draw wisdom from time alone."
+      },
+      "up": {
+        "general": {
+          "ko": "직감이 유난히 정확한 날이에요. 서두르기보다 한 발 물러서 지켜보면 답이 저절로 보여요. 중요한 결정은 마음속 목소리에 한 번 더 귀 기울인 뒤에 하세요.",
+          "en": "Your intuition is unusually sharp today. Step back and watch, and the answer appears. Before big decisions, listen to your inner voice once more."
+        },
+        "love": {
+          "ko": "말보다 눈빛과 분위기로 통하는 날. 상대의 속마음을 짐작해 보세요.",
+          "en": "Connection happens through looks, not words. Sense what they truly feel."
+        },
+        "money": {
+          "ko": "드러나지 않은 정보가 있어요. 큰 지출이나 계약은 조금 더 알아보고.",
+          "en": "There's hidden information. Research more before big spending or contracts."
+        },
+        "work": {
+          "ko": "조용히 분석하고 준비하는 일에 강해요. 비밀 유지가 중요해요.",
+          "en": "Strong at quiet analysis and preparation. Keep confidences."
+        },
+        "advice": {
+          "ko": "오늘은 말하기보다 듣기. 느낌이 이상하면 그 느낌을 믿으세요.",
+          "en": "Listen more than you speak. If something feels off, trust it."
+        }
+      },
+      "rev": {
+        "ko": "직감을 무시하고 남의 말만 따르다 헷갈리기 쉬워요. 나의 느낌을 기록해 보세요.",
+        "en": "Ignoring your gut for others' opinions may confuse you. Write down what you feel."
       }
     },
     {
@@ -39,6 +129,36 @@
       "kw": {
         "ko": "풍요, 돌봄",
         "en": "Abundance, nurture"
+      },
+      "fate": {
+        "ko": "풍요를 만드는 사람이에요. 주변을 따뜻하게 돌보고 무엇이든 자라게 하는 손을 가졌어요. 아름다움과 편안함을 알아보는 감각이 뛰어나요.",
+        "en": "A maker of abundance. You care for those around you and have hands that make things grow. You have a fine sense for beauty and comfort."
+      },
+      "up": {
+        "general": {
+          "ko": "풍요롭고 넉넉한 기운이 흐르는 날이에요. 나와 주변을 정성껏 챙기면 그만큼 좋은 것이 돌아와요. 맛있는 음식, 예쁜 공간, 자연 속에서 마음이 채워져요.",
+          "en": "Abundance flows today. Care for yourself and others, and good things return. Good food, lovely spaces and nature will fill your heart."
+        },
+        "love": {
+          "ko": "사랑받고 사랑하는 기운이 커요. 다정한 표현이 관계를 꽃피워요.",
+          "en": "Love flows both ways. Tender words help the relationship bloom."
+        },
+        "money": {
+          "ko": "꾸준히 키워 온 것이 결실을 맺어요. 나를 위한 작은 선물도 괜찮아요.",
+          "en": "What you've nurtured bears fruit. A small treat for yourself is fine."
+        },
+        "work": {
+          "ko": "창작·디자인·돌봄 일에 좋아요. 팀 분위기를 부드럽게 만들어요.",
+          "en": "Good for creative, design and care work. You soften the team mood."
+        },
+        "advice": {
+          "ko": "오늘은 나를 아껴 주세요. 편안함이 곧 힘이에요.",
+          "en": "Pamper yourself today. Comfort is strength."
+        }
+      },
+      "rev": {
+        "ko": "남을 챙기느라 나를 소홀히 하기 쉬워요. 과식과 과소비도 조심하세요.",
+        "en": "You may neglect yourself caring for others. Watch overeating and overspending."
       }
     },
     {
@@ -49,6 +169,36 @@
       "kw": {
         "ko": "리더십, 질서",
         "en": "Leadership, order"
+      },
+      "fate": {
+        "ko": "든든한 리더예요. 질서와 원칙을 세워 사람들을 이끌고, 맡은 것은 끝까지 책임져요. 흔들리지 않는 중심이 주변에 안정감을 줘요.",
+        "en": "A steady leader. You set order and principles, guide others, and see responsibilities through. Your firm center gives people stability."
+      },
+      "up": {
+        "general": {
+          "ko": "계획과 질서가 힘을 발휘하는 날이에요. 해야 할 일을 정리하고 우선순위대로 처리하면 하루가 단단해져요. 책임지는 모습이 신뢰를 쌓아요.",
+          "en": "Plans and order pay off today. List your tasks and work by priority for a solid day. Taking responsibility builds trust."
+        },
+        "love": {
+          "ko": "믿음직한 모습이 매력이에요. 다만 통제하려 하지 말고 함께 정하세요.",
+          "en": "Your reliability attracts. Decide together rather than control."
+        },
+        "money": {
+          "ko": "규칙적인 저축과 예산이 빛나요. 계획에 없는 지출은 보류.",
+          "en": "Regular saving and budgeting shine. Hold unplanned spending."
+        },
+        "work": {
+          "ko": "리더 역할·관리·정리에 강해요. 결정을 미루지 마세요.",
+          "en": "Strong in leading, managing and organizing. Don't delay decisions."
+        },
+        "advice": {
+          "ko": "오늘의 할 일 세 가지를 정하고 꼭 끝내세요.",
+          "en": "Pick three tasks for today and finish them."
+        }
+      },
+      "rev": {
+        "ko": "고집이 세져 주변과 부딪히기 쉬워요. 규칙보다 사람을 먼저 보세요.",
+        "en": "Stubbornness may cause friction. See the people before the rules."
       }
     },
     {
@@ -59,6 +209,36 @@
       "kw": {
         "ko": "가르침, 전통",
         "en": "Guidance, tradition"
+      },
+      "fate": {
+        "ko": "배움과 전통을 잇는 사람이에요. 경험에서 얻은 지혜를 나누고, 믿을 만한 조언자 역할을 해요. 사람들을 하나로 묶는 가치관이 있어요.",
+        "en": "A keeper of learning and tradition. You share wisdom from experience and serve as a trusted advisor. Your values bring people together."
+      },
+      "up": {
+        "general": {
+          "ko": "믿을 만한 사람의 조언이나 검증된 방법이 길을 열어 주는 날이에요. 새로운 실험보다 기본에 충실할 때 좋은 결과가 나와요. 배우고 가르치는 일 모두 운이 있어요.",
+          "en": "Advice from someone trustworthy or a proven method opens the way. Sticking to basics beats experimenting today. Learning and teaching are both favored."
+        },
+        "love": {
+          "ko": "진지한 약속이나 가족에게 소개하는 일에 좋아요.",
+          "en": "Good for serious commitments or meeting the family."
+        },
+        "money": {
+          "ko": "검증된 방법이 안전해요. 유행하는 투자는 피하세요.",
+          "en": "Stick to proven methods. Avoid trendy investments."
+        },
+        "work": {
+          "ko": "멘토의 조언, 교육, 공식 절차가 도움이 돼요.",
+          "en": "Mentors, training and formal procedures help."
+        },
+        "advice": {
+          "ko": "오늘 궁금한 것을 아는 사람에게 물어보세요.",
+          "en": "Ask someone who knows about what you're curious about."
+        }
+      },
+      "rev": {
+        "ko": "남들의 기준에 맞추느라 답답할 수 있어요. 나만의 방식도 조금은 괜찮아요.",
+        "en": "Others' standards may feel stifling. A little of your own way is okay."
       }
     },
     {
@@ -69,6 +249,36 @@
       "kw": {
         "ko": "사랑, 선택",
         "en": "Love, choice"
+      },
+      "fate": {
+        "ko": "마음으로 선택하는 사람이에요. 관계를 소중히 여기고, 진심이 통하는 사람과 깊이 연결돼요. 조화와 아름다움을 사랑해요.",
+        "en": "One who chooses with the heart. You treasure relationships and connect deeply with sincere people. You love harmony and beauty."
+      },
+      "up": {
+        "general": {
+          "ko": "중요한 선택과 따뜻한 인연이 함께하는 날이에요. 마음이 끌리는 쪽이 결국 맞는 답일 가능성이 커요. 사람과의 관계에서 진심을 보여 주면 큰 응답이 돌아와요.",
+          "en": "Important choices and warm connections meet today. What your heart leans toward is likely right. Show sincerity and you'll get a big response."
+        },
+        "love": {
+          "ko": "애정운 최고! 고백이나 화해에 좋은 날이에요.",
+          "en": "Best day for love. Great for confessions or making up."
+        },
+        "money": {
+          "ko": "함께 쓰는 돈은 미리 상의하면 다툼이 없어요.",
+          "en": "Talk about shared money ahead to avoid arguments."
+        },
+        "work": {
+          "ko": "협업 파트너와 손발이 잘 맞아요. 선택의 기로에선 가치관을 기준으로.",
+          "en": "You sync well with partners. At a crossroads, choose by your values."
+        },
+        "advice": {
+          "ko": "좋아하는 사람에게 마음을 한 줄 표현해 보세요.",
+          "en": "Tell someone you care about how you feel, in one line."
+        }
+      },
+      "rev": {
+        "ko": "선택을 미루다 둘 다 놓칠 수 있어요. 마음이 정말 원하는 쪽을 고르세요.",
+        "en": "Delaying a choice may cost you both. Pick what your heart truly wants."
       }
     },
     {
@@ -79,6 +289,36 @@
       "kw": {
         "ko": "전진, 의지",
         "en": "Drive, victory"
+      },
+      "fate": {
+        "ko": "목표를 향해 달리는 사람이에요. 강한 의지로 장애물을 넘고, 한번 정한 방향은 끝까지 가요. 승부처에서 강해요.",
+        "en": "One who races toward goals. Strong will carries you over obstacles, and you hold your course. You're strong when it counts."
+      },
+      "up": {
+        "general": {
+          "ko": "의지가 강해지고 앞으로 나아가는 힘이 생기는 날이에요. 목표를 분명히 정하고 밀어붙이면 승리가 따라와요. 이동이나 여행에도 좋은 기운이 있어요.",
+          "en": "Your will strengthens and you gain forward momentum. Set a clear goal and push, and victory follows. Travel and movement are favored too."
+        },
+        "love": {
+          "ko": "적극적으로 다가가면 관계가 한 걸음 진전돼요.",
+          "en": "Take the lead and the relationship moves forward."
+        },
+        "money": {
+          "ko": "목표를 정한 저축이 잘 돼요. 이동 관련 지출은 넉넉히.",
+          "en": "Goal-based saving works well. Budget extra for travel."
+        },
+        "work": {
+          "ko": "경쟁·마감·목표 달성에 강해요. 오늘 끝장을 보세요.",
+          "en": "Strong in competition, deadlines and goals. Finish it today."
+        },
+        "advice": {
+          "ko": "오늘의 목표 하나를 정하고 멈추지 마세요.",
+          "en": "Pick one goal for today and don't stop."
+        }
+      },
+      "rev": {
+        "ko": "의욕만 앞서 방향을 잃기 쉬워요. 출발 전에 지도를 다시 보세요.",
+        "en": "Zeal may outrun direction. Check the map before you go."
       }
     },
     {
@@ -89,6 +329,36 @@
       "kw": {
         "ko": "용기, 인내",
         "en": "Courage, patience"
+      },
+      "fate": {
+        "ko": "부드러운 힘을 가진 사람이에요. 거칠게 밀어붙이기보다 따뜻한 인내로 어려움을 다스려요. 겉은 온화해도 속은 누구보다 단단해요.",
+        "en": "One with gentle strength. You tame difficulties with warm patience rather than force. Mild outside, solid within."
+      },
+      "up": {
+        "general": {
+          "ko": "부드러움이 강함을 이기는 날이에요. 화를 내기보다 차분하게 대하면 어려운 사람도 마음을 열어요. 꾸준한 인내가 결국 원하는 것을 가져다줘요.",
+          "en": "Gentleness beats force today. Stay calm instead of angry and even difficult people open up. Patience brings you what you want."
+        },
+        "love": {
+          "ko": "따뜻한 배려가 관계를 단단하게 해요. 서운한 일도 너그럽게.",
+          "en": "Warm care strengthens the bond. Be generous about small hurts."
+        },
+        "money": {
+          "ko": "조급하지 않으면 손해 보지 않아요. 꾸준한 저축이 힘이에요.",
+          "en": "No rush, no loss. Steady saving is power."
+        },
+        "work": {
+          "ko": "어려운 상황을 침착하게 다루는 능력이 빛나요.",
+          "en": "Your calm handling of tough situations shines."
+        },
+        "advice": {
+          "ko": "오늘 화가 나면 숨을 세 번 쉬고 말하세요.",
+          "en": "If angry today, take three breaths before speaking."
+        }
+      },
+      "rev": {
+        "ko": "자신감이 떨어지기 쉬운 날이에요. 이미 해낸 일들을 떠올려 보세요.",
+        "en": "Confidence may dip. Remember what you've already achieved."
       }
     },
     {
@@ -99,6 +369,36 @@
       "kw": {
         "ko": "성찰, 지혜",
         "en": "Reflection, wisdom"
+      },
+      "fate": {
+        "ko": "깊이 생각하는 탐구자예요. 혼자만의 시간에서 답을 찾고, 본질을 꿰뚫는 지혜가 있어요. 조용하지만 사람들이 길을 물으러 찾아와요.",
+        "en": "A deep-thinking seeker. You find answers in solitude and see to the heart of things. Quiet, yet people come to you for direction."
+      },
+      "up": {
+        "general": {
+          "ko": "내면을 돌아보고 생각을 정리하기 좋은 날이에요. 바쁘게 움직이기보다 조용히 혼자만의 시간을 가지면 중요한 깨달음이 찾아와요. 책이나 산책이 좋은 동반자예요.",
+          "en": "A good day to reflect and sort your thoughts. Quiet time alone brings key insights. Books and walks are good companions."
+        },
+        "love": {
+          "ko": "혼자만의 시간도 관계에 필요해요. 깊은 대화 한 번이 큰 의미가 있어요.",
+          "en": "Space is healthy in love. One deep talk means a lot."
+        },
+        "money": {
+          "ko": "불필요한 지출을 정리하기 좋은 날. 구독 서비스를 점검해 보세요.",
+          "en": "Good day to trim waste. Review your subscriptions."
+        },
+        "work": {
+          "ko": "연구·분석·혼자 하는 작업에 집중이 잘 돼요.",
+          "en": "Research, analysis and solo work go deep."
+        },
+        "advice": {
+          "ko": "휴대폰을 잠시 내려놓고 10분만 생각에 잠겨 보세요.",
+          "en": "Put your phone down and think quietly for ten minutes."
+        }
+      },
+      "rev": {
+        "ko": "혼자 있으려다 외로워질 수 있어요. 믿는 사람에게 안부를 전해 보세요.",
+        "en": "Solitude may turn lonely. Check in with someone you trust."
       }
     },
     {
@@ -109,6 +409,36 @@
       "kw": {
         "ko": "전환, 행운",
         "en": "Change, luck"
+      },
+      "fate": {
+        "ko": "흐름을 타는 사람이에요. 변화를 두려워하지 않고 기회가 오면 놓치지 않아요. 운이 좋다는 말을 자주 듣는 편이에요.",
+        "en": "One who rides the current. You don't fear change and catch chances when they come. People often call you lucky."
+      },
+      "up": {
+        "general": {
+          "ko": "운의 바퀴가 좋은 쪽으로 돌아가는 날이에요. 예상 못 한 기회나 반가운 소식이 찾아올 수 있어요. 흐름이 왔을 때 망설이지 말고 올라타세요.",
+          "en": "The wheel turns your way today. An unexpected chance or good news may arrive. When the tide comes, ride it."
+        },
+        "love": {
+          "ko": "우연한 만남이 인연이 될 수 있어요.",
+          "en": "A chance meeting may become something more."
+        },
+        "money": {
+          "ko": "뜻밖의 수입·당첨·할인 운이 있어요. 단, 욕심은 적당히.",
+          "en": "Luck with windfalls and deals. Just don't get greedy."
+        },
+        "work": {
+          "ko": "상황이 빠르게 바뀌어요. 유연하게 대응하면 기회가 돼요.",
+          "en": "Things change fast. Adapt and it becomes opportunity."
+        },
+        "advice": {
+          "ko": "오늘 들어온 제안에 '예'라고 한 번 말해 보세요.",
+          "en": "Say 'yes' to one offer today."
+        }
+      },
+      "rev": {
+        "ko": "일이 꼬이는 듯해도 잠깐의 흐름이에요. 버티면 다시 좋아져요.",
+        "en": "If things tangle, it's temporary. Hold on and they'll turn."
       }
     },
     {
@@ -119,6 +449,36 @@
       "kw": {
         "ko": "균형, 공정",
         "en": "Balance, fairness"
+      },
+      "fate": {
+        "ko": "공정한 판단가예요. 옳고 그름을 분명히 가리고, 누구에게나 균형 잡힌 시선을 가져요. 약속과 원칙을 소중히 지켜요.",
+        "en": "A fair judge. You see right and wrong clearly and keep a balanced view. You value promises and principles."
+      },
+      "up": {
+        "general": {
+          "ko": "균형과 공정함이 중요한 날이에요. 감정보다 사실을 기준으로 판단하면 좋은 결론에 도달해요. 계약, 서류, 정산처럼 정확함이 필요한 일에 운이 있어요.",
+          "en": "Balance and fairness matter today. Judge by facts, not feelings, for a good outcome. Contracts, documents and settlements are favored."
+        },
+        "love": {
+          "ko": "주고받는 균형이 중요해요. 서로 공평한지 이야기해 보세요.",
+          "en": "Give-and-take balance matters. Talk about fairness."
+        },
+        "money": {
+          "ko": "계산을 정확히 하면 손해가 없어요. 정산·환불에 좋아요.",
+          "en": "Accurate accounting avoids loss. Good for settling and refunds."
+        },
+        "work": {
+          "ko": "공정한 평가를 받는 날. 문서는 꼼꼼히 확인하세요.",
+          "en": "You'll be judged fairly. Check documents carefully."
+        },
+        "advice": {
+          "ko": "오늘의 선택에 이유를 한 줄로 적어 보세요.",
+          "en": "Write one line on why you choose what you do today."
+        }
+      },
+      "rev": {
+        "ko": "치우친 판단이나 불공평한 대우에 마음이 상할 수 있어요. 사실을 차분히 정리하세요.",
+        "en": "Unfairness may hurt. Calmly lay out the facts."
       }
     },
     {
@@ -129,6 +489,36 @@
       "kw": {
         "ko": "멈춤, 새 시각",
         "en": "Pause, new view"
+      },
+      "fate": {
+        "ko": "새로운 눈으로 보는 사람이에요. 멈춰 설 줄 알고, 남들이 보지 못한 관점을 찾아내요. 희생과 기다림의 의미를 알아요.",
+        "en": "One who sees with new eyes. You know when to pause and find views others miss. You understand the value of waiting."
+      },
+      "up": {
+        "general": {
+          "ko": "잠시 멈춰 서서 다른 각도로 바라보면 답이 보이는 날이에요. 억지로 밀어붙이면 막히니 기다림을 택하세요. 손해처럼 보이는 일이 나중에 이득이 돼요.",
+          "en": "Pause and look from another angle to find the answer. Forcing it will stall; choose to wait. What looks like a loss may become a gain."
+        },
+        "love": {
+          "ko": "상대의 입장에서 생각해 보면 오해가 풀려요.",
+          "en": "See it from their side and misunderstandings clear."
+        },
+        "money": {
+          "ko": "급하게 사고팔지 마세요. 기다리면 더 좋은 조건이 와요.",
+          "en": "Don't rush to buy or sell. Better terms come with waiting."
+        },
+        "work": {
+          "ko": "막힌 일은 잠시 두고 다른 일부터. 시각을 바꾸면 풀려요.",
+          "en": "Set the stuck task aside; a new angle will free it."
+        },
+        "advice": {
+          "ko": "오늘은 '왜 안 될까' 대신 '어떻게 보일까'를 물어보세요.",
+          "en": "Ask 'how else could this look?' instead of 'why won't it work?'"
+        }
+      },
+      "rev": {
+        "ko": "제자리걸음에 답답할 수 있어요. 쉬는 것도 나아가는 과정이에요.",
+        "en": "Standing still may frustrate you. Rest is part of moving on."
       }
     },
     {
@@ -139,6 +529,36 @@
       "kw": {
         "ko": "끝과 시작",
         "en": "Endings, renewal"
+      },
+      "fate": {
+        "ko": "변화를 받아들이는 사람이에요. 끝내야 할 것을 끝낼 줄 알고, 그 자리에서 새롭게 시작하는 힘이 있어요. 겉모습보다 본질을 봐요.",
+        "en": "One who embraces change. You know when to end things and have the strength to begin anew. You see substance over surface."
+      },
+      "up": {
+        "general": {
+          "ko": "하나의 장이 끝나고 새로운 장이 열리는 날이에요. 무서운 카드가 아니라, 낡은 것을 정리하고 새로 태어나는 의미예요. 미련을 내려놓으면 홀가분해져요.",
+          "en": "One chapter closes and another opens. Not a scary card — it means clearing the old to be reborn. Let go and you'll feel light."
+        },
+        "love": {
+          "ko": "지난 관계의 미련을 정리하면 새로운 시작이 와요.",
+          "en": "Release old attachments and a new start comes."
+        },
+        "money": {
+          "ko": "안 쓰는 물건과 구독을 정리하면 돈이 보여요.",
+          "en": "Clear unused items and subscriptions to find money."
+        },
+        "work": {
+          "ko": "끝난 프로젝트는 깔끔히 마무리하고 다음을 준비하세요.",
+          "en": "Wrap up finished projects cleanly and prepare for what's next."
+        },
+        "advice": {
+          "ko": "오늘 하나를 버리거나 끝내 보세요. 그 자리에 새것이 와요.",
+          "en": "End or throw away one thing today; something new will fill the space."
+        }
+      },
+      "rev": {
+        "ko": "변화를 거부하면 더 힘들어져요. 흘러가는 대로 두는 연습을.",
+        "en": "Resisting change makes it harder. Practice letting it flow."
       }
     },
     {
@@ -149,6 +569,36 @@
       "kw": {
         "ko": "조화, 절제",
         "en": "Harmony, moderation"
+      },
+      "fate": {
+        "ko": "조화를 만드는 사람이에요. 서로 다른 것을 섞어 균형을 찾고, 서두르지 않는 차분함이 있어요. 사람 사이의 다리 역할을 잘해요.",
+        "en": "A maker of harmony. You blend differences into balance and have unhurried calm. You're a natural bridge between people."
+      },
+      "up": {
+        "general": {
+          "ko": "균형과 절제가 행운을 부르는 날이에요. 무엇이든 적당히, 천천히 하면 모든 일이 부드럽게 섞여요. 서로 다른 의견을 중재하기에도 좋아요.",
+          "en": "Balance and moderation bring luck. Do everything in measure and things blend smoothly. Good for mediating differences."
+        },
+        "love": {
+          "ko": "서로 맞춰 가는 노력이 관계를 편안하게 해요.",
+          "en": "Meeting halfway makes love comfortable."
+        },
+        "money": {
+          "ko": "지출과 저축의 균형이 잘 맞는 날. 무리한 투자는 피하세요.",
+          "en": "Spending and saving balance well. Avoid risky investments."
+        },
+        "work": {
+          "ko": "팀을 조율하고 갈등을 푸는 데 강해요.",
+          "en": "Strong in coordinating teams and resolving conflict."
+        },
+        "advice": {
+          "ko": "오늘은 '조금만'이 정답이에요. 커피도, 걱정도.",
+          "en": "Today 'just a little' is the answer — coffee and worry included."
+        }
+      },
+      "rev": {
+        "ko": "과하거나 모자라기 쉬운 날이에요. 리듬을 되찾으면 괜찮아져요.",
+        "en": "You may swing to extremes. Regain your rhythm and you'll be fine."
       }
     },
     {
@@ -159,6 +609,36 @@
       "kw": {
         "ko": "욕망, 집착",
         "en": "Desire, attachment"
+      },
+      "fate": {
+        "ko": "강한 욕망과 매력을 가진 사람이에요. 원하는 것을 분명히 알고 끝까지 손에 넣으려는 힘이 있어요. 사람을 끌어당기는 카리스마가 있어요.",
+        "en": "One with strong desire and allure. You know what you want and have the drive to get it. Your charisma draws people in."
+      },
+      "up": {
+        "general": {
+          "ko": "욕망과 유혹이 강해지는 날이에요. 원하는 것을 향한 열정은 좋지만, 습관처럼 끌려다니는 것은 없는지 살펴보세요. 나를 묶는 것을 알아차리는 순간 자유로워져요.",
+          "en": "Desire and temptation grow strong. Passion for what you want is fine, but check what you're being dragged by out of habit. Seeing your chains sets you free."
+        },
+        "love": {
+          "ko": "강한 끌림이 있지만 집착은 조심하세요.",
+          "en": "Strong attraction, but beware of obsession."
+        },
+        "money": {
+          "ko": "충동구매·도박성 지출 주의. 장바구니는 하루 묵혀 두세요.",
+          "en": "Beware impulse and gambling-like spending. Let the cart sit a day."
+        },
+        "work": {
+          "ko": "야망이 동력이 돼요. 다만 무리한 약속은 피하세요.",
+          "en": "Ambition drives you. Avoid overpromising."
+        },
+        "advice": {
+          "ko": "오늘 하나의 나쁜 습관을 쉬어 보세요.",
+          "en": "Give one bad habit the day off."
+        }
+      },
+      "rev": {
+        "ko": "묶여 있던 것에서 벗어날 기회가 와요. 용기를 내 보세요.",
+        "en": "A chance to break free from what bound you. Be brave."
       }
     },
     {
@@ -169,6 +649,36 @@
       "kw": {
         "ko": "깨달음, 변화",
         "en": "Awakening, upheaval"
+      },
+      "fate": {
+        "ko": "깨달음으로 다시 서는 사람이에요. 낡은 틀이 무너져도 그 자리에서 더 단단하게 일어서요. 진실을 마주할 용기가 있어요.",
+        "en": "One who rises through revelation. When old structures fall, you stand stronger. You have the courage to face the truth."
+      },
+      "up": {
+        "general": {
+          "ko": "예상치 못한 일이 생길 수 있지만, 그 덕분에 진짜 중요한 것이 보이는 날이에요. 흔들리는 것은 원래 약했던 것뿐이에요. 침착하게 다시 쌓으면 더 튼튼해져요.",
+          "en": "Something unexpected may happen, but it reveals what truly matters. Only what was weak will shake. Rebuild calmly and it'll be stronger."
+        },
+        "love": {
+          "ko": "숨겨 둔 마음이 드러날 수 있어요. 솔직함이 관계를 새로 세워요.",
+          "en": "Hidden feelings may surface. Honesty rebuilds the bond."
+        },
+        "money": {
+          "ko": "갑작스러운 지출 대비를. 비상금을 확인하세요.",
+          "en": "Prepare for sudden costs. Check your emergency fund."
+        },
+        "work": {
+          "ko": "계획이 바뀔 수 있어요. 대안을 하나 준비해 두세요.",
+          "en": "Plans may change. Keep a backup ready."
+        },
+        "advice": {
+          "ko": "흔들려도 괜찮아요. 오늘 무너진 건 다시 지을 수 있어요.",
+          "en": "It's okay to shake. What falls today can be rebuilt."
+        }
+      },
+      "rev": {
+        "ko": "큰 충격은 피했어요. 다만 미뤄 둔 문제는 지금 손보는 게 좋아요.",
+        "en": "You dodged the big shock, but fix delayed problems now."
       }
     },
     {
@@ -179,6 +689,36 @@
       "kw": {
         "ko": "희망, 회복",
         "en": "Hope, healing"
+      },
+      "fate": {
+        "ko": "희망을 비추는 사람이에요. 어려운 때에도 빛을 잃지 않고, 주변에 회복과 위로를 건네요. 꿈을 꾸고 그것을 믿는 힘이 있어요.",
+        "en": "A light of hope. You don't lose your glow in hard times and bring healing and comfort to others. You dream and believe in it."
+      },
+      "up": {
+        "general": {
+          "ko": "희망과 회복의 기운이 가득한 날이에요. 지쳤던 마음이 조금씩 채워지고, 바라던 일에 다시 용기가 생겨요. 꿈을 소리 내어 말하면 이루어질 가능성이 커져요.",
+          "en": "Hope and healing fill the day. Your tired heart refills and courage returns. Say your dream out loud and it grows closer."
+        },
+        "love": {
+          "ko": "마음이 맑아지고 진심이 통해요. 설레는 연락이 올 수 있어요.",
+          "en": "Your heart clears and sincerity connects. A sweet message may arrive."
+        },
+        "money": {
+          "ko": "장기적인 목표 저축을 시작하기 좋아요.",
+          "en": "Good day to start saving for a long-term goal."
+        },
+        "work": {
+          "ko": "창의적인 아이디어가 샘솟아요. 비전을 공유하면 지지를 받아요.",
+          "en": "Creative ideas flow. Share your vision and win support."
+        },
+        "advice": {
+          "ko": "오늘 바라는 것 하나를 적어 두세요.",
+          "en": "Write down one thing you wish for today."
+        }
+      },
+      "rev": {
+        "ko": "희망이 잠시 흐려질 수 있어요. 작은 성취 하나로 다시 불을 켜세요.",
+        "en": "Hope may dim. Relight it with one small win."
       }
     },
     {
@@ -189,6 +729,36 @@
       "kw": {
         "ko": "불안, 상상",
         "en": "Dreams, uncertainty"
+      },
+      "fate": {
+        "ko": "깊은 상상력의 사람이에요. 꿈과 감정의 세계를 섬세하게 느끼고, 예술적인 감수성이 풍부해요. 보이지 않는 것을 읽어 내요.",
+        "en": "One of deep imagination. You feel the world of dreams and emotions finely and have rich artistic sensitivity. You read the unseen."
+      },
+      "up": {
+        "general": {
+          "ko": "감정과 상상력이 풍부해지는 날이에요. 다만 마음이 흔들리고 불안이 커질 수 있으니 확실하지 않은 일에 결론을 서두르지 마세요. 꿈이나 직감이 힌트를 줄 수 있어요.",
+          "en": "Emotions and imagination run rich. Feelings may waver and worries grow, so don't rush conclusions on uncertain things. Dreams or hunches may hold hints."
+        },
+        "love": {
+          "ko": "오해가 생기기 쉬워요. 짐작하지 말고 직접 물어보세요.",
+          "en": "Misunderstandings come easily. Ask instead of guessing."
+        },
+        "money": {
+          "ko": "애매한 거래나 정보는 피하세요. 확인이 먼저예요.",
+          "en": "Avoid vague deals or info. Verify first."
+        },
+        "work": {
+          "ko": "창작·예술 작업에는 영감이 넘쳐요. 숫자 업무는 두 번 확인.",
+          "en": "Inspiration for creative work. Double-check numbers."
+        },
+        "advice": {
+          "ko": "불안한 생각은 종이에 적어 밖으로 꺼내 보세요.",
+          "en": "Write anxious thoughts on paper to let them out."
+        }
+      },
+      "rev": {
+        "ko": "헷갈렸던 일이 조금씩 선명해져요. 진실이 드러나는 날이에요.",
+        "en": "What was hazy grows clear. Truth comes to light."
       }
     },
     {
@@ -199,6 +769,36 @@
       "kw": {
         "ko": "기쁨, 성공",
         "en": "Joy, success"
+      },
+      "fate": {
+        "ko": "밝게 빛나는 사람이에요. 있는 그대로의 모습으로 사람들에게 기쁨을 주고, 긍정의 에너지가 넘쳐요. 어디서든 중심에 서게 돼요.",
+        "en": "One who shines brightly. Just being yourself brings people joy, and your positivity overflows. You end up at the center wherever you go."
+      },
+      "up": {
+        "general": {
+          "ko": "기쁨과 성공의 기운이 가득한 최고의 날이에요. 하는 일마다 밝은 결과가 따르고, 주변 사람들도 덩달아 웃게 돼요. 자신감을 갖고 마음껏 빛나세요.",
+          "en": "One of the best days — joy and success abound. Bright results follow and those around you smile too. Shine with confidence."
+        },
+        "love": {
+          "ko": "사랑이 활짝 피는 날! 함께 웃는 시간을 만드세요.",
+          "en": "Love blooms! Make time to laugh together."
+        },
+        "money": {
+          "ko": "노력한 만큼 보상받아요. 기분 좋은 소비도 괜찮아요.",
+          "en": "Effort is rewarded. A happy purchase is fine."
+        },
+        "work": {
+          "ko": "성과를 인정받고 주목받아요. 발표나 공개에 최고예요.",
+          "en": "You're recognized and noticed. Great for presentations and launches."
+        },
+        "advice": {
+          "ko": "오늘은 감사한 일 세 가지를 떠올려 보세요.",
+          "en": "Think of three things you're grateful for."
+        }
+      },
+      "rev": {
+        "ko": "기쁨이 조금 늦게 와요. 그래도 분명히 와요. 웃음을 잃지 마세요.",
+        "en": "Joy comes a little late, but it comes. Keep smiling."
       }
     },
     {
@@ -209,6 +809,36 @@
       "kw": {
         "ko": "부름, 결단",
         "en": "Calling, decision"
+      },
+      "fate": {
+        "ko": "부름에 응답하는 사람이에요. 중요한 순간에 결단하고, 과거를 돌아보며 더 나은 나로 거듭나요. 스스로를 깨우는 힘이 있어요.",
+        "en": "One who answers the call. You decide at key moments and grow from looking back. You have the power to awaken yourself."
+      },
+      "up": {
+        "general": {
+          "ko": "중요한 결정을 내리기 좋은 날이에요. 지난 일을 돌아보고 배운 것을 바탕으로 새 출발을 하면 좋은 결과가 와요. 오래 기다리던 소식이 들려올 수도 있어요.",
+          "en": "A good day for big decisions. Reflect on the past and start anew with what you learned. Long-awaited news may arrive."
+        },
+        "love": {
+          "ko": "지난 인연에서 연락이 오거나 관계를 새롭게 정의할 때예요.",
+          "en": "An old connection may reach out, or it's time to redefine a bond."
+        },
+        "money": {
+          "ko": "미뤄 둔 정산·환급이 들어올 수 있어요.",
+          "en": "Delayed settlements or refunds may come in."
+        },
+        "work": {
+          "ko": "평가·면접·결과 발표에 좋은 기운이에요.",
+          "en": "Favorable for reviews, interviews and results."
+        },
+        "advice": {
+          "ko": "오늘 미뤄 둔 결정 하나를 내려 보세요.",
+          "en": "Make one decision you've been putting off."
+        }
+      },
+      "rev": {
+        "ko": "결정을 미루면 기회가 지나가요. 작게라도 선택하세요.",
+        "en": "Delay and the chance passes. Choose, even in a small way."
       }
     },
     {
@@ -219,6 +849,36 @@
       "kw": {
         "ko": "완성, 성취",
         "en": "Completion, fulfillment"
+      },
+      "fate": {
+        "ko": "완성으로 이끄는 사람이에요. 시작한 일을 끝까지 해내고, 큰 그림 속에서 모든 조각을 맞춰요. 넓은 세상과 연결되는 힘이 있어요.",
+        "en": "One who brings things to completion. You finish what you start and fit every piece into the big picture. You connect with the wider world."
+      },
+      "up": {
+        "general": {
+          "ko": "하나의 목표가 완성되고 성취감을 맛보는 날이에요. 지금까지의 노력이 결실을 맺고 다음 단계로 나아갈 준비가 돼요. 스스로를 칭찬해 주세요.",
+          "en": "A goal reaches completion and you taste achievement. Your efforts bear fruit and you're ready for the next stage. Praise yourself."
+        },
+        "love": {
+          "ko": "관계가 안정되고 한 단계 깊어져요.",
+          "en": "The relationship steadies and deepens."
+        },
+        "money": {
+          "ko": "목표했던 금액에 다가가요. 성취를 축하하는 작은 보상도 좋아요.",
+          "en": "You near your money goal. A small reward is deserved."
+        },
+        "work": {
+          "ko": "프로젝트 마무리와 성과 정리에 최고예요.",
+          "en": "Best for wrapping up projects and reviewing results."
+        },
+        "advice": {
+          "ko": "오늘 끝낸 일을 하나 적고 스스로 칭찬하세요.",
+          "en": "Write down one thing you finished and praise yourself."
+        }
+      },
+      "rev": {
+        "ko": "마지막 조각이 아직 남았어요. 조금만 더 하면 완성이에요.",
+        "en": "One last piece remains. A little more and it's done."
       }
     }
   ]

@@ -137,7 +137,7 @@ function glyph(n: number, c: string) {
   const G: Record<number, string> = {
     0: `<circle cx="180" cy="250" r="40" fill="none" stroke="${c}" stroke-width="6"/><path d="M150 330 q30 -30 60 0" fill="none" stroke="${c}" stroke-width="6"/><path d="${star(180, 250, 16, 4)}" fill="${c}"/>`,
     1: `<path d="M120 270 q30 -50 60 0 q30 50 60 0 q-30 -50 -60 0 q-30 50 -60 0z" fill="none" stroke="${c}" stroke-width="7"/>`,
-    2: `<path d="M196 200 a56 56 0 1 0 0 112 a44 44 0 1 1 0 -112z" fill="${c}"/>`,
+    2: `<circle cx="180" cy="256" r="56" fill="${c}"/><circle cx="204" cy="244" r="48" fill="#f5ecd6"/>`,
     3: `<path d="M130 290 l20 -60 l30 34 l30 -34 l20 60z" fill="${c}"/><circle cx="150" cy="226" r="7" fill="${c}"/><circle cx="210" cy="226" r="7" fill="${c}"/><circle cx="180" cy="256" r="7" fill="#fff"/>`,
     4: `<rect x="138" y="230" width="84" height="70" rx="6" fill="${c}"/><path d="M138 230 l14 -28 l14 28 l14 -28 l14 28 l14 -28 l14 28" fill="${c}"/>`,
     6: `<path d="M180 320 C110 270 130 210 180 240 C230 210 250 270 180 320z" fill="${c}"/>`,
@@ -150,7 +150,7 @@ function glyph(n: number, c: string) {
     14: `<path d="M130 220 h40 l-6 50 h-28z M190 260 h40 l-6 50 h-28z" fill="${c}"/><path d="M164 250 q20 -10 30 20" fill="none" stroke="${c}" stroke-width="5"/>`,
     16: `<rect x="150" y="214" width="60" height="110" fill="${c}"/><path d="M196 190 l-22 44 h20 l-18 40" fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>`,
     17: `<path d="${star(180, 260, 58, 8, 0.38)}" fill="${c}"/><path d="${star(130, 214, 12, 4)}" fill="${c}"/><path d="${star(232, 312, 10, 4)}" fill="${c}"/>`,
-    18: `<path d="M206 200 a62 62 0 1 0 0 124 a50 50 0 1 1 0 -124z" fill="${c}"/><path d="${star(140, 222, 10, 4)}" fill="${c}"/>`,
+    18: `<circle cx="180" cy="262" r="62" fill="${c}"/><circle cx="210" cy="246" r="54" fill="#f3e8cf"/><path d="${star(232, 312, 10, 4)}" fill="${c}"/>`,
     19: `<circle cx="180" cy="262" r="38" fill="${c}"/>${Array.from({ length: 12 }, (_, i) => `<line x1="180" y1="206" x2="180" y2="188" stroke="${c}" stroke-width="6" stroke-linecap="round" transform="rotate(${i * 30} 180 262)"/>`).join('')}`,
     20: `<path d="M140 300 l80 -60 M212 232 l18 -6 l-6 18z" stroke="${c}" stroke-width="8" fill="${c}"/><path d="M130 300 q50 30 100 0" fill="none" stroke="${c}" stroke-width="6"/>`,
     21: `<ellipse cx="180" cy="262" rx="52" ry="66" fill="none" stroke="${c}" stroke-width="7"/><path d="${star(180, 262, 22, 4)}" fill="${c}"/>`,

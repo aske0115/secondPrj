@@ -107,3 +107,21 @@ p.sub { text-align: center; color: var(--muted); margin: 0 0 22px; font-size: 14
 .result .big { font-size: 46px; font-weight: 800; color: var(--gold); margin: 4px 0; }
 .grow { height: 8px; background: rgba(255,255,255,.12); border-radius: 999px; overflow: hidden; margin: 6px 0 2px; }
 .grow b { display: block; height: 100%; background: linear-gradient(90deg, #f0c873, #e3b45a); }
+/* 사주 풀이·오늘의 운세 전문 */
+.pillar .ch.me { box-shadow: 0 0 0 3px var(--gold), 0 0 10px var(--gold); }
+.pillar .god { font-size: 11px; color: #8a6a3a; margin: 1px 0 5px; min-height: 14px; }
+.read { font-size: 14.5px; line-height: 1.7; margin: 8px 0; }
+.sheet.reading { max-height: 88vh; }
+.sheet.reading .face { margin: 6px auto 8px; }
+.face.rev svg, .mini.rev svg { transform: rotate(180deg); }
+.sec { border-top: 1px dashed #d8ccb4; padding: 10px 0 2px; }
+.sec b { font-size: 14px; }
+.sec p { margin: 4px 0 6px; font-size: 14.5px; line-height: 1.65; }
+.lucky3 { flex-wrap: wrap; margin-top: 8px; }
+.lucky3 div { flex: 1 1 28%; }
+.flipbox { display: flex; gap: 14px; align-items: center; }
+.flipbox .mini { animation: wobble 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
+.mini svg { display: block; filter: drop-shadow(0 4px 8px rgba(0,0,0,.3)); }
+.godhead { display: flex; gap: 12px; align-items: center; margin: 6px 0 4px; }
+.godhead .gz { font-size: 30px; font-weight: 800; background: #3a2d22; color: #f7f0e1; border-radius: 12px; padding: 6px 10px; letter-spacing: 2px; }
+.pillars.one { grid-template-columns: 110px; justify-content: center; }

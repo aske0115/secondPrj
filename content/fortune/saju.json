@@ -1,0 +1,165 @@
+{
+  "_note": "사주 풀이 문구(결정 028). gods = 오늘 일진의 십신별 하루 운세, days = 일간(나를 나타내는 글자) 성격, elements = 오행이 많을 때·없을 때, branch = 오늘 지지와 내 일지의 충·합. 모든 문구는 ko·en 두 벌. AI로 늘릴 때는 같은 구조로 summary를 늘린다(content:check가 한영·개수를 검사).",
+  "gods": {
+    "bigyeon": {
+      "name": { "ko": "비견", "en": "Companion", "hanja": "比肩" },
+      "meaning": { "ko": "나와 같은 기운이 어깨를 나란히 하는 날", "en": "A day when your own kind stands beside you" },
+      "summary": [
+        { "ko": "주관이 뚜렷해지고 스스로 밀고 나갈 힘이 생기는 날이에요. 남에게 기대기보다 내 방식대로 할 때 일이 잘 풀려요. 다만 비슷한 사람과 의견이 부딪히기 쉬우니, 이길 필요가 없는 말싸움은 피하세요.", "en": "Your convictions sharpen and you have the drive to push forward alone. Things go best when you do them your way. People like you may clash with you, so skip arguments you don't need to win." },
+        { "ko": "동료·친구와 함께하는 일에 힘이 실려요. 혼자 다 하려 하기보다 역할을 나누면 속도가 붙어요. 자존심 때문에 도움을 거절하지만 않으면 좋은 하루예요.", "en": "Teamwork carries weight today. Split the load instead of carrying it all. As long as pride doesn't make you refuse help, it's a good day." }
+      ],
+      "love": { "ko": "친구 같은 편안함이 커져요. 솔직한 대화가 관계를 단단하게 해요.", "en": "A friend-like ease grows. Honest talk strengthens the bond." },
+      "money": { "ko": "들어오는 만큼 나가기 쉬워요. 함께 쓰는 돈은 미리 나눠 정하세요.", "en": "Money flows out as fast as it comes. Agree on shared costs up front." },
+      "work": { "ko": "내 의견을 분명히 말할 때예요. 경쟁자가 오히려 자극이 돼요.", "en": "Speak your mind clearly. A rival may spur you on." },
+      "health": { "ko": "에너지는 넉넉해요. 운동으로 힘을 풀어 주면 좋아요.", "en": "Energy is plentiful. Burn it off with exercise." },
+      "advice": { "ko": "고집과 소신은 한 끗 차이. 한 번은 들어 주세요.", "en": "Conviction and stubbornness are close cousins. Listen once." }
+    },
+    "geopjae": {
+      "name": { "ko": "겁재", "en": "Rival", "hanja": "劫財" },
+      "meaning": { "ko": "경쟁과 승부욕이 일어나는 날", "en": "A day that stirs competition" },
+      "summary": [
+        { "ko": "승부욕이 올라오고 과감해지는 날이에요. 도전에는 좋지만 충동적인 결정이나 큰 지출은 한 번 더 생각하세요. 주변 사람과 내 것을 두고 다투기 쉬우니 양보가 곧 이득이에요.", "en": "Your competitive streak rises and you feel bold. Good for challenges, but think twice before impulse decisions or big spending. Disputes over 'mine' are likely; giving way pays off." },
+        { "ko": "에너지가 크게 출렁이는 하루예요. 목표를 정해 한곳에 쏟으면 성과가 나고, 흩어지면 지치기만 해요. 돈을 빌리거나 빌려주는 일은 오늘은 미뤄 두세요.", "en": "Your energy swings wide today. Pour it into one goal and you'll see results; scatter it and you'll only tire. Hold off on lending or borrowing money." }
+      ],
+      "love": { "ko": "질투나 비교가 생기기 쉬워요. 상대를 믿는 표현을 먼저 해 주세요.", "en": "Jealousy and comparison creep in. Show trust first." },
+      "money": { "ko": "지출 주의! 충동구매와 보증은 피하세요.", "en": "Watch your spending. Avoid impulse buys and co-signing." },
+      "work": { "ko": "경쟁에서 이길 힘은 있어요. 다만 팀의 신뢰를 잃지 않게.", "en": "You can win the contest, just don't lose the team's trust." },
+      "health": { "ko": "무리하기 쉬운 날. 잠을 충분히 챙기세요.", "en": "Easy to overdo it. Get enough sleep." },
+      "advice": { "ko": "이기는 것보다 오래 가는 것을 택하세요.", "en": "Choose what lasts over what wins." }
+    },
+    "siksin": {
+      "name": { "ko": "식신", "en": "Joy", "hanja": "食神" },
+      "meaning": { "ko": "타고난 재능과 여유가 흘러나오는 날", "en": "A day your talents and ease flow out" },
+      "summary": [
+        { "ko": "마음에 여유가 생기고 재능이 자연스럽게 드러나는 날이에요. 맛있는 음식, 취미, 만드는 일에서 작은 행복을 찾게 돼요. 서두르지 않아도 일이 순리대로 풀리니 편안하게 즐기세요.", "en": "Your mind relaxes and your talents show naturally. You'll find small joys in good food, hobbies and making things. No need to rush; things unfold on their own." },
+        { "ko": "베풀수록 돌아오는 날이에요. 아는 것을 나누거나 누군가를 챙기면 좋은 인연과 기회로 이어져요. 먹을 복이 있으니 좋은 사람과 식사 약속을 잡아 보세요.", "en": "What you give comes back today. Sharing what you know or caring for someone leads to good ties and chances. Food luck is with you, so plan a meal with someone you like." }
+      ],
+      "love": { "ko": "다정함이 잘 전해지는 날. 작은 선물이나 음식이 마음을 열어요.", "en": "Warmth comes across well. A small gift or treat opens hearts." },
+      "money": { "ko": "꾸준히 일한 만큼 들어와요. 재능으로 버는 돈에 운이 있어요.", "en": "Steady work pays off. Money from your talents is favored." },
+      "work": { "ko": "아이디어와 결과물의 질이 좋아요. 손으로 만드는 일이 특히 잘 풀려요.", "en": "Ideas and output are strong. Hands-on work goes especially well." },
+      "health": { "ko": "컨디션이 좋아요. 과식만 조심하세요.", "en": "You feel good. Just don't overeat." },
+      "advice": { "ko": "좋아하는 일을 한 가지만 해 보세요.", "en": "Do just one thing you love." }
+    },
+    "sanggwan": {
+      "name": { "ko": "상관", "en": "Flair", "hanja": "傷官" },
+      "meaning": { "ko": "표현력과 재치가 날카로워지는 날", "en": "A day your wit and expression sharpen" },
+      "summary": [
+        { "ko": "말과 표현에 힘이 실리고 재치가 빛나는 날이에요. 발표, 글쓰기, 창작에 특히 좋아요. 다만 날카로운 말이 상처가 되기 쉬우니, 윗사람이나 규칙에 맞설 때는 한 박자 쉬어 가세요.", "en": "Your words carry weight and your wit shines. Great for presenting, writing and creating. Sharp words can wound, so pause before you push back against bosses or rules." },
+        { "ko": "틀을 깨는 생각이 떠오르는 날이에요. 새로운 방식을 시도해 보면 의외의 성과가 나요. 불평은 대안과 함께 말하면 설득력이 생겨요.", "en": "Ideas that break the mold come to you. Try a new approach and you may be surprised. Pair complaints with solutions and they become persuasive." }
+      ],
+      "love": { "ko": "솔직함이 매력이지만 말투는 부드럽게. 칭찬을 먼저 하세요.", "en": "Honesty is charming, but keep the tone soft. Lead with praise." },
+      "money": { "ko": "재치로 기회를 잡아요. 계약서의 작은 글씨는 꼭 확인하세요.", "en": "Wit wins opportunities. Read the fine print." },
+      "work": { "ko": "기획·홍보·창작에 좋아요. 보고는 공손하게.", "en": "Great for planning, promotion and creative work. Report politely." },
+      "health": { "ko": "신경이 예민해지기 쉬워요. 목과 어깨를 풀어 주세요.", "en": "Nerves run high. Loosen your neck and shoulders." },
+      "advice": { "ko": "말하기 전에 세 번 생각하면 오늘은 무적이에요.", "en": "Think three times before speaking and you're unstoppable." }
+    },
+    "pyeonjae": {
+      "name": { "ko": "편재", "en": "Windfall", "hanja": "偏財" },
+      "meaning": { "ko": "뜻밖의 재물과 활동이 커지는 날", "en": "A day of unexpected gains and wider action" },
+      "summary": [
+        { "ko": "활동 반경이 넓어지고 뜻밖의 기회가 들어오는 날이에요. 사람을 만나고 움직일수록 재물운이 따라와요. 큰 손으로 쓰기 쉬우니 기분 내는 지출은 한도를 정해 두세요.", "en": "Your range widens and unexpected chances arrive. The more you meet people and move, the more luck follows. You'll be tempted to spend big, so set a limit." },
+        { "ko": "사업 감각과 순발력이 좋아지는 날이에요. 흩어진 일을 한꺼번에 처리하거나 새로운 거래를 시도하기 좋아요. 다만 운에 기대는 투자는 작게만.", "en": "Business sense and quick thinking peak today. Good for clearing many tasks at once or trying a new deal. Keep any luck-based bets small." }
+      ],
+      "love": { "ko": "만남의 기회가 늘어요. 활동적인 데이트가 잘 어울려요.", "en": "More chances to meet. An active date suits the day." },
+      "money": { "ko": "뜻밖의 수입이나 할인 운이 있어요. 큰 지출은 하루 미루기.", "en": "Unexpected income or a good deal may come. Delay big purchases a day." },
+      "work": { "ko": "영업·협상·외근에 강해요. 넓게 보고 빠르게 움직이세요.", "en": "Strong in sales, negotiation and fieldwork. See wide, move fast." },
+      "health": { "ko": "바쁘게 움직이는 만큼 물을 자주 마시세요.", "en": "You'll be on the move; drink water often." },
+      "advice": { "ko": "들어온 행운의 10%는 저축으로.", "en": "Save 10% of whatever luck brings in." }
+    },
+    "jeongjae": {
+      "name": { "ko": "정재", "en": "Earnings", "hanja": "正財" },
+      "meaning": { "ko": "성실함이 정당한 보상으로 돌아오는 날", "en": "A day diligence earns its due" },
+      "summary": [
+        { "ko": "꼼꼼함과 성실함이 빛나는 날이에요. 계획대로 차근차근 해 나가면 확실한 결과가 손에 남아요. 가계부 정리, 저축, 약속 지키기처럼 기본에 충실할수록 운이 단단해져요.", "en": "Care and diligence shine today. Follow the plan step by step and solid results stay in your hands. Budgeting, saving and keeping promises make your luck sturdier." },
+        { "ko": "안정이 가장 큰 행운인 날이에요. 새로운 모험보다 지금 가진 것을 잘 지키고 다듬는 쪽이 이득이에요. 믿을 만한 사람과의 약속이 좋은 결실을 맺어요.", "en": "Stability is your biggest luck today. Protecting and polishing what you have beats a new adventure. Promises with reliable people bear fruit." }
+      ],
+      "love": { "ko": "믿음직한 모습이 매력이에요. 약속 시간을 꼭 지키세요.", "en": "Reliability is attractive today. Be on time." },
+      "money": { "ko": "고정 수입·월급과 관련한 좋은 소식이 있어요. 아끼는 만큼 남아요.", "en": "Good news about regular income. What you save, you keep." },
+      "work": { "ko": "정리·정산·마감에 좋아요. 실수 없이 끝내는 날.", "en": "Good for organizing, settling accounts and deadlines." },
+      "health": { "ko": "규칙적인 식사가 컨디션을 지켜 줘요.", "en": "Regular meals keep you in shape." },
+      "advice": { "ko": "오늘은 큰 한 방보다 작은 확실함.", "en": "Small certainties over one big swing." }
+    },
+    "pyeongwan": {
+      "name": { "ko": "편관", "en": "Challenge", "hanja": "偏官" },
+      "meaning": { "ko": "압박이 큰 만큼 돌파력도 커지는 날", "en": "A day of pressure and breakthrough" },
+      "summary": [
+        { "ko": "부담스러운 일이나 갑작스러운 요청이 몰려오기 쉬운 날이에요. 피하기보다 정면으로 부딪히면 오히려 실력을 인정받아요. 다만 몸과 마음이 지치기 쉬우니 무리한 약속은 줄이세요.", "en": "Heavy tasks or sudden requests may pile up. Face them head-on and you'll earn respect. You'll tire easily, so cut back on extra commitments." },
+        { "ko": "긴장감이 집중력을 끌어올리는 날이에요. 위기에서 판단이 빨라지니 급한 일을 처리하기엔 좋아요. 화가 나도 바로 반응하지 말고 하룻밤 재워 두세요.", "en": "Tension sharpens your focus. You decide fast under pressure, so urgent tasks go well. If something angers you, sleep on it before reacting." }
+      ],
+      "love": { "ko": "예민해지기 쉬워요. 서운한 말은 내일 하세요.", "en": "You may be touchy. Save hurt words for tomorrow." },
+      "money": { "ko": "예상 못 한 지출이 생길 수 있어요. 비상금을 확인하세요.", "en": "Unexpected costs may appear. Check your emergency fund." },
+      "work": { "ko": "어려운 일을 맡게 되지만 해내면 크게 인정받아요.", "en": "A tough task lands on you, but finishing it earns big credit." },
+      "health": { "ko": "스트레스·두통 주의. 가벼운 산책이 약이에요.", "en": "Watch stress and headaches. A light walk helps." },
+      "advice": { "ko": "버티면 실력, 무너지면 경험. 둘 다 남아요.", "en": "Endure and it's skill; fall and it's experience. Both remain." }
+    },
+    "jeonggwan": {
+      "name": { "ko": "정관", "en": "Duty", "hanja": "正官" },
+      "meaning": { "ko": "질서와 명예, 인정이 따르는 날", "en": "A day of order, honor and recognition" },
+      "summary": [
+        { "ko": "원칙을 지키는 만큼 신뢰와 인정이 쌓이는 날이에요. 맡은 책임을 성실히 해내면 윗사람의 눈에 띄어요. 규칙과 예의를 지키는 것이 오늘의 가장 큰 무기예요.", "en": "Keeping to principles builds trust and recognition. Carry out your duties well and those above will notice. Rules and courtesy are your best tools today." },
+        { "ko": "공식적인 자리, 서류, 시험에 운이 있는 날이에요. 단정한 차림과 정확한 말이 좋은 인상을 남겨요. 다소 답답하게 느껴져도 정해진 길이 지름길이에요.", "en": "Luck favors formal settings, paperwork and exams. Neat clothes and precise words leave a good impression. The set path may feel stiff, but it's the shortcut." }
+      ],
+      "love": { "ko": "진지한 관계로 나아가기 좋아요. 예의 바른 모습이 호감을 사요.", "en": "Good for getting serious. Good manners win hearts." },
+      "money": { "ko": "정당한 대가가 들어와요. 세금·서류 정리에 좋아요.", "en": "Fair pay comes in. Good for taxes and paperwork." },
+      "work": { "ko": "승진·평가·면접에 좋은 기운이에요.", "en": "Favorable for promotions, reviews and interviews." },
+      "health": { "ko": "자세를 바르게. 허리를 펴면 기분도 펴져요.", "en": "Mind your posture; straighten up and so will your mood." },
+      "advice": { "ko": "오늘은 정석대로가 정답이에요.", "en": "Today, the textbook way is the right way." }
+    },
+    "pyeonin": {
+      "name": { "ko": "편인", "en": "Insight", "hanja": "偏印" },
+      "meaning": { "ko": "직관과 독특한 생각이 깊어지는 날", "en": "A day intuition and unusual ideas deepen" },
+      "summary": [
+        { "ko": "직관이 예리해지고 남다른 시각이 생기는 날이에요. 공부, 연구, 혼자 하는 작업에 집중이 잘 돼요. 생각이 많아져 결정을 미루기 쉬우니, 마감이 있는 일은 오전에 끝내세요.", "en": "Your intuition sharpens and you see things differently. Study, research and solo work go well. Overthinking can stall decisions, so finish deadline tasks in the morning." },
+        { "ko": "혼자만의 시간이 힘이 되는 날이에요. 잠깐 사람들과 떨어져 생각을 정리하면 막혔던 문제의 실마리가 보여요. 낯선 분야의 책이나 영상이 뜻밖의 영감을 줘요.", "en": "Time alone recharges you. Step away to sort your thoughts and a stuck problem loosens. A book or video from an unfamiliar field may inspire you." }
+      ],
+      "love": { "ko": "말없이 통하는 순간이 있어요. 혼자만의 시간도 존중해 주세요.", "en": "A wordless understanding may come. Respect each other's space." },
+      "money": { "ko": "큰 결정은 보류. 배우는 데 쓰는 돈은 남는 투자예요.", "en": "Hold big decisions. Money spent learning is well spent." },
+      "work": { "ko": "분석·기획·연구에 강해요. 단순 반복 일은 지루할 수 있어요.", "en": "Strong in analysis, planning and research. Routine may bore you." },
+      "health": { "ko": "잠이 부족하기 쉬워요. 화면을 끄고 일찍 쉬세요.", "en": "Sleep may run short. Screens off, rest early." },
+      "advice": { "ko": "떠오른 생각은 바로 메모하세요. 오늘의 보물이에요.", "en": "Jot down every idea; they're today's treasure." }
+    },
+    "jeongin": {
+      "name": { "ko": "정인", "en": "Support", "hanja": "正印" },
+      "meaning": { "ko": "도움과 배움, 따뜻한 지지가 들어오는 날", "en": "A day of help, learning and warm support" },
+      "summary": [
+        { "ko": "누군가의 도움과 응원이 들어오는 든든한 날이에요. 어른이나 선배의 조언이 길을 밝혀 주고, 배우는 일이 머리에 잘 들어와요. 받기만 하지 말고 고맙다는 말을 꼭 전하세요.", "en": "Help and encouragement come your way. Advice from elders lights the path and learning sinks in easily. Don't just receive; say thank you." },
+        { "ko": "마음이 안정되고 회복되는 날이에요. 서두르지 말고 충분히 쉬어 가며 준비하면 다음 기회를 잘 잡을 수 있어요. 자격증, 문서, 계약처럼 이름이 남는 일에 운이 있어요.", "en": "Your mind settles and recovers. Rest and prepare without hurry, and you'll catch the next chance. Luck favors certificates, documents and contracts." }
+      ],
+      "love": { "ko": "따뜻한 보살핌을 받는 날. 감사 표현이 관계를 깊게 해요.", "en": "You're cared for today. Gratitude deepens the bond." },
+      "money": { "ko": "부모님·윗사람의 도움이나 좋은 정보가 들어와요.", "en": "Help or good tips may come from family or elders." },
+      "work": { "ko": "공부·시험·자격 준비에 최고예요.", "en": "Best for study, exams and certifications." },
+      "health": { "ko": "회복력이 좋아요. 따뜻한 차 한 잔이 보약이에요.", "en": "You recover well. A warm cup of tea is medicine." },
+      "advice": { "ko": "배운 것을 한 줄로 정리해 보세요.", "en": "Sum up what you learned in one line." }
+    }
+  },
+  "branch": {
+    "clash": { "ko": "오늘의 기운이 나의 일지(日支)와 부딪혀요(충). 이동·변화가 많고 계획이 틀어지기 쉬우니 여유 시간을 넉넉히 두세요.", "en": "Today's energy clashes with your day branch. Expect movement and changes; leave extra time in your plans." },
+    "harmony": { "ko": "오늘의 기운이 나의 일지(日支)와 어울려요(합). 사람과의 인연, 협력, 화해에 좋은 날이에요.", "en": "Today's energy harmonizes with your day branch. Good for new ties, cooperation and making up." }
+  },
+  "days": {
+    "甲": { "ko": "큰 나무처럼 곧고 위로 자라는 사람이에요. 리더십과 개척 정신이 강하고 한번 정하면 밀고 나가요. 다만 굽히는 것을 어려워해 부러질 수 있으니 유연함을 기르면 더 크게 자라요.", "en": "Like a tall tree, you grow straight and upward. Strong in leadership and pioneering spirit, you push on once decided. Learn to bend and you'll grow even taller." },
+    "乙": { "ko": "풀과 덩굴처럼 부드럽고 끈질긴 사람이에요. 환경에 맞춰 길을 찾아내는 적응력과 친화력이 뛰어나요. 겉은 여려 보여도 속은 누구보다 강해요.", "en": "Like grass and vines, you're gentle and tenacious. You adapt and find a way in any setting, and people warm to you. Soft outside, strong within." },
+    "丙": { "ko": "한낮의 태양처럼 밝고 뜨거운 사람이에요. 열정과 표현력이 넘쳐 주변을 환하게 만들어요. 감정이 금방 드러나니 한 번 식히고 말하면 더 빛나요.", "en": "Like the midday sun, you're bright and warm. Your passion and expressiveness light up a room. Feelings show fast; cool down before speaking and you'll shine more." },
+    "丁": { "ko": "촛불과 등불처럼 따뜻하고 섬세한 사람이에요. 겉으로는 조용해도 속에는 꺼지지 않는 열정이 있어요. 사람의 마음을 잘 읽고 배려해요.", "en": "Like a candle or lantern, you're warm and subtle. Quiet outside, with a passion that never goes out. You read and care for others' hearts." },
+    "戊": { "ko": "큰 산과 들판처럼 듬직한 사람이에요. 포용력이 크고 믿음직해서 사람들이 기대고 싶어 해요. 변화에 느린 편이니 가끔은 먼저 움직여 보세요.", "en": "Like a great mountain, you're steady and dependable. Your broad embrace makes people lean on you. You change slowly; sometimes move first." },
+    "己": { "ko": "기름진 밭처럼 품고 길러 내는 사람이에요. 실속 있고 꼼꼼하며 사람을 잘 챙겨요. 남을 챙기느라 나를 놓치지 않게 조심하세요.", "en": "Like fertile soil, you nurture and grow things. Practical, careful and caring. Don't forget yourself while caring for others." },
+    "庚": { "ko": "바위와 쇠처럼 단단하고 결단력 있는 사람이에요. 의리가 강하고 옳고 그름이 분명해요. 말이 직설적이니 따뜻한 한마디를 더하면 좋아요.", "en": "Like rock and iron, you're firm and decisive. Loyal, with a clear sense of right and wrong. You're blunt; add a warm word." },
+    "辛": { "ko": "보석처럼 섬세하고 빛나는 사람이에요. 감각이 예민하고 완벽을 추구하며 자기만의 기준이 있어요. 작은 흠에 상처받기 쉬우니 스스로에게 너그러워지세요.", "en": "Like a jewel, you're refined and radiant. Sensitive, a perfectionist with your own standards. Small flaws can hurt; be gentle with yourself." },
+    "壬": { "ko": "큰 강과 바다처럼 넓고 자유로운 사람이에요. 지혜롭고 생각의 스케일이 커서 큰 그림을 잘 그려요. 한곳에 머무르기 힘들어하니 마무리를 챙기세요.", "en": "Like a river or the sea, you're vast and free. Wise and big-picture minded. You dislike standing still; make sure to finish things." },
+    "癸": { "ko": "이슬과 빗물처럼 조용히 스며드는 사람이에요. 직관과 감수성이 뛰어나고 남을 잘 이해해요. 생각이 깊어 걱정이 많아질 수 있으니 가볍게 털어 내는 연습을 해 보세요.", "en": "Like dew and rain, you seep in quietly. Intuitive and empathetic, you understand others well. Deep thoughts can turn to worry; practice letting go." }
+  },
+  "elements": {
+    "wood": { "many": { "ko": "나무 기운이 많아 성장 욕구와 추진력이 커요. 시작은 잘하니 마무리를 챙기세요.", "en": "Lots of Wood: strong drive to grow. You start well; mind the finish." }, "few": { "ko": "나무 기운이 부족해 새로운 시작이 망설여질 수 있어요. 초록 식물, 산책, 아침 시간이 도움이 돼요.", "en": "Little Wood: new starts may feel hard. Plants, walks and mornings help." } },
+    "fire": { "many": { "ko": "불 기운이 많아 열정적이고 표현이 풍부해요. 급해지지 않게 숨을 고르세요.", "en": "Lots of Fire: passionate and expressive. Breathe before you rush." }, "few": { "ko": "불 기운이 부족해 감정 표현이 서툴 수 있어요. 햇볕, 따뜻한 색, 사람들과의 웃음이 채워 줘요.", "en": "Little Fire: expressing feelings may be hard. Sunlight, warm colors and laughter help." } },
+    "earth": { "many": { "ko": "흙 기운이 많아 믿음직하고 안정적이에요. 고집이 세지지 않게 새로운 것도 받아들여 보세요.", "en": "Lots of Earth: dependable and stable. Stay open to the new." }, "few": { "ko": "흙 기운이 부족해 마음이 들뜨기 쉬워요. 규칙적인 생활과 정리 정돈이 중심을 잡아 줘요.", "en": "Little Earth: you may feel unsettled. Routine and tidying ground you." } },
+    "metal": { "many": { "ko": "쇠 기운이 많아 결단력과 원칙이 강해요. 날카로움을 부드러운 말로 감싸 보세요.", "en": "Lots of Metal: decisive and principled. Wrap your edge in soft words." }, "few": { "ko": "쇠 기운이 부족해 결정을 미루기 쉬워요. 할 일 목록과 마감을 정하면 힘이 생겨요.", "en": "Little Metal: decisions may drift. To-do lists and deadlines give you strength." } },
+    "water": { "many": { "ko": "물 기운이 많아 지혜롭고 생각이 깊어요. 걱정이 길어지면 몸을 움직여 보세요.", "en": "Lots of Water: wise and thoughtful. When worry lingers, move your body." }, "few": { "ko": "물 기운이 부족해 쉬는 법을 잊기 쉬워요. 충분한 잠과 물, 조용한 시간이 필요해요.", "en": "Little Water: you may forget to rest. Sleep, water and quiet time help." } }
+  },
+  "luck": {
+    "wood": { "dir": { "ko": "동쪽", "en": "East" }, "time": { "ko": "새벽 3시~아침 7시", "en": "3–7 AM" }, "item": { "ko": "초록 식물", "en": "A green plant" } },
+    "fire": { "dir": { "ko": "남쪽", "en": "South" }, "time": { "ko": "오전 9시~오후 1시", "en": "9 AM–1 PM" }, "item": { "ko": "향초", "en": "A scented candle" } },
+    "earth": { "dir": { "ko": "가운데(집 근처)", "en": "Center (near home)" }, "time": { "ko": "오후 1시~3시", "en": "1–3 PM" }, "item": { "ko": "도자기 컵", "en": "A ceramic mug" } },
+    "metal": { "dir": { "ko": "서쪽", "en": "West" }, "time": { "ko": "오후 3시~저녁 7시", "en": "3–7 PM" }, "item": { "ko": "은빛 액세서리", "en": "Silver jewelry" } },
+    "water": { "dir": { "ko": "북쪽", "en": "North" }, "time": { "ko": "밤 9시~새벽 1시", "en": "9 PM–1 AM" }, "item": { "ko": "물 한 병", "en": "A bottle of water" } }
+  }
+}

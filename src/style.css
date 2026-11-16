@@ -62,3 +62,14 @@ body {
 .sheet p { margin: 0 0 14px; font-size: 14px; color: #6b5a44; }
 .sheet .row { display: flex; gap: 10px; justify-content: center; }
 @keyframes rise { from { transform: translateY(30px); opacity: 0; } }
+/* 튜토리얼 */
+#coach { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+#coach.blocking { pointer-events: auto; }
+#coach .spot { position: absolute; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(30,22,14,.62); transition: all .25s ease-out; }
+#coach .spot.pulse { outline: 3px solid #fff; animation: spot 1.1s ease-in-out infinite; }
+@keyframes spot { 50% { outline-color: rgba(255,255,255,.25); } }
+#coach .bubble { position: absolute; left: 16px; right: 16px; max-width: 380px; margin: 0 auto; background: var(--paper); border-radius: 14px;
+  padding: 14px 16px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.35); text-align: center; pointer-events: auto; animation: rise .3s ease-out; }
+#coach .bubble p { margin: 0 0 10px; font-size: 15px; line-height: 1.5; }
+#coach .bubble .pill { padding: 10px 28px; }
+#coach .bubble .skip { display: block; margin-top: 8px; font-size: 12px; color: #9a8a72; text-decoration: underline; cursor: pointer; }

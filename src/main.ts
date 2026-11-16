@@ -1,6 +1,7 @@
 // 전술 퍼즐 프로토타입 화면(결정 019). 규칙은 game/rules.ts, 여기는 그리기·입력·연출만.
 import { L, T, lang, setLang } from './i18n';
 import * as sfx from './audio';
+import { Tutorial } from './ui/tutorial';
 import {
   biteTarget, endTurn, fromStage, move, push, pushTargets, reachable, sheepLeft, stars, clone,
   DX, DY, type Event, type State, type StageData, type Unit,
@@ -27,6 +28,8 @@ restartBtn.textContent = L('⟲ 처음부터', '⟲ Restart');
 endBtn.textContent = L('턴 끝내기', 'End turn');
 langBtn.textContent = lang === 'ko' ? 'English' : '한국어';
 langBtn.onclick = () => setLang(lang === 'ko' ? 'en' : 'ko');
+const helpBtn = $('help') as HTMLButtonElement;
+helpBtn.textContent = L('규칙 보기', 'How to play');
 
 const FACE = { dog: '🐕', wolf: '🐺', sheep: '🐑' } as const;
 const ARROW = ['▲', '▶', '▼', '◀'];
@@ -197,6 +200,7 @@ boardEl.addEventListener('pointerdown', (e) => {
   const x = Math.floor((e.clientX - r.left) / cell), y = Math.floor((e.clientY - r.top) / cell);
   const u = state.units.find((v) => v.x === x && v.y === y);
   const dog = state.units.find((v) => v.id === selected);
+  if (tutorial.blocks({ tile: [x, y] })) return;
 
   if (u?.kind === 'dog') {
     selected = selected === u.id ? null : u.done ? null : u.id;
@@ -207,7 +211,8 @@ boardEl.addEventListener('pointerdown', (e) => {
     history.push(clone(state));
     move(state, dog.id, x, y);
     sfx.click();
-    return render();
+    render();
+    return tutorial.notify({ tile: [x, y] });
   }
   if (dog && u && pushTargets(state, dog).some((p) => p.unit.id === u.id)) {
     history.push(clone(state));
@@ -217,6 +222,7 @@ boardEl.addEventListener('pointerdown', (e) => {
     sfx.buzz(18);
     autoSelect();
     render();
+    tutorial.notify({ tile: [x, y] });
     if (state.over) setTimeout(showResult, 500);
     return;
   }
@@ -254,6 +260,7 @@ function playEvents(events: Event[]) {
 }
 
 undoBtn.onclick = () => {
+  if (tutorial.blocks('other')) return;
   const prev = history.pop();
   if (!prev || busy) return;
   state = prev;
@@ -263,12 +270,13 @@ undoBtn.onclick = () => {
   unitEls.clear();
   render();
 };
-restartBtn.onclick = () => load(index);
-prevBtn.onclick = () => index > 0 && load(index - 1);
-nextBtn.onclick = () => index < STAGES.length - 1 && load(index + 1);
+restartBtn.onclick = () => !tutorial.blocks('other') && load(index);
+prevBtn.onclick = () => !tutorial.blocks('other') && index > 0 && load(index - 1);
+nextBtn.onclick = () => !tutorial.blocks('other') && index < STAGES.length - 1 && load(index + 1);
+helpBtn.onclick = () => !busy && tutorial.start();
 
 endBtn.onclick = async () => {
-  if (busy || state.over) return;
+  if (busy || state.over || tutorial.blocks('end')) return;
   busy = true;
   selected = null;
   render(state, false);
@@ -284,12 +292,14 @@ endBtn.onclick = async () => {
   busy = false;
   autoSelect();
   render();
+  tutorial.notify('end');
   if (state.over) setTimeout(showResult, 300);
 };
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function showResult() {
+  if (tutorial.active) return; // 튜토리얼 중에는 안내가 다음으로 이어 준다
   const won = state.over === 'won';
   const n = stars(state);
   if (won) {
@@ -327,7 +337,17 @@ addEventListener('resize', () => {
   }, 80);
 });
 
-load(index);
+const tutorial = new Tutorial({
+  load,
+  tileRect: (x, y) => {
+    const r = boardEl.getBoundingClientRect();
+    return new DOMRect(r.left + x * cell, r.top + y * cell, cell, cell);
+  },
+});
+
+// 처음 실행하면 튜토리얼부터(주소에 stage를 준 개발·촬영용 실행은 제외)
+if (!Tutorial.done() && !new URLSearchParams(location.search).has('stage')) tutorial.start();
+else load(index);
 
 // 개발·촬영용 훅
-Object.assign(window, { __demo: { state: () => state, load: (n: number) => load(n - 1) } });
+Object.assign(window, { __demo: { state: () => state, load: (n: number) => load(n - 1), tutorial: () => tutorial.start() } });

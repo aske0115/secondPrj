@@ -359,6 +359,24 @@ function home() {
   $('play').onclick = startCatch;
   $('shop').onclick = shopSheet;
   $('pet').onclick = (e) => petTap(e as MouseEvent);
+  // 테스트용: 코인 줄을 2초 안에 5번 누르면 기운·코인 지급(출시 빌드 --mode release 에서는 꺼짐)
+  if (import.meta.env.MODE !== 'release') {
+    let taps: number[] = [];
+    document.querySelector<HTMLElement>('.stats')!.addEventListener('click', () => {
+      const now = Date.now();
+      taps = [...taps.filter((t) => now - t < 2000), now];
+      if (taps.length < 5) return;
+      taps = [];
+      ELEMENTS.forEach((e) => (save.ki[e] += 500));
+      save.kiTotal += 2500;
+      save.coins += 1000;
+      save.playsUsed = 0;
+      persist();
+      sfx.sparkle();
+      toast(L('테스트: 기운 +500씩, 코인 +1000, 판수 초기화', 'Test: +500 each energy, +1000 coins, plays reset'));
+      setTimeout(home, 600);
+    });
+  }
   if (hidden)
     $('flip').onclick = () => {
       save.revealedDay = dayKey(new Date());

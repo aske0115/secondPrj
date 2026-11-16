@@ -9,7 +9,9 @@
     "test": "vitest run",
     "content:check": "vitest run src/content",
     "native": "npm run build && npx cap sync ios",
-    "ios": "npm run native && npx cap open ios"
+    "ios": "npm run native && npx cap open ios",
+    "build:release": "tsc --noEmit && vite build --mode release",
+    "native:release": "npm run build:release && npx cap sync ios"
   },
   "dependencies": {
     "@capacitor/core": "^8.6.2",

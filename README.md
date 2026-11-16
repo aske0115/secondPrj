@@ -1,6 +1,6 @@
 # secondPrj (가칭)
 
-Daeun.dev의 두 번째 모바일 게임. 양치기 개가 늑대를 밀어 양을 지키는 한 손 전술 퍼즐을 프로토타입 중입니다([결정 019](docs/DECISIONS.md), [규칙](docs/GAME_RULES.md)). 앞서 만든 디오라마 복원은 중단했습니다(결정 018, 태그 `diorama-prototype`).
+Daeun.dev의 두 번째 모바일 게임. 디오라마 복원(결정 018, 태그 `diorama-prototype`)과 양치기 개 전술 퍼즐(결정 022, 태그 `tactics-prototype`)을 프로토타입까지 만들고 중단했습니다. 다음 방향을 정하는 중입니다([결정 기록](docs/DECISIONS.md)).
 
 - 작업 규칙: [AGENTS.md](AGENTS.md)
 - 결정 기록: [docs/DECISIONS.md](docs/DECISIONS.md)

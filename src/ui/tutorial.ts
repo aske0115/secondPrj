@@ -1,5 +1,5 @@
 // 따라 하는 튜토리얼(결정 020). 화면을 어둡게 하고 할 곳만 밝혀, 정해진 동작만 받는다.
-// 1부(1스테이지): 빨간 칸 → 개 이동 → 늑대 밀기 / 2부(3스테이지): 늑대가 늑대를 물게 하기 → 턴 끝내기 → 마지막은 스스로
+// 1부(1스테이지): 빨간 칸 → 아무것도 안 하면 지는 장면 → 같은 판에서 개 이동·늑대 밀기로 이기는 장면 / 2부(3스테이지): 늑대가 늑대를 물게 하기 → 턴 끝내기 → 마지막은 스스로
 import { L } from '../i18n';
 
 type Gate = { tile: [number, number] } | 'end' | 'next';
@@ -10,6 +10,8 @@ interface Step {
   /** 칸 대신 밝힐 요소 */
   el?: string;
   gate: Gate;
+  /** '다음'을 누른 뒤 할 일(판 다시 놓기 등) */
+  after?: (host: Host) => void;
 }
 
 export interface Host {
@@ -24,6 +26,18 @@ const PART1: Step[] = [
     tiles: [[2, 2], [3, 2]],
     gate: 'next',
   },
+  // 지는 장면을 먼저 직접 본다
+  {
+    text: () => L('먼저 <b>아무것도 안 하면</b> 어떻게 되는지 볼까요?<br>턴 끝내기를 눌러 보세요.', 'First, let’s see what happens if you <b>do nothing</b>.<br>Tap End turn.'),
+    el: 'end',
+    gate: 'end',
+  },
+  {
+    text: () => L('<span class="big lose">패배 😢</span>늑대가 빨간 칸의 양을 물었어요.<br><b>양을 모두 잃으면 져요.</b>', '<span class="big lose">Defeat 😢</span>The wolf bit the sheep on the red tile.<br><b>Lose all your sheep and you lose.</b>'),
+    gate: 'next',
+    after: (host) => host.load(0),
+  },
+  { text: () => L('이번엔 개로 양을 지켜 봐요. 같은 판을 다시 놓았어요.', 'Now let’s protect it with the dog. Same board again.'), gate: 'next' },
   {
     text: () => L('개는 <b>흰 점</b> 칸으로 2칸까지 움직여요.<br>늑대 바로 위 칸을 눌러 보세요.', 'Your dog can move up to 2 tiles to the <b>white dots</b>.<br>Tap the tile right above the wolf.'),
     tiles: [[1, 1], [2, 1]],
@@ -37,6 +51,11 @@ const PART1: Step[] = [
   {
     text: () => L('늑대가 강에 떠내려갔어요! 🌊<br>강·바위·다른 늑대 쪽으로 밀어서 늑대를 막아요.', 'Swept away by the river! 🌊<br>Push wolves into rivers, rocks or other wolves.'),
     tiles: [[0, 3], [4, 3]],
+    gate: 'next',
+  },
+  {
+    text: () => L('<span class="big win">승리! ★★★</span>늑대를 모두 물리치거나 정해진 턴을 버티면 이겨요.<br>양을 <b>하나도 안 잃으면 별 3개</b>예요.', '<span class="big win">Victory! ★★★</span>Defeat every wolf, or hold out for the set turns.<br>Lose <b>no sheep</b> for 3 stars.'),
+    tiles: [[3, 2]],
     gate: 'next',
   },
 ];
@@ -85,7 +104,16 @@ export class Tutorial {
     this.coach.append(this.spot, this.bubble);
     this.coach.hidden = true;
     document.body.appendChild(this.coach);
-    addEventListener('resize', () => this.active && setTimeout(() => this.show(), 120));
+  }
+
+  /** 늑대 차례 동안은 덮개를 걷어 물기 장면이 잘 보이게 한다(끝나면 notify가 다음 안내를 띄움) */
+  pause() {
+    if (this.active) this.coach.hidden = true;
+  }
+
+  /** 판 크기가 바뀌면 밝힌 자리를 다시 맞춘다 */
+  refresh() {
+    if (this.active) this.show();
   }
 
   static done() {
@@ -125,6 +153,7 @@ export class Tutorial {
   }
 
   private next() {
+    this.steps[this.i]?.after?.(this.host);
     this.i++;
     if (this.i < this.steps.length) return this.show();
     if (this.part === 1) {
@@ -174,7 +203,15 @@ export class Tutorial {
     b.style.top = b.style.bottom = '';
     if (!rect) b.style.bottom = `${h * 0.16}px`; // 첫 안내는 판을 가리지 않게 아래쪽에
     else if (rect.top + rect.height / 2 > h * 0.62) b.style.bottom = `${h - rect.top + pad + 14}px`;
-    else b.style.top = `${rect.bottom + pad + 14}px`;
+    else {
+      // 판 아래 빈자리(버튼 바로 위)에 두어 늑대·양을 가리지 않게. 그래도 밝힌 곳과 겹치면 그 바로 아래로
+      const bar = document.getElementById('bar')!.getBoundingClientRect();
+      b.style.bottom = `${h - bar.top + 6}px`;
+      if (b.getBoundingClientRect().top < rect.bottom + pad + 8) {
+        b.style.bottom = '';
+        b.style.top = `${rect.bottom + pad + 14}px`;
+      }
+    }
   }
 }
 

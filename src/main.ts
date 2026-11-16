@@ -83,6 +83,9 @@ function load(i: number) {
 
 function layout() {
   const wrap = $('board-wrap').getBoundingClientRect();
+  // 실기기 웹뷰는 켜지는 순간 아직 배치가 안 끝나 크기가 0으로 잡히기도 한다. 그때는 그리지 않고
+  // 판 영역 크기 감시(ResizeObserver)가 실제 크기를 알려 줄 때 다시 그린다
+  if (wrap.width < 80 || wrap.height < 80) return;
   cell = Math.floor(Math.min((wrap.width - 4) / state.w, (wrap.height - 4) / state.h, 86));
   document.documentElement.style.setProperty('--cell', `${cell}px`);
   boardEl.style.width = `${cell * state.w}px`;
@@ -279,6 +282,7 @@ endBtn.onclick = async () => {
   if (busy || state.over || tutorial.blocks('end')) return;
   busy = true;
   selected = null;
+  tutorial.pause();
   render(state, false);
   const { state: after, steps } = endTurn(state);
   for (const step of steps) {
@@ -326,16 +330,24 @@ function toast(text: string) {
   toastTimer = window.setTimeout(() => updateUi(state), 1500);
 }
 
+/** 판 크기를 다시 재고 전부 다시 그린다(늦은 첫 배치·회전·접기·백그라운드 복귀) */
+function relayout() {
+  if (!state) return;
+  layout();
+  for (const [, el] of unitEls) el.remove();
+  unitEls.clear();
+  render();
+  tutorial.refresh();
+}
 let resizeTimer = 0;
-addEventListener('resize', () => {
+const scheduleRelayout = () => {
   clearTimeout(resizeTimer);
-  resizeTimer = window.setTimeout(() => {
-    layout();
-    for (const [, el] of unitEls) el.remove();
-    unitEls.clear();
-    render();
-  }, 80);
-});
+  resizeTimer = window.setTimeout(relayout, 60);
+};
+new ResizeObserver(scheduleRelayout).observe($('board-wrap'));
+addEventListener('resize', scheduleRelayout);
+document.addEventListener('visibilitychange', () => !document.hidden && scheduleRelayout());
+addEventListener('pageshow', scheduleRelayout);
 
 const tutorial = new Tutorial({
   load,

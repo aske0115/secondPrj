@@ -73,3 +73,6 @@ body {
 #coach .bubble p { margin: 0 0 10px; font-size: 15px; line-height: 1.5; }
 #coach .bubble .pill { padding: 10px 28px; }
 #coach .bubble .skip { display: block; margin-top: 8px; font-size: 12px; color: #9a8a72; text-decoration: underline; cursor: pointer; }
+#coach .bubble .big { display: block; font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+#coach .bubble .lose { color: #c4472f; }
+#coach .bubble .win { color: #c98a12; }

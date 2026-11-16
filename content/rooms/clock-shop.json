@@ -1,0 +1,308 @@
+{
+  "id": "clock-shop",
+  "title": {
+    "ko": "오래된 시계방",
+    "en": "The Old Clock Shop"
+  },
+  "note": {
+    "ko": "할아버지가 하시던 시계방이에요. 다시 문을 열고 싶어요.",
+    "en": "This was my grandfather's clock shop. I'd like to open it again."
+  },
+  "reply": {
+    "ko": "초침 소리가 돌아왔네요. 할아버지도 이 소리를 제일 좋아하셨어요.",
+    "en": "The ticking is back. It was Grandpa's favorite sound."
+  },
+  "palette": {
+    "wall": "#d8c6a6",
+    "floor": "#7c5638",
+    "trim": "#5a3a24"
+  },
+  "props": [
+    {
+      "id": "counter",
+      "model": "counter",
+      "pos": [
+        0.6,
+        0,
+        0.3
+      ]
+    },
+    {
+      "id": "shelf",
+      "model": "shelf",
+      "pos": [
+        -1.5,
+        0,
+        -2.05
+      ]
+    },
+    {
+      "id": "stool",
+      "model": "stool",
+      "pos": [
+        2.2,
+        0,
+        1.3
+      ]
+    },
+    {
+      "id": "wall-clock",
+      "model": "wallClock",
+      "pos": [
+        1.7,
+        2.45,
+        -2.2
+      ],
+      "name": {
+        "ko": "벽시계",
+        "en": "Wall clock"
+      },
+      "task": {
+        "kind": "wipe",
+        "surface": "face",
+        "focus": {
+          "yaw": 0,
+          "pitch": 0.05,
+          "size": 1.3
+        }
+      },
+      "effect": "ticking",
+      "story": {
+        "ko": "뒷면에 '1968 개업'이라고 새겨져 있다.",
+        "en": "Engraved on the back: 'Opened 1968'."
+      }
+    },
+    {
+      "id": "photo",
+      "model": "frame",
+      "pos": [
+        -2.94,
+        2.0,
+        -0.4
+      ],
+      "rot": [
+        0,
+        90,
+        0
+      ],
+      "name": {
+        "ko": "액자",
+        "en": "Photo frame"
+      },
+      "task": {
+        "kind": "wipe",
+        "surface": "photo",
+        "focus": {
+          "yaw": 1.5708,
+          "pitch": 0.05,
+          "size": 1.25
+        }
+      },
+      "story": {
+        "ko": "가게 앞에 선 할아버지와 어린 손녀.",
+        "en": "Grandpa and his granddaughter in front of the shop."
+      }
+    },
+    {
+      "id": "window",
+      "model": "window",
+      "pos": [
+        0.25,
+        2.05,
+        -2.22
+      ],
+      "name": {
+        "ko": "창문",
+        "en": "Window"
+      },
+      "task": {
+        "kind": "wipe",
+        "surface": "glass",
+        "focus": {
+          "yaw": 0,
+          "pitch": 0.05,
+          "size": 1.6
+        }
+      },
+      "effect": "sunlight"
+    },
+    {
+      "id": "case",
+      "model": "displayCase",
+      "pos": [
+        0.75,
+        1.0,
+        0.45
+      ],
+      "name": {
+        "ko": "진열장 유리",
+        "en": "Display glass"
+      },
+      "task": {
+        "kind": "wipe",
+        "surface": "glass",
+        "focus": {
+          "yaw": 0.15,
+          "pitch": 0.35,
+          "size": 1.25
+        }
+      }
+    },
+    {
+      "id": "mantle-clock",
+      "model": "mantleClock",
+      "pos": [
+        -1.0,
+        2.28,
+        -2.05
+      ],
+      "name": {
+        "ko": "탁상시계",
+        "en": "Mantel clock"
+      },
+      "task": {
+        "kind": "place",
+        "from": {
+          "pos": [
+            -1.3,
+            0.17,
+            1.2
+          ],
+          "rot": [
+            0,
+            30,
+            90
+          ]
+        }
+      }
+    },
+    {
+      "id": "book-a",
+      "model": "book",
+      "pos": [
+        -2.2,
+        1.58,
+        -2.05
+      ],
+      "name": {
+        "ko": "장부",
+        "en": "Ledger"
+      },
+      "task": {
+        "kind": "place",
+        "from": {
+          "pos": [
+            -0.4,
+            0.04,
+            1.6
+          ],
+          "rot": [
+            90,
+            0,
+            20
+          ]
+        }
+      },
+      "story": {
+        "ko": "마지막 장부엔 '수리 완료, 감사합니다'.",
+        "en": "The last ledger line: 'Repaired. Thank you.'"
+      }
+    },
+    {
+      "id": "book-b",
+      "model": "bookRed",
+      "pos": [
+        -1.95,
+        1.58,
+        -2.05
+      ],
+      "rot": [
+        0,
+        0,
+        -8
+      ],
+      "name": {
+        "ko": "부품 책",
+        "en": "Parts catalog"
+      },
+      "task": {
+        "kind": "place",
+        "from": {
+          "pos": [
+            -0.1,
+            0.04,
+            1.85
+          ],
+          "rot": [
+            90,
+            0,
+            -35
+          ]
+        }
+      }
+    },
+    {
+      "id": "lamp",
+      "model": "deskLamp",
+      "pos": [
+        1.55,
+        1.0,
+        0.25
+      ]
+    },
+    {
+      "id": "bulb",
+      "model": "bulb",
+      "pos": [
+        1.55,
+        1.62,
+        0.43
+      ],
+      "name": {
+        "ko": "전구",
+        "en": "Light bulb"
+      },
+      "task": {
+        "kind": "place",
+        "from": {
+          "pos": [
+            2.0,
+            0.07,
+            1.9
+          ],
+          "rot": [
+            0,
+            0,
+            90
+          ]
+        }
+      },
+      "effect": "lampOn"
+    },
+    {
+      "id": "plate",
+      "model": "plate",
+      "pos": [
+        -0.2,
+        1.25,
+        0.35
+      ],
+      "name": {
+        "ko": "기념 접시",
+        "en": "Keepsake plate"
+      },
+      "task": {
+        "kind": "mend",
+        "focus": {
+          "yaw": 0.1,
+          "pitch": 0.3,
+          "size": 1.3
+        }
+      },
+      "story": {
+        "ko": "가게 30주년 기념 접시. 금으로 이으니 더 예쁘다.",
+        "en": "A 30th-anniversary plate, prettier with golden seams."
+      }
+    }
+  ]
+}

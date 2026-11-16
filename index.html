@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>secondPrj</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="hud">
+    <div id="note" class="card"></div>
+    <div id="hint"></div>
+    <button id="back" class="pill" hidden></button>
+    <button id="lang" class="pill small" aria-label="Language"></button>
+  </div>
+  <div id="finale" class="sheet" hidden></div>
+  <div id="compare" hidden>
+    <img id="cmp-after" alt="" />
+    <img id="cmp-before" alt="" />
+    <div id="cmp-line"></div>
+    <input id="cmp-range" type="range" min="0" max="100" value="50" />
+    <button id="cmp-close" class="pill"></button>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

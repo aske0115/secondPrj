@@ -1,6 +1,6 @@
 # secondPrj (가칭)
 
-Daeun.dev의 두 번째 모바일 게임. **사주·타로로 태어나 매일의 운세로 자라는 펫**을 프로토타입 중입니다([결정 024](docs/DECISIONS.md)). 앞서 디오라마 복원(태그 `diorama-prototype`)과 전술 퍼즐(태그 `tactics-prototype`)은 중단했습니다.
+Daeun.dev의 두 번째 게임 실험 저장소. 2026-11-16 하루 동안 디오라마 복원(`diorama-prototype`), 전술 퍼즐(`tactics-prototype`), 사주·타로 운세 펫(`fortune-pet-prototype`)을 프로토타입까지 만들고 모두 중단했습니다. 이유와 교훈은 [결정 기록](docs/DECISIONS.md).
 
 - 작업 규칙: [AGENTS.md](AGENTS.md)
 - 결정 기록: [docs/DECISIONS.md](docs/DECISIONS.md)

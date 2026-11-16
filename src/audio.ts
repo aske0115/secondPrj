@@ -1,4 +1,6 @@
 // 합성음(쓸어킬처럼 음원 파일 없이 만들어 저작권 걱정이 없다).
+import { Capacitor } from '@capacitor/core';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 let ctx: AudioContext | null = null;
 let master: GainNode;
 let wipeGain: GainNode | null = null;
@@ -103,7 +105,12 @@ export function finale() {
   [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 1.2, 'sine', 0.08, i * 0.12));
 }
 
+/** 짧은 진동. iPhone 웹뷰는 navigator.vibrate를 무시하므로 앱에서는 네이티브 햅틱을 쓴다 */
 export function buzz(ms = 12) {
+  if (Capacitor.isNativePlatform()) {
+    void Haptics.impact({ style: ms >= 20 ? ImpactStyle.Medium : ImpactStyle.Light }).catch(() => {});
+    return;
+  }
   try {
     navigator.vibrate?.(ms);
   } catch {

@@ -12,4 +12,5 @@ Daeun.dev의 두 번째 모바일 게임. 이동 중에 잠깐씩 하는 작은 
 npm install
 npm run dev      # http://localhost:5317 (영어: ?lang=en)
 npm test         # content:check
+npm run ios      # iOS: 웹 빌드 → 동기화 → Xcode 열기(서명은 Xcode에서), 자세히는 docs/IOS.md
 ```

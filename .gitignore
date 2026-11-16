@@ -5,3 +5,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+ios/App/App/public/
+ios/build/
+ios/App/Pods/
+ios/DerivedData/

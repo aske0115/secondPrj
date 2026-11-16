@@ -4,6 +4,8 @@
 
 > **최신(2026-11-16 밤)**: **첫 프로토타입이 돌아갑니다**(결정 016). `npm install` → `npm run dev` → http://localhost:5317 (영어 화면은 `?lang=en`). 시계방 하나에서 닦기·제자리 놓기·붙이기·전후 비교까지 됩니다. 스크린샷은 `docs/screens/2026-11-16/`. 개발 훅 `__demo`(complete·focus·screen·stats·hideHud). 남은 큰 일: 휴대폰 실기기 성능, 무료 3D 소품 교체, 첫 30초(먼지 낀 액자로 시작), 이름.
 
+> **최신(2026-11-16 밤 2)**: **iOS 앱 프로젝트가 생겼습니다**(결정 017, `docs/IOS.md`). `npm run ios` → Xcode에서 Team만 고르면 실기기에 올릴 수 있습니다. 번들 ID `kr.co.daeun.secondprj`는 가칭이라 이름이 정해지면 등록 전에 바꿉니다.
+
 ## 배경
 - 개발자: Daeun.dev(1인). 첫 게임은 쓸어킬(Sweepkill, `~/Projects/neon-survivor`, 저장소 `aske0115/neon-rush`)입니다.
 - 이 게임은 쓸어킬보다 완성도를 높인 두 번째 게임입니다. 쓸어킬에서 잘된 점(웹 코드 한 벌 + Capacitor로 iOS·안드로이드, 합성 사운드, 봇 시뮬레이션 밸런스, 문서 구조, 처음부터 한·영)은 이어받고, 아쉬운 점(시스템 과다로 인한 혼동, 늦은 손맛 다듬기, Canvas 2D 성능, 흔한 장르·이름, 홍보 장치 미루기)은 피합니다.

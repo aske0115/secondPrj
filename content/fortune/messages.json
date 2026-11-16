@@ -1,0 +1,67 @@
+{
+  "_note": "오늘의 운세 문구. 갈래(category)는 오늘 기운과 나의 관계(십신의 다섯 갈래). 같은 날 같은 사람에게는 seed로 항상 같은 줄이 고른다. AI로 줄을 늘릴 때는 갈래마다 ko·en을 함께 쓴다.",
+  "categories": {
+    "friend": {
+      "title": { "ko": "어깨를 나란히 하는 날", "en": "A day for allies" },
+      "lines": [
+        { "ko": "혼자보다 함께가 빠른 날이에요. 먼저 연락해 보세요.", "en": "Together beats alone today. Reach out first." },
+        { "ko": "비슷한 사람이 곁에 모여요. 경쟁보다 협력이 이득이에요.", "en": "Like-minded people gather. Cooperation pays more than rivalry." },
+        { "ko": "고집이 세지기 쉬운 날. 한 번만 양보하면 일이 풀려요.", "en": "Stubbornness creeps in. One small concession clears the way." },
+        { "ko": "오래된 친구의 한마디가 힘이 되어 줘요.", "en": "A word from an old friend gives you strength." }
+      ],
+      "pet": { "ko": "친구 펫이 놀러 왔어요!", "en": "A friend pet came to visit!" }
+    },
+    "express": {
+      "title": { "ko": "나를 드러내는 날", "en": "A day to shine" },
+      "lines": [
+        { "ko": "떠오른 생각을 말로 꺼내 보세요. 반응이 좋아요.", "en": "Say the idea out loud. People will like it." },
+        { "ko": "손으로 만드는 일, 맛있는 음식이 행운을 불러요.", "en": "Making things and good food bring luck today." },
+        { "ko": "말이 앞서기 쉬워요. 한 박자 쉬고 말하면 더 좋아요.", "en": "Words may run ahead. Pause a beat before you speak." },
+        { "ko": "작은 즐거움을 챙기면 하루가 가벼워져요.", "en": "Small pleasures make the day lighter." }
+      ],
+      "pet": { "ko": "펫이 신나서 노래를 불러요 ♪", "en": "Your pet is singing happily ♪" }
+    },
+    "wealth": {
+      "title": { "ko": "실속을 챙기는 날", "en": "A day for gains" },
+      "lines": [
+        { "ko": "작은 돈이 들어오거나 아낄 기회가 생겨요.", "en": "A little money comes in, or a chance to save." },
+        { "ko": "계획한 일을 끝까지 챙기면 손에 남는 게 있어요.", "en": "Follow through on your plans and something stays in your hands." },
+        { "ko": "충동구매만 조심하면 좋은 하루예요.", "en": "A good day, as long as you skip impulse buys." },
+        { "ko": "정리하다 잊고 있던 것을 찾게 돼요.", "en": "Tidying up turns up something you forgot." }
+      ],
+      "pet": { "ko": "펫이 반짝이는 동전을 물어 왔어요!", "en": "Your pet brought you a shiny coin!" }
+    },
+    "work": {
+      "title": { "ko": "책임이 무거운 날", "en": "A day of duty" },
+      "lines": [
+        { "ko": "부담이 커도 규칙대로 하면 인정받아요.", "en": "It feels heavy, but doing it by the book earns respect." },
+        { "ko": "윗사람이나 약속이 신경 쓰여요. 미리 챙기면 편해요.", "en": "Bosses or deadlines weigh on you. Prepare early and relax." },
+        { "ko": "무리하지 말고 오늘 할 몫만 해내요.", "en": "Don't overdo it. Just finish today's share." },
+        { "ko": "버티는 힘이 실력이 되는 날이에요.", "en": "Today, endurance becomes skill." }
+      ],
+      "pet": { "ko": "펫이 열심히 땅을 파고 있어요.", "en": "Your pet is digging hard." }
+    },
+    "learn": {
+      "title": { "ko": "도움을 받는 날", "en": "A day of support" },
+      "lines": [
+        { "ko": "누군가의 조언이 길을 밝혀 줘요. 잘 들어 보세요.", "en": "Someone's advice lights the way. Listen well." },
+        { "ko": "배우고 읽기 좋은 날. 짧은 공부도 오래 남아요.", "en": "Good for learning. Even a little study sticks." },
+        { "ko": "생각이 많아지기 쉬워요. 산책이 머리를 맑게 해요.", "en": "Thoughts may pile up. A walk clears your head." },
+        { "ko": "쉬어 가도 괜찮아요. 충전이 곧 실력이에요.", "en": "It's fine to rest. Recharging is strength." }
+      ],
+      "pet": { "ko": "펫이 책 위에서 꾸벅꾸벅 졸아요.", "en": "Your pet is dozing on a book." }
+    }
+  },
+  "elements": {
+    "wood": { "ko": "나무", "en": "Wood", "hanja": "木", "color": { "ko": "초록", "en": "Green", "hex": "#5fa463" }, "numbers": [3, 8],
+      "pet": { "emoji": "🦌", "ko": "숲사슴", "en": "Grove Fawn", "trait": { "ko": "곧게 자라는 다정한 아이", "en": "Kind and always growing" } } },
+    "fire": { "ko": "불", "en": "Fire", "hanja": "火", "color": { "ko": "빨강", "en": "Red", "hex": "#e0603e" }, "numbers": [2, 7],
+      "pet": { "emoji": "🦊", "ko": "불꼬리여우", "en": "Ember Fox", "trait": { "ko": "밝고 열정적인 아이", "en": "Bright and passionate" } } },
+    "earth": { "ko": "흙", "en": "Earth", "hanja": "土", "color": { "ko": "노랑", "en": "Yellow", "hex": "#d9a441" }, "numbers": [5, 10],
+      "pet": { "emoji": "🐻", "ko": "언덕곰", "en": "Hill Bear", "trait": { "ko": "믿음직하고 포근한 아이", "en": "Steady and cozy" } } },
+    "metal": { "ko": "쇠", "en": "Metal", "hanja": "金", "color": { "ko": "하양", "en": "White", "hex": "#c9c9c9" }, "numbers": [4, 9],
+      "pet": { "emoji": "🦉", "ko": "은빛부엉이", "en": "Silver Owl", "trait": { "ko": "냉철하고 깔끔한 아이", "en": "Sharp and tidy" } } },
+    "water": { "ko": "물", "en": "Water", "hanja": "水", "color": { "ko": "검정·남색", "en": "Navy", "hex": "#3b5b8a" }, "numbers": [1, 6],
+      "pet": { "emoji": "🐢", "ko": "물결거북", "en": "Ripple Turtle", "trait": { "ko": "지혜롭고 유연한 아이", "en": "Wise and flexible" } } }
+  }
+}

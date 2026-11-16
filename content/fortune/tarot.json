@@ -1,0 +1,225 @@
+{
+  "_note": "메이저 아르카나 22장. 원소는 골든 던 체계(불·물·흙·공기)를 오행으로 옮겼다. 공기는 바람(손괘=목)의 성장 기운이면 wood, 판단·지성이면 metal. 다섯 기운이 고르게 나오도록 수레바퀴(목성의 확장)는 wood, 은둔자(분별·지성)는 metal로 둔다.",
+  "cards": [
+    {
+      "n": 0,
+      "ko": "바보",
+      "en": "The Fool",
+      "el": "wood",
+      "kw": {
+        "ko": "새 출발, 자유",
+        "en": "New beginnings, freedom"
+      }
+    },
+    {
+      "n": 1,
+      "ko": "마법사",
+      "en": "The Magician",
+      "el": "metal",
+      "kw": {
+        "ko": "재능, 실행력",
+        "en": "Skill, willpower"
+      }
+    },
+    {
+      "n": 2,
+      "ko": "여사제",
+      "en": "The High Priestess",
+      "el": "water",
+      "kw": {
+        "ko": "직관, 비밀",
+        "en": "Intuition, mystery"
+      }
+    },
+    {
+      "n": 3,
+      "ko": "여황제",
+      "en": "The Empress",
+      "el": "earth",
+      "kw": {
+        "ko": "풍요, 돌봄",
+        "en": "Abundance, nurture"
+      }
+    },
+    {
+      "n": 4,
+      "ko": "황제",
+      "en": "The Emperor",
+      "el": "fire",
+      "kw": {
+        "ko": "리더십, 질서",
+        "en": "Leadership, order"
+      }
+    },
+    {
+      "n": 5,
+      "ko": "교황",
+      "en": "The Hierophant",
+      "el": "earth",
+      "kw": {
+        "ko": "가르침, 전통",
+        "en": "Guidance, tradition"
+      }
+    },
+    {
+      "n": 6,
+      "ko": "연인",
+      "en": "The Lovers",
+      "el": "wood",
+      "kw": {
+        "ko": "사랑, 선택",
+        "en": "Love, choice"
+      }
+    },
+    {
+      "n": 7,
+      "ko": "전차",
+      "en": "The Chariot",
+      "el": "water",
+      "kw": {
+        "ko": "전진, 의지",
+        "en": "Drive, victory"
+      }
+    },
+    {
+      "n": 8,
+      "ko": "힘",
+      "en": "Strength",
+      "el": "fire",
+      "kw": {
+        "ko": "용기, 인내",
+        "en": "Courage, patience"
+      }
+    },
+    {
+      "n": 9,
+      "ko": "은둔자",
+      "en": "The Hermit",
+      "el": "metal",
+      "kw": {
+        "ko": "성찰, 지혜",
+        "en": "Reflection, wisdom"
+      }
+    },
+    {
+      "n": 10,
+      "ko": "운명의 수레바퀴",
+      "en": "Wheel of Fortune",
+      "el": "wood",
+      "kw": {
+        "ko": "전환, 행운",
+        "en": "Change, luck"
+      }
+    },
+    {
+      "n": 11,
+      "ko": "정의",
+      "en": "Justice",
+      "el": "metal",
+      "kw": {
+        "ko": "균형, 공정",
+        "en": "Balance, fairness"
+      }
+    },
+    {
+      "n": 12,
+      "ko": "매달린 사람",
+      "en": "The Hanged Man",
+      "el": "water",
+      "kw": {
+        "ko": "멈춤, 새 시각",
+        "en": "Pause, new view"
+      }
+    },
+    {
+      "n": 13,
+      "ko": "죽음",
+      "en": "Death",
+      "el": "water",
+      "kw": {
+        "ko": "끝과 시작",
+        "en": "Endings, renewal"
+      }
+    },
+    {
+      "n": 14,
+      "ko": "절제",
+      "en": "Temperance",
+      "el": "fire",
+      "kw": {
+        "ko": "조화, 절제",
+        "en": "Harmony, moderation"
+      }
+    },
+    {
+      "n": 15,
+      "ko": "악마",
+      "en": "The Devil",
+      "el": "earth",
+      "kw": {
+        "ko": "욕망, 집착",
+        "en": "Desire, attachment"
+      }
+    },
+    {
+      "n": 16,
+      "ko": "탑",
+      "en": "The Tower",
+      "el": "fire",
+      "kw": {
+        "ko": "깨달음, 변화",
+        "en": "Awakening, upheaval"
+      }
+    },
+    {
+      "n": 17,
+      "ko": "별",
+      "en": "The Star",
+      "el": "wood",
+      "kw": {
+        "ko": "희망, 회복",
+        "en": "Hope, healing"
+      }
+    },
+    {
+      "n": 18,
+      "ko": "달",
+      "en": "The Moon",
+      "el": "water",
+      "kw": {
+        "ko": "불안, 상상",
+        "en": "Dreams, uncertainty"
+      }
+    },
+    {
+      "n": 19,
+      "ko": "태양",
+      "en": "The Sun",
+      "el": "fire",
+      "kw": {
+        "ko": "기쁨, 성공",
+        "en": "Joy, success"
+      }
+    },
+    {
+      "n": 20,
+      "ko": "심판",
+      "en": "Judgement",
+      "el": "metal",
+      "kw": {
+        "ko": "부름, 결단",
+        "en": "Calling, decision"
+      }
+    },
+    {
+      "n": 21,
+      "ko": "세계",
+      "en": "The World",
+      "el": "earth",
+      "kw": {
+        "ko": "완성, 성취",
+        "en": "Completion, fulfillment"
+      }
+    }
+  ]
+}

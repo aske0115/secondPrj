@@ -1,6 +1,6 @@
 # secondPrj (가칭)
 
-Daeun.dev의 두 번째 모바일 게임. 디오라마 복원(결정 018, 태그 `diorama-prototype`)과 양치기 개 전술 퍼즐(결정 022, 태그 `tactics-prototype`)을 프로토타입까지 만들고 중단했습니다. 다음 방향을 정하는 중입니다([결정 기록](docs/DECISIONS.md)).
+Daeun.dev의 두 번째 모바일 게임. **사주·타로로 태어나 매일의 운세로 자라는 펫**을 프로토타입 중입니다([결정 024](docs/DECISIONS.md)). 앞서 디오라마 복원(태그 `diorama-prototype`)과 전술 퍼즐(태그 `tactics-prototype`)은 중단했습니다.
 
 - 작업 규칙: [AGENTS.md](AGENTS.md)
 - 결정 기록: [docs/DECISIONS.md](docs/DECISIONS.md)
@@ -10,7 +10,7 @@ Daeun.dev의 두 번째 모바일 게임. 디오라마 복원(결정 018, 태그
 ## 실행
 ```bash
 npm install
-npm run dev      # http://localhost:5317 (?stage=3, ?lang=en)
-npm test         # 규칙 + 스테이지 검사(풀이기)
+npm run dev      # http://localhost:5317 (?lang=en)
+npm test         # 사주 정답표 + 콘텐츠 검사
 npm run ios      # iOS: 웹 빌드 → 동기화 → Xcode 열기(서명은 Xcode에서), docs/IOS.md
 ```

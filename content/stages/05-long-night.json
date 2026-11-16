@@ -1,7 +1,0 @@
-{
-  "id": "05-long-night",
-  "name": { "ko": "긴 밤", "en": "The Long Night" },
-  "turns": 3,
-  "map": ["v...<", "..T..", ".S.S.", "D.~.D", ".S.#.", "~~..^"],
-  "spawns": [{ "turn": 2, "x": 2, "y": 0, "dir": 2 }]
-}

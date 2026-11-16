@@ -1,7 +1,9 @@
 // 사주·타로 운세 펫 프로토타입(결정 024). 계산은 fortune/saju.ts, 여기는 화면과 하루 한 번의 성장만.
 import { L, T, lang, setLang } from './i18n';
 import * as sfx from './audio';
-import { petSvg, eggSvg, cardFaceSvg, cardBackSvg, svgImage } from './art';
+import { petSvg, eggSvg, cardFaceSvg, cardBackSvg, svgImage, decoSvg } from './art';
+import { runCatch, modsFor, type CatchResult } from './play/catch';
+import decor from '../content/fortune/decor.json';
 import messages from '../content/fortune/messages.json';
 import tarot from '../content/fortune/tarot.json';
 import {
@@ -25,16 +27,37 @@ interface Save {
   checkins: number;
   lastDay: string | null;
   pettedDay: string | null;
+  /** 모은 기운(꾸미기에 씀)과 누적 기운(성장 단계) */
+  ki: Record<Element, number>;
+  kiTotal: number;
+  playsDay: string | null;
+  playsUsed: number;
+  decor: string[];
 }
+const PLAYS_PER_DAY = 3;
 const KEY = 'fortunePet.v1';
 function loadSave(): Save {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    if (s) return s;
+    if (s) return { ...fresh(), ...s };
   } catch {
     /* 깨진 저장은 새로 시작 */
   }
-  return { profile: null, coins: 0, streak: 0, checkins: 0, lastDay: null, pettedDay: null };
+  return fresh();
+}
+function fresh(): Save {
+  return {
+    profile: null, coins: 0, streak: 0, checkins: 0, lastDay: null, pettedDay: null,
+    ki: { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }, kiTotal: 0, playsDay: null, playsUsed: 0, decor: [],
+  };
+}
+function playsLeft() {
+  return save.playsDay === dayKey(new Date()) ? Math.max(0, PLAYS_PER_DAY - save.playsUsed) : PLAYS_PER_DAY;
+}
+function stageOf(total: number) {
+  let i = 0;
+  decor.stages.forEach((st, k) => total >= st.need && (i = k));
+  return i;
 }
 let save = loadSave();
 function persist() {
@@ -203,7 +226,12 @@ function home() {
   const first = checkIn();
   const pet = EL[p.self].pet;
   const lucky = luckyElement(p);
-  const level = Math.floor(save.checkins / 3) + 1;
+  const stage = stageOf(save.kiTotal);
+  const st = decor.stages[stage];
+  const nextSt = decor.stages[stage + 1];
+  const growPct = nextSt ? ((save.kiTotal - st.need) / (nextSt.need - st.need)) * 100 : 100;
+  // 펫 둘레 자리: [가로 중심 %, 바닥에서 px, 앞줄 여부]. 뒷줄은 펫 뒤, 앞줄은 펫 발치 앞에 그려 깊이감을 준다
+  const SLOTS: [number, number, boolean][] = [[9, 100, false], [25, 116, false], [8, 6, true], [23, -2, true], [37, -10, true], [63, -10, true], [77, -2, true], [92, 6, true], [75, 116, false], [91, 100, false]];
   const d = new Date();
   const dateText = lang === 'ko' ? `${d.getMonth() + 1}월 ${d.getDate()}일` : d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
   const todayText = p.source === 'saju'
@@ -215,9 +243,15 @@ function home() {
   app.innerHTML = `
     <div class="topbar"><span>${dateText} · ${todayText}</span><span><button class="link" id="mine">${L('내 운명', 'My fate')}</button><button class="link" id="lang">${lang === 'ko' ? 'EN' : '한'}</button></span></div>
     <div class="stage" id="stage"><div class="glow" style="background:${elColor(p.self)}"></div>
-      <div class="pet" id="pet">${petSvg(p.self, 168 + Math.min(level, 10) * 4)}</div>
+      ${save.decor.map((id) => {
+        const it = decor.items.find((x) => x.id === id)!;
+        const big = it.cost > 20;
+        const [x, y, front] = SLOTS[it.slot];
+        return `<div class="deco" style="left:${x}%;bottom:${y}px;z-index:${front ? 3 : 0}">${decoSvg(id, big ? 68 : 54)}</div>`;
+      }).join('')}
+      <div class="pet" id="pet">${petSvg(p.self, Math.round(170 * st.scale))}</div>
       <div class="say">${T(CAT[fortune.category].pet)}</div></div>
-    <div class="petname"><b>${T(pet)}</b> · Lv.${level}</div>
+    <div class="petname"><b>${T(pet)}</b> · ${T(st)}${nextSt ? `<div class="grow"><b style="width:${growPct}%"></b></div><small>${L(`다음 단계 ${T(nextSt)}까지 기운 ${nextSt.need - save.kiTotal}`, `${nextSt.need - save.kiTotal} energy to ${T(nextSt)}`)}</small>` : ''}</div>
     <div class="paper today">
       <div class="head"><h2 style="margin:0">${T(CAT[fortune.category].title)}</h2><span class="stars">${'★'.repeat(fortune.score)}${'☆'.repeat(5 - fortune.score)}</span></div>
       <div class="cat">${tag}</div>
@@ -228,13 +262,88 @@ function home() {
       </div>
     </div>
     <div class="stats"><span>🪙 <b>${save.coins}</b></span><span>🔥 <b>${save.streak}</b>${L('일 연속', '-day streak')}</span><span>📅 <b>${save.checkins}</b>${L('일', save.checkins === 1 ? ' day' : ' days')}</span></div>
-    <button class="btn gold" id="share">${L('오늘의 운세 카드 공유하기', 'Share today’s card')}</button>
+    <div class="ki">${ELEMENTS.map((e) => `<span><i style="background:${elColor(e)};color:${elColor(e)}"></i>${save.ki[e]}</span>`).join('')}</div>
+    <button class="btn gold" id="play" ${playsLeft() ? '' : 'disabled'}>${L('오늘의 기운 모으기', 'Gather today’s energy')}<span class="badge">${playsLeft()}/${PLAYS_PER_DAY}</span>
+      <small>${T(modsFor(fortune.category).label)}</small></button>
+    <div class="row2"><button class="btn" id="shop">${L('꾸미기', 'Decorate')}</button><button class="btn" id="share">${L('운세 카드 공유', 'Share card')}</button></div>
     ${disclaimer()}`;
   $('lang').onclick = () => setLang(lang === 'ko' ? 'en' : 'ko');
   $('mine').onclick = born;
   $('share').onclick = shareCard;
+  $('play').onclick = startCatch;
+  $('shop').onclick = shopSheet;
   $('pet').onclick = (e) => petTap(e as MouseEvent);
   if (first) setTimeout(() => toast(L(`오늘 출석! 🪙 +${fortune.category === 'wealth' ? 20 : 10}`, `Checked in! 🪙 +${fortune.category === 'wealth' ? 20 : 10}`)), 400);
+}
+
+async function startCatch() {
+  if (!playsLeft()) return;
+  sfx.unlockAudio();
+  const p = save.profile!;
+  const img = await svgImage(petSvg(p.self, 240));
+  runCatch({ lucky: luckyElement(p), category: fortune.category, pet: img, L, onEnd: (r) => catchResult(r) });
+}
+
+function catchResult(r: CatchResult) {
+  const today = dayKey(new Date());
+  if (save.playsDay !== today) {
+    save.playsDay = today;
+    save.playsUsed = 0;
+  }
+  save.playsUsed++;
+  const before = stageOf(save.kiTotal);
+  let gained = 0;
+  for (const e of ELEMENTS) {
+    save.ki[e] += r.ki[e];
+    gained += r.ki[e];
+  }
+  save.kiTotal += gained;
+  save.coins += r.coins;
+  persist();
+  const grown = stageOf(save.kiTotal) > before;
+  sfx.finale();
+  overlay.innerHTML = `<div class="paper result" style="width:100%;max-width:420px">
+    <h2>${L('기운을 모았어요!', 'Energy gathered!')}</h2>
+    <div class="big">${r.score}</div>
+    <div class="note">${L(`최고 콤보 ${r.bestCombo} · 금화 🪙 +${r.coins}`, `Best combo ${r.bestCombo} · Coins 🪙 +${r.coins}`)}</div>
+    <div class="ki" style="color:var(--ink)">${ELEMENTS.map((e) => `<span style="background:#efe5cf"><i style="background:${elColor(e)};color:${elColor(e)}"></i>+${r.ki[e]}</span>`).join('')}</div>
+    ${grown ? `<h2 style="color:#c98a12;margin-top:12px">${L(`펫이 ${T(decor.stages[stageOf(save.kiTotal)])}(으)로 자랐어요!`, `Your pet grew into a ${T(decor.stages[stageOf(save.kiTotal)])}!`)}</h2>` : ''}
+  </div>
+  <div class="row" style="margin-top:10px">${playsLeft() ? `<button class="btn gold" id="ov-again">${L(`한 판 더 (${playsLeft()})`, `Again (${playsLeft()})`)}</button>` : ''}<button class="btn" id="ov-home">${L('펫에게 가기', 'Back to pet')}</button></div>`;
+  overlay.hidden = false;
+  $('ov-home').onclick = () => ((overlay.hidden = true), home());
+  if (playsLeft()) $('ov-again').onclick = () => ((overlay.hidden = true), home(), startCatch());
+}
+
+function shopSheet() {
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  const draw = () => {
+    sheet.innerHTML = `<div class="head" style="display:flex;justify-content:space-between;align-items:center"><h2>${L('펫의 정원 꾸미기', 'Decorate the garden')}</h2><button class="link" id="sh-close" style="color:#8a7a62">${L('닫기', 'Close')}</button></div>
+      <div class="ki" style="color:var(--ink)">${ELEMENTS.map((e) => `<span style="background:#efe5cf"><i style="background:${elColor(e)};color:${elColor(e)}"></i>${save.ki[e]}</span>`).join('')}</div>
+      <div class="shop">${decor.items.map((it) => {
+        const el = it.el as Element;
+        const owned = save.decor.includes(it.id);
+        const can = save.ki[el] >= it.cost;
+        return `<div class="item">${decoSvg(it.id, 64)}<b>${T(it)}</b><br><span style="color:${elColor(el)}">●</span> ${elName(el)} ${it.cost}
+          <button data-id="${it.id}" ${owned || !can ? 'disabled' : ''}>${owned ? L('놓았어요', 'Placed') : can ? L('놓기', 'Place') : L('기운 부족', 'Need more')}</button></div>`;
+      }).join('')}</div>`;
+    sheet.querySelector('#sh-close')!.addEventListener('click', () => (sheet.remove(), home()));
+    sheet.querySelectorAll<HTMLButtonElement>('.item button').forEach((b) =>
+      b.addEventListener('click', () => {
+        const it = decor.items.find((x) => x.id === b.dataset.id)!;
+        save.ki[it.el as Element] -= it.cost;
+        save.decor.push(it.id);
+        persist();
+        sfx.sparkle();
+        sfx.buzz(15);
+        toast(L(`${it.ko}을(를) 놓았어요!`, `${it.en} placed!`));
+        draw();
+      }),
+    );
+  };
+  draw();
+  document.body.appendChild(sheet);
 }
 
 function petTap(e: MouseEvent) {
@@ -368,6 +477,8 @@ else welcome();
 Object.assign(window, {
   __demo: {
     reset: () => (localStorage.removeItem(KEY), location.reload()),
+    morePlays: () => ((save.playsUsed = 0), persist(), home()),
+    giveKi: (n = 50) => (ELEMENTS.forEach((e) => (save.ki[e] += n)), (save.kiTotal += n * 5), persist(), home()),
     save: () => save,
     fortuneOn: (y: number, m: number, d: number) => save.profile && dailyFortune(save.profile, new Date(y, m - 1, d), TAROT_EL),
   },

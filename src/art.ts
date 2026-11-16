@@ -204,3 +204,40 @@ export function svgImage(svg: string): Promise<HTMLImageElement> {
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
   });
 }
+
+// ── 꾸미기 소품(펫 주변에 놓인다). 펫과 같은 규칙: 둥근 형태, 그라데이션, 진한 외곽선
+const DECO: Record<string, string> = {
+  sapling: `<defs>${grad('dsa', '#9fe08f', '#3f8f45')}</defs><rect x="46" y="62" width="8" height="30" rx="3" fill="#7a5130"/>
+    <circle cx="50" cy="44" r="24" fill="url(#dsa)" stroke="#2f5d2f" stroke-width="2.5"/><circle cx="36" cy="56" r="14" fill="url(#dsa)" stroke="#2f5d2f" stroke-width="2.5"/><circle cx="64" cy="56" r="14" fill="url(#dsa)" stroke="#2f5d2f" stroke-width="2.5"/>
+    <circle cx="44" cy="38" r="4" fill="#fff" opacity=".5"/>`,
+  blossom: `<defs>${grad('dbl', '#ffd1e6', '#e07aa8')}</defs><path d="M50 92 q-4 -30 6 -50 M52 64 q14 -6 20 -18 M50 70 q-12 -6 -18 -16" stroke="#6b4428" stroke-width="5" fill="none" stroke-linecap="round"/>
+    ${[[56, 34, 16], [74, 44, 12], [32, 50, 12], [44, 30, 11], [66, 26, 9]].map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#dbl)" stroke="#b5527f" stroke-width="2"/>`).join('')}`,
+  lantern: `<defs><radialGradient id="dla" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#fff2b0"/><stop offset=".5" stop-color="#ff9a3d"/><stop offset="1" stop-color="#c2412a"/></radialGradient></defs>
+    <circle cx="50" cy="50" r="34" fill="#ffb347" opacity=".25"/><rect x="47" y="8" width="6" height="12" fill="#5a3a24"/>
+    <ellipse cx="50" cy="52" rx="24" ry="30" fill="url(#dla)" stroke="#7a2e12" stroke-width="2.5"/><path d="M30 52 h40 M34 36 h32 M34 68 h32" stroke="#7a2e12" stroke-width="1.5" opacity=".6"/>
+    <rect x="40" y="20" width="20" height="6" rx="2" fill="#5a3a24"/><rect x="40" y="80" width="20" height="6" rx="2" fill="#5a3a24"/><path d="M50 86 v8" stroke="#e3b45a" stroke-width="3"/>`,
+  campfire: `<defs><linearGradient id="dcf" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff5a2a"/><stop offset=".6" stop-color="#ffb02e"/><stop offset="1" stop-color="#fff3a8"/></linearGradient></defs>
+    <circle cx="50" cy="66" r="36" fill="#ff8a3d" opacity=".22"/><path d="M22 88 l56 -14 M22 74 l56 14" stroke="#6b4428" stroke-width="9" stroke-linecap="round"/>
+    <path d="M50 20 q22 26 14 46 q-6 14 -14 14 q-8 0 -14 -14 q-8 -20 14 -46z" fill="url(#dcf)" stroke="#a83a16" stroke-width="2"/><path d="M50 46 q10 14 4 26 q-4 6 -4 6 q-8 -10 0 -32z" fill="#fff6c0"/>`,
+  rocks: `<defs>${grad('dro', '#e9dccb', '#9c8a74')}</defs><path d="M14 90 q-2 -26 22 -30 q20 -2 24 20 q4 12 -4 12z" fill="url(#dro)" stroke="#5e4e3c" stroke-width="2.5"/>
+    <path d="M48 92 q-4 -40 24 -44 q22 0 18 32 q-2 12 -12 12z" fill="url(#dro)" stroke="#5e4e3c" stroke-width="2.5"/><path d="M60 64 q6 -6 14 -4" stroke="#fff" stroke-width="3" opacity=".5" fill="none"/>
+    <circle cx="30" cy="90" r="5" fill="#7cc36e"/><circle cx="38" cy="92" r="4" fill="#7cc36e"/>`,
+  sunflower: `<path d="M50 94 v-46" stroke="#4f8a3a" stroke-width="5"/><ellipse cx="38" cy="72" rx="10" ry="5" fill="#6fae4f" transform="rotate(-30 38 72)"/>
+    ${Array.from({ length: 12 }, (_, i) => `<ellipse cx="50" cy="20" rx="6" ry="13" fill="#ffd23f" stroke="#c98f12" stroke-width="1.5" transform="rotate(${i * 30} 50 36)"/>`).join('')}
+    <circle cx="50" cy="36" r="11" fill="#7a4a1e"/><circle cx="47" cy="33" r="3" fill="#a8703a"/>`,
+  crystal: `<defs><linearGradient id="dcr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#cfc6ff"/><stop offset="1" stop-color="#7f74c9"/></linearGradient></defs>
+    <circle cx="50" cy="52" r="34" fill="#cfc6ff" opacity=".25"/><path d="M50 8 l16 30 l-6 50 h-20 l-6 -50z" fill="url(#dcr)" stroke="#4d4766" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M24 50 l10 16 l-4 26 h-12 l-4 -26z M76 46 l10 18 l-4 28 h-12 l-4 -28z" fill="url(#dcr)" stroke="#4d4766" stroke-width="2" stroke-linejoin="round"/><path d="M50 8 v80" stroke="#fff" stroke-width="2" opacity=".6"/>`,
+  bell: `<defs>${grad('dbe', '#fff1c4', '#c99a3e')}</defs><path d="M20 26 h60" stroke="#5a3a24" stroke-width="6" stroke-linecap="round"/><path d="M28 26 v-14 M72 26 v-14" stroke="#5a3a24" stroke-width="5"/>
+    <path d="M50 30 q-22 0 -24 34 l-6 12 h60 l-6 -12 q-2 -34 -24 -34z" fill="url(#dbe)" stroke="#7a5a1a" stroke-width="2.5"/><circle cx="50" cy="82" r="6" fill="#7a5a1a"/><path d="M40 46 q4 -8 10 -8" stroke="#fff" stroke-width="3" opacity=".6" fill="none"/>`,
+  pond: `<defs><radialGradient id="dpo" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#bfeee5"/><stop offset="1" stop-color="#2f7fa8"/></radialGradient></defs>
+    <ellipse cx="50" cy="74" rx="44" ry="18" fill="#8a7a5a"/><ellipse cx="50" cy="72" rx="40" ry="15" fill="url(#dpo)"/>
+    <ellipse cx="34" cy="70" rx="9" ry="4" fill="#5fae5a"/><circle cx="64" cy="68" r="5" fill="#ff9ac2"/><path d="M40 76 q8 -4 16 0" stroke="#fff" stroke-width="2" opacity=".6" fill="none"/>`,
+  fountain: `<defs>${grad('dfo', '#eaf6ff', '#8fb4d9')}</defs><ellipse cx="50" cy="86" rx="40" ry="10" fill="url(#dfo)" stroke="#4d6a8a" stroke-width="2.5"/>
+    <rect x="44" y="46" width="12" height="40" fill="url(#dfo)" stroke="#4d6a8a" stroke-width="2"/><ellipse cx="50" cy="46" rx="22" ry="7" fill="url(#dfo)" stroke="#4d6a8a" stroke-width="2"/>
+    <path d="M50 40 q-14 -22 -26 4 M50 40 q14 -22 26 4 M50 40 v-24" stroke="#7fc8ff" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="50" cy="14" r="4" fill="#bfe6ff"/>`,
+};
+
+export function decoSvg(id: string, size = 64) {
+  return `<svg viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${DECO[id] ?? ''}</svg>`;
+}

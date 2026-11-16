@@ -1,0 +1,22 @@
+{
+  "_note": "꾸미기 소품. cost는 그 기운(el)으로 낸다. slot은 펫 둘레 자리(0~9, 왼쪽부터). AI로 늘릴 때 src/art.ts의 DECO에 같은 id의 그림이 있어야 한다(content:check).",
+  "items": [
+    { "id": "sapling", "el": "wood", "cost": 15, "slot": 1, "ko": "새싹 나무", "en": "Sapling" },
+    { "id": "blossom", "el": "wood", "cost": 45, "slot": 8, "ko": "꽃나무", "en": "Blossom tree" },
+    { "id": "lantern", "el": "fire", "cost": 15, "slot": 7, "ko": "등불", "en": "Lantern" },
+    { "id": "campfire", "el": "fire", "cost": 45, "slot": 3, "ko": "모닥불", "en": "Campfire" },
+    { "id": "rocks", "el": "earth", "cost": 15, "slot": 2, "ko": "돌 정원", "en": "Rock garden" },
+    { "id": "sunflower", "el": "earth", "cost": 45, "slot": 6, "ko": "해바라기", "en": "Sunflower" },
+    { "id": "crystal", "el": "metal", "cost": 15, "slot": 0, "ko": "수정", "en": "Crystal" },
+    { "id": "bell", "el": "metal", "cost": 45, "slot": 9, "ko": "행운의 종", "en": "Lucky bell" },
+    { "id": "pond", "el": "water", "cost": 15, "slot": 4, "ko": "작은 연못", "en": "Little pond" },
+    { "id": "fountain", "el": "water", "cost": 45, "slot": 5, "ko": "분수", "en": "Fountain" }
+  ],
+  "stages": [
+    { "need": 0, "ko": "아기", "en": "Baby", "scale": 0.8 },
+    { "need": 40, "ko": "꼬마", "en": "Kid", "scale": 0.9 },
+    { "need": 120, "ko": "청년", "en": "Teen", "scale": 1.0 },
+    { "need": 260, "ko": "어른", "en": "Adult", "scale": 1.1 },
+    { "need": 500, "ko": "수호신", "en": "Guardian", "scale": 1.2 }
+  ]
+}

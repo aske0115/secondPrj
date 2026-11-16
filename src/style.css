@@ -48,8 +48,8 @@ p.sub { text-align: center; color: var(--muted); margin: 0 0 22px; font-size: 14
 .face { display: flex; justify-content: center; margin: 8px auto 6px; filter: drop-shadow(0 12px 24px rgba(0,0,0,.5)); animation: flip .8s ease-out; }
 @keyframes flip { from { transform: rotateY(90deg) scale(.8); opacity: 0; } }
 /* 펫과 홈 */
-.stage { position: relative; height: 240px; display: flex; align-items: center; justify-content: center; }
-.pet { line-height: 0; animation: bob 2.6s ease-in-out infinite; cursor: pointer; user-select: none; filter: drop-shadow(0 8px 10px rgba(0,0,0,.3)); }
+.stage { position: relative; height: 240px; margin-bottom: 26px; display: flex; align-items: center; justify-content: center; }
+.pet { position: relative; z-index: 1; line-height: 0; animation: bob 2.6s ease-in-out infinite; cursor: pointer; user-select: none; filter: drop-shadow(0 8px 10px rgba(0,0,0,.3)); }
 .pet.hatch { animation: hatch .9s cubic-bezier(.2,1.6,.4,1), bob 2.6s ease-in-out .9s infinite; }
 @keyframes hatch { from { transform: scale(.2) rotate(-12deg); opacity: 0; } }
 .pet svg, .egg svg { display: block; overflow: visible; }
@@ -83,3 +83,27 @@ p.sub { text-align: center; color: var(--muted); margin: 0 0 22px; font-size: 14
   padding: 10px 16px; border-radius: 999px; font-size: 14px; box-shadow: 0 6px 18px #0006; z-index: 20; animation: fade 2.2s forwards; }
 @keyframes fade { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
 #overlay[hidden] { display: none; }
+/* 기운 모으기 */
+.catch { position: fixed; inset: 0; z-index: 30; touch-action: none; padding-top: env(safe-area-inset-top); }
+.catch canvas { position: absolute; inset: 0; }
+/* 꾸미기·성장 */
+.deco { position: absolute; line-height: 0; transform: translateX(-50%); filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); animation: pop .5s cubic-bezier(.2,1.6,.4,1); }
+@keyframes pop { from { transform: translateX(-50%) scale(0); } }
+.ki { display: flex; gap: 6px; justify-content: center; margin: 10px 0 2px; }
+.ki span { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.08); border-radius: 999px; padding: 4px 9px; font-size: 13px; }
+.ki i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px currentColor; }
+.btn .badge { display: inline-block; margin-left: 6px; font-size: 12px; background: rgba(0,0,0,.15); border-radius: 999px; padding: 2px 8px; }
+.row2 { display: flex; gap: 10px; }
+.row2 .btn { margin: 6px 0; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 78vh; overflow: auto; background: var(--paper); color: var(--ink); border-radius: 22px 22px 0 0;
+  padding: 18px 18px calc(env(safe-area-inset-bottom) + 18px); z-index: 25; box-shadow: 0 -10px 30px #0008; animation: rise .35s ease-out; }
+@keyframes rise { from { transform: translateY(40px); opacity: 0; } }
+.shop { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.item { background: #efe5cf; border-radius: 14px; padding: 10px; text-align: center; font-size: 13px; }
+.item svg { display: block; margin: 0 auto 4px; }
+.item button { width: 100%; border: 0; border-radius: 10px; padding: 8px; font-weight: 700; margin-top: 6px; background: var(--gold); color: var(--ink); }
+.item button:disabled { background: #d8ccb4; color: #8a7a62; }
+.result { text-align: center; }
+.result .big { font-size: 46px; font-weight: 800; color: var(--gold); margin: 4px 0; }
+.grow { height: 8px; background: rgba(255,255,255,.12); border-radius: 999px; overflow: hidden; margin: 6px 0 2px; }
+.grow b { display: block; height: 100%; background: linear-gradient(90deg, #f0c873, #e3b45a); }

@@ -152,3 +152,18 @@ export function buzz(ms = 12) {
     /* 진동이 없는 기기 */
   }
 }
+
+/** 구슬 받기: 콤보가 오를수록 음이 한 칸씩 올라간다(펜타토닉이라 어떤 순서로 이어져도 듣기 좋다) */
+const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093];
+export function pling(step: number, lucky = false) {
+  const f = PENTA[Math.min(step, PENTA.length - 1)];
+  tone(f, 0.18, 'sine', 0.09);
+  tone(f * 2, 0.12, 'triangle', 0.03, 0.01);
+  if (lucky) tone(f * 1.5, 0.25, 'sine', 0.06, 0.05);
+}
+
+/** 금화 */
+export function coin() {
+  tone(1319, 0.08, 'square', 0.05);
+  tone(1976, 0.22, 'square', 0.05, 0.07);
+}

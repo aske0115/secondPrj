@@ -1,0 +1,7 @@
+{
+  "id": "01-first-wolf",
+  "name": { "ko": "첫 번째 늑대", "en": "The First Wolf" },
+  "tip": { "ko": "빨간 칸은 늑대가 물 자리예요. 개를 늑대 옆으로 옮겨 강 쪽으로 밀어 보세요.", "en": "Red tiles show where wolves will bite. Move your dog next to the wolf and push it into the river." },
+  "turns": 1,
+  "map": [".....", ".D...", "..>S.", "~~~~~", "....."]
+}

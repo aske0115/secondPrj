@@ -1,0 +1,7 @@
+{
+  "id": "03-turn-the-bite",
+  "name": { "ko": "엇갈린 이빨", "en": "Turn the Bite" },
+  "tip": { "ko": "밀려도 늑대는 보던 방향 그대로 물어요. 다른 늑대를 물게 해 보세요.", "en": "A pushed wolf still bites the way it faces. Make it bite another wolf." },
+  "turns": 2,
+  "map": ["D....", ".v...", "..>S.", ".....", "S...#", "..##."]
+}

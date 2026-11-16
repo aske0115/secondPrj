@@ -100,6 +100,41 @@ export function chirp() {
   o.stop(t + 0.5);
 }
 
+/** 부딪힘: 낮은 둔탁음 */
+export function thud() {
+  tone(110, 0.16, 'sine', 0.22);
+  tone(70, 0.2, 'triangle', 0.15, 0.01);
+}
+
+/** 늑대 물기 */
+export function snap() {
+  tone(520, 0.05, 'sawtooth', 0.08);
+  tone(260, 0.09, 'square', 0.06, 0.04);
+}
+
+/** 강에 떠내려감 */
+export function splash() {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer(ctx);
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.setValueAtTime(2400, t);
+  f.frequency.exponentialRampToValueAtTime(300, t + 0.5);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.25, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+  src.connect(f).connect(g).connect(master);
+  src.start(t);
+  src.stop(t + 0.6);
+}
+
+/** 실패 */
+export function fail() {
+  [392, 330, 262].forEach((f, i) => tone(f, 0.4, 'triangle', 0.08, i * 0.16));
+}
+
 /** 복원 완료 */
 export function finale() {
   [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 1.2, 'sine', 0.08, i * 0.12));

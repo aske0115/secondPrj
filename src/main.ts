@@ -1,4 +1,4 @@
-// 망치섬 / Tumble Isle(결정 032·054). 드래그로 이동, 공격은 자동, 게이지가 차면 쓸어내기로 적을 섬 밖으로 민다.
+// 망치섬 / Tumble Isle(결정 032·054). 드래그로 이동, 공격은 자동, 게이지가 차면 쾅!(땅 내려찍기)으로 적을 섬 밖으로 민다(쓸어킬과 겹치지 않게 '쓸어!'에서 바꿈, 결정 056).
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -282,7 +282,7 @@ const newGame = () => ({
   lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
-  swings: 0, misses: 0,
+  swings: 0, misses: 0, sweepLock: 0, helperUsed: false,
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
@@ -387,7 +387,7 @@ function burst(x: number, z: number, color: THREE.Color, n: number) {
 let lastPop = 0, combo = 0;
 function reward(charge: number) {
   g.kills++;
-  g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge);
+  if (g.sweepLock <= 0) g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge);
   const now = performance.now();
   if (now - lastPop > 45) { // 한꺼번에 죽을 때 소리가 뭉개지지 않게, 이어 죽이면 음이 올라간다
     combo = now - lastPop < 500 ? combo + 1 : 0;
@@ -423,7 +423,7 @@ function fall(e: Enemy, byCrumble = false) {
   if (mode === 'bonus') g.bonusFalls++;
   g.chain = g.chainT > 0 ? g.chain + 1 : 1;
   g.chainT = 1.2;
-  reward(R.FALL_CHARGE);
+  reward(byCrumble ? 0 : R.FALL_CHARGE); // 무너짐으로 한꺼번에 떨어진 적은 게이지를 채우지 않는다
   gainXp(byCrumble ? R.killXp(e.big) : R.fallXp(e.big));
   const now = performance.now();
   if (now - lastFallSfx > 70) {
@@ -471,6 +471,7 @@ function hurt(dmg: number) {
 function sweep() {
   if (mode !== 'play' || g.charge < R.sweepCost(g.lv.sweep)) return;
   g.charge = 0;
+  g.sweepLock = R.SWEEP_LOCK;
   const rad = R.sweepRadius(g.lv.sweep);
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     const e = g.enemies[i];
@@ -644,7 +645,7 @@ function weapons(dt: number) {
 }
 
 const DROP_NAME: Record<R.DropId, string> = {
-  heart: L('회복!', 'Heal!'), charge: L('쓸어! 충전!', 'Sweep charged!'), golden: L('황금 망치!', 'Golden mallet!'), helper: L('묘지기가 도와줍니다!', 'The keeper joins you!'),
+  heart: L('회복!', 'Heal!'), charge: L('쾅! 충전!', 'Slam charged!'), golden: L('황금 망치!', 'Golden mallet!'), helper: L('묘지기가 도와줍니다!', 'The keeper joins you!'),
 };
 function openDrop(d: Drop) {
   if (d.type === 'heart') g.hp = Math.min(g.maxHp, g.hp + R.HEAL);
@@ -662,7 +663,8 @@ function supplies(dt: number) {
   if (g.dropCd <= 0 && g.drops.length < dropViews.length) {
     g.dropCd = R.DROP_INTERVAL;
     const a = rnd(0, Math.PI * 2), r = rnd(0.15, 0.65) * g.isl;
-    g.drops.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: 12, type: R.pickDrop(g.hp >= g.maxHp), life: R.DROP_LIFE });
+    g.drops.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: 12, type: R.pickDrop(g.hp >= g.maxHp, Math.random, g.helperUsed), life: R.DROP_LIFE });
+    if (g.drops[g.drops.length - 1].type === 'helper') g.helperUsed = true;
   }
   for (let k = g.drops.length - 1; k >= 0; k--) {
     const d = g.drops[k];
@@ -701,10 +703,10 @@ function supplies(dt: number) {
   if (hd > lim) { h.x *= lim / hd; h.z *= lim / hd; }
   h.cd -= dt;
   if (tgt && bd < 1.5 && h.cd <= 0) {
-    h.cd = 0.55;
+    h.cd = 0.8;
     for (let i = g.enemies.length - 1; i >= 0; i--) {
       const e = g.enemies[i], ex = e.x - h.x, ez = e.z - h.z, ed = Math.hypot(ex, ez) || 1;
-      if (!e.out && ed < 1.9 + eRadius(e)) hit(i, 12, (ex / ed) * 11, (ez / ed) * 11);
+      if (!e.out && ed < 1.7 + eRadius(e)) hit(i, 8, (ex / ed) * 10, (ez / ed) * 10);
     }
     sfx.whack();
   }
@@ -722,6 +724,7 @@ function update(dt: number) {
   }
   g.inv -= dt;
   g.chainT -= dt;
+  g.sweepLock -= dt;
   const isl = R.islandRadius(g.t, stage());
   if (isl < g.isl) crumble(isl);
 
@@ -975,9 +978,9 @@ const ICON: Record<R.UpgradeId | 'heart', string> = {
 };
 const UPS: Record<R.UpgradeId | 'heart', [string, string, string]> = {
   hammer: [L('망치', 'Mallet'), L('더 자주, 더 넓게 휘두릅니다', 'Swings faster and wider'), '#f0a24a'],
-  log: [L('굴러가는 통나무', 'Rolling log'), L('통나무가 섬을 가로질러 적을 쓸어냅니다', 'A log rolls across the isle, sweeping foes'), '#a0703f'],
+  log: [L('굴러가는 통나무', 'Rolling log'), L('통나무가 섬을 가로질러 적을 밀어냅니다', 'A log rolls across the isle, bowling foes over'), '#a0703f'],
   pumpkin: [L('호박 폭탄', 'Pumpkin bomb'), L('던진 호박이 터지며 둥글게 밀어냅니다', 'Thrown pumpkins burst and push foes away'), '#f08a2a'],
-  sweep: [L('쓸어내기', 'Sweep'), L('더 넓게 쓸고 더 빨리 찹니다', 'Wider sweep, charges faster'), '#ff8a4c'],
+  sweep: [L('내려찍기', 'Ground slam'), L('쾅!이 더 넓게 퍼지고 더 빨리 찹니다', 'Wider slam, charges faster'), '#ff8a4c'],
   knock: [L('밀치기', 'Shove'), L('모든 공격이 적을 더 멀리 밀어냅니다', 'Every hit knocks enemies farther'), '#b06ee8'],
   speed: [L('가벼운 신발', 'Light boots'), L('더 빨리 움직입니다', 'Move faster'), '#3fc1a5'],
   heart: [L('회복', 'Heal'), L(`체력을 ${R.HEAL} 채웁니다`, `Restore ${R.HEAL} HP`), '#ff5a6e'],
@@ -1012,7 +1015,7 @@ function showPick() {
 const PERK_UI: Record<MT.Perk, [string, string, string, string]> = {
   vigor: [L('튼튼한 몸', 'Sturdy'), L('최대 체력 +20', 'Max HP +20'), '#ff5a6e', ICON.heart],
   shove: [L('묵직한 손', 'Heavy hands'), L('모든 넉백 +12%', 'All knockback +12%'), '#b06ee8', ICON.knock],
-  charge: [L('미리 충전', 'Head start'), L('쓸어! 게이지 15%를 채우고 시작', 'Start with 15% Sweep charge'), '#ff8a4c', ICON.sweep],
+  charge: [L('미리 충전', 'Head start'), L('쾅! 게이지 15%를 채우고 시작', 'Start with 15% Slam charge'), '#ff8a4c', ICON.sweep],
   wisdom: [L('지혜', 'Wisdom'), L('경험치 +10%', 'XP +10%'), '#35b9ab', '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>'],
 };
 const coinPill = () => `<div class="coins"><i></i>${meta.coins.toLocaleString()}</div>`;
@@ -1134,7 +1137,7 @@ function end(win: boolean) {
       `<div class="row"><button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div>`,
   );
 }
-$('sweep').querySelector('span')!.textContent = L('쓸어!', 'Sweep!');
+$('sweep').querySelector('span')!.textContent = L('쾅!', 'SLAM!');
 
 // 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
 const hud = { hint: $('hint'), toast: $('toast'), warn: $('warn'), hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };

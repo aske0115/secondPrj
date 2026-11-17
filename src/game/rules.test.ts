@@ -20,7 +20,7 @@ test('레벨업 선택지는 서로 다른 3개이고, 다 올린 강화와 필�
   expect(pickUpgrades(lv, false)).toEqual(['heart']);
 });
 
-test('쓸어내기 충전량은 끝까지 올려도 양수다', () => {
+test('쾅!(내려찍기) 충전량은 끝까지 올려도 양수다', () => {
   expect(sweepCost(MAX_LEVEL)).toBeGreaterThan(0);
 });
 
@@ -80,6 +80,8 @@ test('낙하산: 체력이 가득이면 회복은 안 나오고, 아니면 모�
   expect(seen(true).has('heart')).toBe(false);
   expect(seen(false).size).toBe(DROPS.length);
   expect(FIRST_DROP + DROP_FALL).toBeLessThan(BONUS_AT);
+  const used = new Set(Array.from({ length: 40 }, (_, i) => pickDrop(false, () => (i % 10) / 10, true)));
+  expect(used.has('helper')).toBe(false); // 도우미는 판당 1번
 });
 
 test('레벨업은 공격 스킬 위주: 매번 하나 이상, 전체로는 패시브보다 훨씬 자주', () => {

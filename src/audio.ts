@@ -76,7 +76,7 @@ let bonkIdx = 0;
 export const whack = () => play('whack', 0.9, 0.06);
 /** 통나무·호박·충격파·돌진에 맞음 */
 export const bonk = () => play((['bonk1', 'bonk2', 'bonk3'] as const)[bonkIdx++ % 3], 0.55, 0.07);
-/** 헛스윙·쓸어!·돌진 */
+/** 헛스윙·쾅!·돌진 */
 export const swish = (big = false) => play(big ? 'swish1' : 'swish2', big ? 0.9 : 0.45, 0.1, 0, big ? 0.8 : 1.15);
 /** 섬 밖으로 떨어짐: 휘파람 뒤에 멀리서 퐁 */
 export function fall() {

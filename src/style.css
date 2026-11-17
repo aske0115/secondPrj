@@ -62,7 +62,7 @@ body[data-mode="bonus"] #sweep { opacity: .35; }
 #stick i { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; background: #fffc;
   box-shadow: 0 3px 8px #0002; transform: translate(var(--kx, 0), var(--ky, 0)); }
 
-/* ───── 쓸어! 버튼: 둘레가 차오른다 ───── */
+/* ───── 쾅! 버튼: 둘레가 차오른다 ───── */
 #sweep { --p: 0; position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px); width: 96px; height: 96px; margin-left: -48px;
   padding: 0; border: 0; border-radius: 50%; box-shadow: var(--shadow); transition: opacity .25s;
   background: conic-gradient(var(--gold) calc(var(--p) * 1%), #ffffff73 0); }

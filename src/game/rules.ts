@@ -70,6 +70,8 @@ export function pickUpgrades(lv: Levels, hpFull: boolean, rand = Math.random): (
 
 // 밀어 떨어뜨리기가 그냥 처치보다 이득이어야 벼랑 쪽으로 몰 이유가 생긴다
 export const KILL_CHARGE = 1;
+/** 쾅! 직후 이 시간 동안은 게이지가 차지 않는다(쾅!으로 떨어뜨린 보상이 바로 다음 쾅!을 채워 무한으로 쓰던 고리, 결정 055) */
+export const SWEEP_LOCK = 3;
 export const FALL_CHARGE = 2;
 export const killXp = (big: boolean) => (big ? 3 : 1);
 export const fallXp = (big: boolean) => killXp(big) * 2;
@@ -83,7 +85,7 @@ export type Stage = {
 export const STAGES: readonly Stage[] = [
   // 크기는 노는 방식: 좁을수록 가장자리가 가까워 떨어뜨리기가 늘어난다. 넓히면 오히려 어려워져서(봇 측정) 첫 섬이 가장 넓다(결정 045)
   { name: ['풀밭 섬', 'Meadow Isle'], r: 13, grass: 0x86c46a, cliff: 0xb89468, sky: 0xbfe6f5, sun: 0xfff0d2,
-    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.65, big: 0.5, hp: 0.7, speed: 0.85, dmg: 0.6 }, // 첫 섬은 배우는 섬: 처음 하는 사람도 몇 판 안에 깨게(결정 050)
+    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.55, big: 0.45, hp: 0.6, speed: 0.85, dmg: 0.45 }, // 첫 섬은 배우는 섬: 처음 하는 사람도 몇 판 안에 깨게(결정 050)
   { name: ['단풍 섬', 'Maple Isle'], r: 12, grass: 0xd9a24e, cliff: 0x9a6b4a, sky: 0xf6dcc0, sun: 0xffd9a8,
     crumbles: [{ at: 30, r: 11 }, { at: 60, r: 10 }, { at: 90, r: 9 }], spawn: 1.15, big: 1.25, hp: 1.2, speed: 1.05, dmg: 1 },
   { name: ['달빛 묘지 섬', 'Moonlit Isle'], r: 10.5, grass: 0x5f8a7a, cliff: 0x6b6378, sky: 0x2d3555, sun: 0xb9c6ff,
@@ -97,14 +99,15 @@ export const crumbleWarning = (t: number, st: Stage = STAGES[0]) => st.crumbles.
 // 낙하산 보급: 판 중간중간 하늘에서 상자가 내려온다. 밟으면 열린다(결정 042)
 export const DROPS = ['heart', 'charge', 'golden', 'helper'] as const;
 export type DropId = (typeof DROPS)[number];
-export const FIRST_DROP = 12;
-export const DROP_INTERVAL = 17;
+export const FIRST_DROP = 20;
+export const DROP_INTERVAL = 28; // 사용자: 17초는 너무 잦음(결정 055)
 export const DROP_FALL = 3; // 내려오는 데 걸리는 초
 export const DROP_LIFE = 12; // 땅에 닿은 뒤 이만큼 지나면 사라진다
 export const GOLDEN_SECONDS = 8;
-export const HELPER_SECONDS = 12;
+export const HELPER_SECONDS = 7; // 사용자: 12초는 너무 오래 잡음(결정 055)
 /** 체력이 가득이면 회복은 빼고 고른다 */
-export function pickDrop(hpFull: boolean, rand = Math.random): DropId {
-  const pool = DROPS.filter((d) => !(hpFull && d === 'heart'));
+/** 체력이 가득이면 회복은, 이번 판에 도우미가 이미 왔으면 도우미는 빼고 고른다(도우미는 판당 1번) */
+export function pickDrop(hpFull: boolean, rand = Math.random, helperUsed = false): DropId {
+  const pool = DROPS.filter((d) => !(hpFull && d === 'heart') && !(helperUsed && d === 'helper'));
   return pool[Math.floor(rand() * pool.length)];
 }

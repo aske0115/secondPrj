@@ -78,18 +78,20 @@ export const fallXp = (big: boolean) => killXp(big) * 2;
 
 // 섬(스테이지). 앞 섬을 버티면 다음 섬이 열린다. 섬마다 색·무너지는 때·적 세기가 다르다
 export type Crumble = { readonly at: number; readonly r: number };
+/** 섬마다 다른 장난감 장치(결정 059): 풀밭 스프링 버섯, 단풍 통, 달빛 유령 등불 */
+export type Gadget = 'spring' | 'barrel' | 'lantern';
 export type Stage = {
   name: readonly [string, string]; r: number; grass: number; cliff: number; sky: number; sun: number;
-  crumbles: readonly Crumble[]; spawn: number; big: number; hp: number; speed: number; dmg: number;
+  crumbles: readonly Crumble[]; spawn: number; big: number; hp: number; speed: number; dmg: number; gadget: Gadget;
 };
 export const STAGES: readonly Stage[] = [
   // 크기는 노는 방식: 좁을수록 가장자리가 가까워 떨어뜨리기가 늘어난다. 넓히면 오히려 어려워져서(봇 측정) 첫 섬이 가장 넓다(결정 045)
   { name: ['풀밭 섬', 'Meadow Isle'], r: 13, grass: 0x86c46a, cliff: 0xb89468, sky: 0xbfe6f5, sun: 0xfff0d2,
-    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.55, big: 0.45, hp: 0.6, speed: 0.85, dmg: 0.45 }, // 첫 섬은 배우는 섬: 처음 하는 사람도 몇 판 안에 깨게(결정 050)
+    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.55, big: 0.45, hp: 0.6, speed: 0.85, dmg: 0.45, gadget: 'spring' }, // 첫 섬은 배우는 섬: 처음 하는 사람도 몇 판 안에 깨게(결정 050)
   { name: ['단풍 섬', 'Maple Isle'], r: 12, grass: 0xd9a24e, cliff: 0x9a6b4a, sky: 0xf6dcc0, sun: 0xffd9a8,
-    crumbles: [{ at: 30, r: 11 }, { at: 60, r: 10 }, { at: 90, r: 9 }], spawn: 1.15, big: 1.25, hp: 1.2, speed: 1.05, dmg: 1 },
+    crumbles: [{ at: 30, r: 11 }, { at: 60, r: 10 }, { at: 90, r: 9 }], spawn: 1.15, big: 1.25, hp: 1.2, speed: 1.05, dmg: 1, gadget: 'barrel' },
   { name: ['달빛 묘지 섬', 'Moonlit Isle'], r: 10.5, grass: 0x5f8a7a, cliff: 0x6b6378, sky: 0x2d3555, sun: 0xb9c6ff,
-    crumbles: [{ at: 25, r: 10 }, { at: 50, r: 9.4 }, { at: 75, r: 8.8 }, { at: 100, r: 8.2 }], spawn: 1.42, big: 1.55, hp: 1.52, speed: 1.13, dmg: 1.1 },
+    crumbles: [{ at: 25, r: 10 }, { at: 50, r: 9.4 }, { at: 75, r: 8.8 }, { at: 100, r: 8.2 }], spawn: 1.42, big: 1.55, hp: 1.52, speed: 1.13, dmg: 1.1, gadget: 'lantern' },
 ];
 export const CRUMBLE_WARN = 3;
 export const islandRadius = (t: number, st: Stage = STAGES[0]) => st.crumbles.reduce((r, c) => (t >= c.at ? c.r : r), st.r);
@@ -140,3 +142,21 @@ export const KIND_KNOCK: Record<Kind, number> = { '': 1, balloon: 2.2, shield: 1
 export const SHIELD_BLOCK = 0.25; // 방패는 정면에서 오는 망치를 막는다(통나무·호박·쾅!은 그대로)
 export const BOMB_RADIUS = 2.6;
 export const BOMB_KNOCK = 13;
+
+// ───── 섬 장치(결정 059) ─────
+export const GADGET_COUNT = 3;
+export const SPRING_LAUNCH = 18; // 버섯을 밟은 적이 섬 바깥쪽으로 튕겨 나가는 힘
+export const SPRING_CD = 0.8;
+export const BARREL_SPEED = 9;
+export const BARREL_RANGE = 7; // 이만큼 굴러가거나 적에 닿으면 터진다
+export const BARREL_RESPAWN = 9;
+export const LANTERN_EVERY = 9;
+export const LANTERN_ON = 2.5;
+export const LANTERN_PULL = 4.5; // 이 거리 안의 적을 끌어당긴다
+export const LANTERN_FORCE = 9;
+
+// ───── 날씨(결정 059): 판마다 한 번, 한쪽으로 모두 미끄러진다 ─────
+export const WEATHER_AT = 55;
+export const WEATHER_SECONDS = 6;
+export const WEATHER_PUSH = 12; // 넉백으로 더해 가장자리 적은 떨어진다(자기들끼리 밀린 것과 구분되는 기준 2를 넘김)
+export type Weather = 'wind' | 'quake';

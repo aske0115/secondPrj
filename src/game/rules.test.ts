@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { WEATHER_AT, WEATHER_SECONDS, WEATHER_PUSH, BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -114,4 +114,10 @@ test('새 적은 정해진 시간 뒤에만 나온다', () => {
   const later = new Set(Array.from({ length: 100 }, (_, i) => pickKind(60, false, () => i / 100)));
   expect(later.has('balloon') && later.has('bomb')).toBe(true);
   expect(new Set(Array.from({ length: 100 }, (_, i) => pickKind(60, true, () => i / 100))).has('shield')).toBe(true);
+});
+
+test('날씨는 보너스 판과 겹치지 않고 판 안에서 끝난다', () => {
+  expect(WEATHER_AT + WEATHER_SECONDS).toBeLessThan(BONUS_AT);
+  expect(WEATHER_PUSH / 4.5).toBeGreaterThan(2); // 넉백이 계속 쌓이면 가장자리 적이 떨어질 만큼(감쇠 4.5/초)
+  for (const st of STAGES) expect(['spring', 'barrel', 'lantern']).toContain(st.gadget);
 });

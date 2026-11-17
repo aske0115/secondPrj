@@ -92,6 +92,8 @@ export function fall() {
   o.start(t);
   o.stop(t + 0.6);
 }
+/** 스프링 버섯에 튕김 */
+export const pop = () => play('pop', 0.8, 0.06, 0, 1.3);
 /** 호박 폭탄 터짐·상자 착지 */
 export const squish = (vol = 1) => play('squish', vol, 0.08);
 /** 통나무가 굴러 나옴 */

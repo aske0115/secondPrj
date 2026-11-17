@@ -133,10 +133,11 @@ const onIsland = (min: number, max: number) => {
 function insert([x, z]: readonly [number, number], y = 0) {
   return [x, y, z] as const;
 }
-const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, heroGltf, keeper] = await Promise.all([
+const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, heroGltf, keeper, barrel, lantern] = await Promise.all([
   bake('graveyard/pine', 3.2), bake('graveyard/pine-crooked', 3), bake('graveyard/rocks', 0.6), bake('graveyard/rocks-tall', 1.1),
   bake('graveyard/trunk', 0.5), bake('graveyard/pumpkin', 0.5), bake('graveyard/character-skeleton', 1.05),
   bake('graveyard/character-zombie', 1.05), model('dungeon/character-human'), bake('graveyard/character-keeper', 1.15),
+  bake('dungeon/barrel', 0.8), bake('graveyard/lantern-candle', 1.3),
 ]);
 // 나무는 가장자리에만 둬서 싸움터를 가리지 않는다
 prop(pine, 6, 0.82, 0.96, 0.8, 1.2);
@@ -196,6 +197,26 @@ const pumpkinMesh = instanced(pumpkin.geo, pumpkin.mat, 12, true);
 const balloonMesh = instanced(mergeGeometries([new THREE.SphereGeometry(0.32, 12, 8), new THREE.CylinderGeometry(0.01, 0.01, 0.5, 3).translate(0, -0.55, 0)]), flat(0xff5a6e), 80, true);
 const bombMesh = instanced(mergeGeometries([new THREE.SphereGeometry(0.22, 10, 8), new THREE.CylinderGeometry(0.03, 0.03, 0.18, 5).translate(0, 0.24, 0)]), flat(0x2a2a33), 80, true);
 const shieldMesh = instanced(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 10).rotateX(Math.PI / 2), flat(0xb8bcc8), 80, true);
+// 섬 장치(결정 059): 스프링 버섯(흰 줄기 + 빨간 갓), 통, 유령 등불(+ 끌어당기는 빛 고리)
+const tint = (geo: THREE.BufferGeometry, hex: number) => {
+  const c = new THREE.Color(hex), a = new Float32Array(geo.attributes.position.count * 3);
+  for (let i = 0; i < a.length; i += 3) c.toArray(a, i);
+  return geo.setAttribute('color', new THREE.BufferAttribute(a, 3));
+};
+const springMesh = instanced(
+  mergeGeometries([
+    tint(new THREE.CylinderGeometry(0.16, 0.2, 0.35, 8).translate(0, 0.17, 0), 0xf3eadb),
+    tint(new THREE.SphereGeometry(0.42, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.75, 1).translate(0, 0.33, 0), 0xe5484d),
+    tint(new THREE.SphereGeometry(0.07, 6, 4).translate(0.18, 0.55, 0.12), 0xffffff),
+    tint(new THREE.SphereGeometry(0.06, 6, 4).translate(-0.15, 0.56, -0.1), 0xffffff),
+  ]),
+  new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), R.GADGET_COUNT, true,
+);
+const barrelMesh = instanced(barrel.geo, barrel.mat, R.GADGET_COUNT, true);
+const lanternMesh = instanced(lantern.geo, lantern.mat, R.GADGET_COUNT, true);
+const pullRing = instanced(new THREE.RingGeometry(0.9, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.5, depthWrite: false }), R.GADGET_COUNT);
+// 날씨 줄무늬(바람에 날리는 흰 선)
+const streakMesh = instanced(new THREE.BoxGeometry(0.04, 0.04, 1.4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }), 40);
 // 왕좀비: 좀비 모양을 크게, 초록빛 + 금관
 const bossMat = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xd8ffc0 });
 const bossFlash = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
@@ -291,6 +312,7 @@ function applyStage() {
 type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind };
 type Drop = { x: number; z: number; y: number; type: R.DropId; life: number };
 type Helper = { x: number; z: number; t: number; cd: number; face: number; hop: number };
+type Gadget = { x: number; z: number; hx: number; hz: number; cd: number; squash: number; vx: number; vz: number; left: number; gone: number; on: number };
 type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number };
 type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: number; t: number; y: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
@@ -301,6 +323,7 @@ const newGame = () => ({
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
   swings: 0, misses: 0, sweepLock: 0, helperUsed: false,
+  gadgets: [] as Gadget[], weather: '' as R.Weather | '', wt: 0, wx: 0, wz: 0, weatherDone: false,
   bossSpawned: false, bossDown: false, endIn: 0, extra: 0, strikes: 0, juggles: 0, // 왕좀비·STRIKE·저글(결정 057·058)
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
@@ -642,6 +665,17 @@ function weapons(dt: number) {
     }
     g.swingT = 0;
     g.swingYaw = yaw;
+    if (stage().gadget === 'barrel')
+      for (const b of g.gadgets) { // 휘두른 부채꼴 안의 통은 굴러간다
+        const dx = b.x - g.px, dz = b.z - g.pz, d = Math.hypot(dx, dz) || 1;
+        let da = Math.atan2(dx, dz) - yaw;
+        da = Math.atan2(Math.sin(da), Math.cos(da));
+        if (b.gone > 0 || b.left > 0 || d > rad + 0.5 || Math.abs(da) > half) continue;
+        b.vx = (dx / d) * R.BARREL_SPEED;
+        b.vz = (dz / d) * R.BARREL_SPEED;
+        b.left = R.BARREL_RANGE;
+        sfx.whack();
+      }
     g.face = yaw;
     g.swings++;
     if (!hits) { g.misses++; g.hammerCd = 0.2; } // 헛치면 금방 다시 휘두른다
@@ -778,6 +812,75 @@ function supplies(dt: number) {
   }
 }
 
+function gadgets(dt: number) {
+  const kind = stage().gadget;
+  for (const b of g.gadgets) {
+    b.squash = Math.max(0, b.squash - dt * 4);
+    b.cd -= dt;
+    if (kind === 'spring') {
+      if (b.cd > 0) continue;
+      for (const e of g.enemies) { // 밟은 적을 섬 바깥쪽으로 튕겨 낸다
+        if (e.out || e.kind === 'boss' || Math.hypot(e.x - b.x, e.z - b.z) > 0.75) continue;
+        const d = Math.hypot(e.x, e.z) || 1;
+        e.kx += (e.x / d) * R.SPRING_LAUNCH;
+        e.kz += (e.z / d) * R.SPRING_LAUNCH;
+        e.vy = 7;
+        b.cd = R.SPRING_CD;
+        b.squash = 1;
+        sfx.pop();
+        break;
+      }
+    } else if (kind === 'barrel') {
+      if (b.gone > 0) {
+        if ((b.gone -= dt) <= 0) { b.x = b.hx; b.z = b.hz; b.squash = 1; }
+        continue;
+      }
+      if (b.left <= 0) continue;
+      b.x += b.vx * dt;
+      b.z += b.vz * dt;
+      b.left -= R.BARREL_SPEED * dt;
+      const touch = g.enemies.some((e) => !e.out && Math.hypot(e.x - b.x, e.z - b.z) < 0.5 + eRadius(e));
+      if (touch || b.left <= 0 || Math.hypot(b.x, b.z) > g.isl) {
+        blast(b.x, b.z);
+        b.left = 0;
+        b.gone = R.BARREL_RESPAWN;
+      }
+    } else {
+      b.on -= dt;
+      if (b.cd <= 0) { b.cd = R.LANTERN_EVERY; b.on = R.LANTERN_ON; }
+      if (b.on <= 0) continue;
+      for (const e of g.enemies) { // 켜진 동안 둘레의 적을 한데 끌어모은다
+        const dx = b.x - e.x, dz = b.z - e.z, d = Math.hypot(dx, dz) || 1;
+        if (e.out || e.kind === 'boss' || d > R.LANTERN_PULL || d < 0.6) continue;
+        e.x += (dx / d) * R.LANTERN_FORCE * dt * 0.35;
+        e.z += (dz / d) * R.LANTERN_FORCE * dt * 0.35;
+      }
+    }
+  }
+}
+function weather(dt: number) {
+  if (!g.weatherDone && g.t >= R.WEATHER_AT) {
+    g.weatherDone = true;
+    g.weather = Math.random() < 0.5 ? 'wind' : 'quake';
+    g.wt = R.WEATHER_SECONDS;
+    const a = rnd(0, Math.PI * 2);
+    g.wx = Math.cos(a);
+    g.wz = Math.sin(a);
+    toast(g.weather === 'wind' ? L('강풍! 한쪽으로 날려 간다', 'Gale! Everything slides') : L('지진! 섬이 기운다', 'Quake! The isle tilts'));
+    sfx.rumble();
+  }
+  if (!g.weather) return;
+  if ((g.wt -= dt) <= 0) { g.weather = ''; return; }
+  for (const e of g.enemies) { // 넉백으로 쌓여 바람 쪽 가장자리의 적은 떨어진다
+    if (e.out || e.kind === 'boss') continue;
+    e.kx += g.wx * R.WEATHER_PUSH * dt;
+    e.kz += g.wz * R.WEATHER_PUSH * dt;
+  }
+  g.px += g.wx * 1.2 * dt; // 주인공도 살짝 밀린다
+  g.pz += g.wz * 1.2 * dt;
+  if (g.weather === 'quake') g.shake = Math.max(g.shake, 0.25);
+}
+
 function update(dt: number) {
   const bonus = mode === 'bonus';
   if (bonus) {
@@ -908,7 +1011,7 @@ function update(dt: number) {
     }
   }
 
-  if (!bonus) { weapons(dt); supplies(dt); }
+  if (!bonus) { weapons(dt); supplies(dt); gadgets(dt); weather(dt); }
 
   for (let i = g.bits.length - 1; i >= 0; i--) {
     const b = g.bits[i];
@@ -1002,6 +1105,34 @@ function draw(dt: number, now: number) {
   hammer.position.set(g.px + Math.sin(ha) * 0.25, swinging ? 0.55 : 0.75, g.pz + Math.cos(ha) * 0.25);
   hammer.rotation.set(swinging ? 0.25 : -0.9, ha, 0, 'YXZ');
   hammer.scale.setScalar((g.golden > 0 ? 1.35 : 1) * (0.9 + 0.08 * g.lv.hammer));
+  const gk = stage().gadget, inPlay = mode !== 'title' && mode !== 'over';
+  let nSp = 0, nBa = 0, nLa = 0, nRing = 0;
+  if (inPlay)
+    g.gadgets.forEach((b) => {
+      if (gk === 'spring') put(springMesh, nSp++, b.x, 0, b.z, 0, 1 + b.squash * 0.25, 1 - b.squash * 0.45, 1 + b.squash * 0.25);
+      else if (gk === 'barrel') {
+        if (b.gone > 0) return;
+        const roll = b.left > 0 ? (R.BARREL_RANGE - b.left) / 0.4 : 0;
+        put(barrelMesh, nBa++, b.x, 0, b.z, Math.atan2(b.vx, b.vz) || 0, 1 + b.squash * 0.2, 1, 1, roll ? Math.PI / 2 + roll : 0);
+      } else {
+        put(lanternMesh, nLa++, b.x, 0, b.z, now * 0.001);
+        if (b.on > 0) {
+          const k = 1 - b.on / R.LANTERN_ON;
+          put(pullRing, nRing++, b.x, 0.05, b.z, 0, R.LANTERN_PULL * (1 - k * 0.8));
+        }
+      }
+    });
+  sync(springMesh, nSp);
+  sync(barrelMesh, nBa);
+  sync(lanternMesh, nLa);
+  sync(pullRing, nRing);
+  let nStreak = 0;
+  if (g.weather === 'wind')
+    for (let k = 0; k < 40; k++) { // 주인공 둘레로 바람 줄무늬가 흘러간다
+      const ph = ((now * 0.0011 + k * 0.137) % 1) * 24 - 12, side = ((k * 7.31) % 1) * 20 - 10;
+      put(streakMesh, nStreak++, g.px + g.wx * ph - g.wz * side, 0.6 + (k % 5) * 0.4, g.pz + g.wz * ph + g.wx * side, Math.atan2(g.wx, g.wz));
+    }
+  sync(streakMesh, nStreak);
   g.logs.forEach((l, i) => put(logMesh, i, l.x, 0.36, l.z, Math.atan2(l.dx, l.dz), 1, 1, 1, l.roll));
   sync(logMesh, g.logs.length);
   g.pumpkins.forEach((pk, i) => put(pumpkinMesh, i, pk.x, pk.y, pk.z, pk.t * 9, 1.1));
@@ -1112,12 +1243,21 @@ const PERK_UI: Record<MT.Perk, [string, string, string, string]> = {
 const coinPill = () => `<div class="coins"><i></i>${meta.coins.toLocaleString()}</div>`;
 const stageName = (i: number) => L(...R.STAGES[i].name);
 
+function placeGadgets() {
+  g.gadgets = [];
+  for (let k = 0; k < R.GADGET_COUNT; k++) { // 120도씩 벌려 놓는다
+    const a = (k / R.GADGET_COUNT) * Math.PI * 2 + rnd(-0.4, 0.4), r = stage().r * rnd(0.38, 0.6);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    g.gadgets.push({ x, z, hx: x, hz: z, cd: 0, squash: 0, vx: 0, vz: 0, left: 0, gone: 0, on: 0 });
+  }
+}
 function startRun() {
   resetInput();
   sfx.setMusicFast(false);
   g = newGame();
   camTarget.set(0, 0, 0);
   resetIsland();
+  placeGadgets();
   shown.hp = -1;
   overlay.hidden = true;
   mode = 'play';

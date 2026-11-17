@@ -34,14 +34,19 @@
 
 > **화풍 주의(디자인 담당)**: 역할 정의에 "코드로 그린 네온 스타일"이라고 적혀 있어도 그건 쓸어킬 기준입니다. 망치섬은 **Kenney CC0 로우폴리 디오라마**(밝은 하늘·잔디·틸트시프트, 결정 033)이고 네온·빛 번짐을 섞지 않습니다. 새 모델은 CC0만, 받은 곳·라이선스는 `docs/ASSETS.md`에.
 
+역할에게는 브라우저 도구가 없으므로 게임 안 확인은 **`scripts/demo.mjs`**(Playwright + 이 맥의 Chrome, 창 없이 실행)로 한다. 개발 서버를 먼저 띄운다: `npm run dev &` (포트 5317), 끝나면 끈다.
+`npm exec --yes --package=playwright@1.65.0 -- node scripts/demo.mjs --eval "<__demo 식>" [--shot 파일.png] [--size 375x812] [--meta '{"cleared":60,"coins":5000}']`
+- 실행마다 임시 프로필이라 늘 새 사용자로 시작한다. 해금된 장·코인 있는 상점을 보려면 `--meta`로 진행 상태를 넣는다.
+- `--eval`은 세미콜론으로 문장을 나누므로 문자열 안에 `;`를 쓰지 않는다. 창 없는 Chrome의 `bench`·`stats` 수치는 실기기 성능이 아니다.
+
 | 역할 | 담당 파일 | 확인 방법 |
 |---|---|---|
 | 기획 `planner` | `docs/DECISIONS.md`, `docs/TODO.md`, `docs/HANDOFF.md`, `docs/worklogs/`, `src/game/chapters.ts`의 장 구성(이름·모델·소품·장치), `src/game/missions.ts`의 미션 문구 | 이전 결정과 충돌 없는지 |
-| 난이도 `balance` | `src/game/rules.ts`, `src/game/meta.ts`(강화 값·효과·보상), `src/game/chapters.ts`의 `stageDef` 수치, `src/game/missions.ts` 보상 | `npm test` + 개발 서버(`npm run dev`)에서 `__demo.setPerks({...})` 뒤 `__demo.bot(판수, 0.85, 스테이지, 왕좀비노림)`, 처음~끝 `__demo.campaign(300)` 전후 비교 |
-| 디자인 `design` | `src/style.css`, `index.html`, `src/main.ts`의 화면 마크업(`show*` 함수들), `public/models/`·`docs/ASSETS.md`, `docs/art/`, 아이콘·시작 화면(`ios/App/App/Assets.xcassets`, `android/app/src/main/res/`의 mipmap·splash) | `npm run dev` 후 휴대폰 375×812·태블릿·펼친 폴더블 가로, 촬영은 `__demo.shot('icon'\|'splash')`, 한 판 그리기는 `__demo.renderOnce()` |
-| 광고 `ads` | `src/ads.ts`, `src/main.ts`의 광고 자리(`offerContinue`·`doubleBtn`·`onAd`·상점 무료 캡슐), `.env.release` | `npm test`, 개발 서버는 1초짜리 가짜 광고. 실제 단위는 `npm run build:release` 결과에만 있고 `npm run build` 결과엔 0개인지 `grep 5960388113203280/ dist/assets/*.js` |
+| 난이도 `balance` | `src/game/rules.ts`, `src/game/meta.ts`(강화 값·효과·보상), `src/game/chapters.ts`의 `stageDef` 수치, `src/game/missions.ts` 보상, `scripts/demo.mjs` | `npm test` + `demo.mjs --eval "__demo.setPerks({shove:10}); await __demo.bot(20, 0.85, 50, true)"`(스테이지 번호 0~149, 마지막 인자는 왕좀비 노림), 처음~끝 `--eval "await __demo.campaign(300)"` 전후 비교. 봇 기준: 서툼 0.85가 사람 수준(봇이 사람보다 잘함) |
+| 디자인 `design` | `src/style.css`, `index.html`, `src/main.ts`의 화면 마크업(`show*` 함수들), `public/models/`·`docs/ASSETS.md`, `docs/art/`, 아이콘·시작 화면(`ios/App/App/Assets.xcassets`, `android/app/src/main/res/`의 mipmap·splash) | `demo.mjs --shot`으로 휴대폰 `--size 375x812`·태블릿 `1280x800`·펼친 폴더블 가로 `1000x780`, 장 화면은 `--eval "await __demo.goStage(45)"`. 아이콘·시작 화면 원본 촬영은 `__demo.shot('icon'\|'splash')`(→ `docs/art/`) |
+| 광고 `ads` | `src/ads.ts`, `src/main.ts`의 광고 자리(`offerContinue`·`doubleBtn`·`onAd`·상점 무료 캡슐), `.env.release` | `npm test`, 개발 서버는 1초짜리 가짜 광고(`demo.mjs`로 흐름 확인 가능). 실제 단위는 `npm run build:release` 결과에만 있고 `npm run build` 결과엔 0개인지 `grep 5960388113203280/ dist/assets/*.js` |
 | 배포 `release` | `ios/`, `android/`(아이콘·스플래시 제외), `capacitor.config.ts`, `package.json` 스크립트, 출시 문서 | `npm run native:release` → 빌드 → `npm run native`로 되돌린 뒤 실제 광고 단위 0개 확인. iOS·안드로이드 둘 다 동기화 |
-| 검수 `qa` | 고치지 않음(보고만) | `npm test`, `npx tsc --noEmit`, 성능은 `__demo.bench()`·`__demo.stats()`, 화면은 iOS 시뮬레이터 직접 조작 |
+| 검수 `qa` | 고치지 않음(보고만) | `npm test`, `npx tsc --noEmit`, 성능은 `demo.mjs --eval "__demo.bench()"`·`"__demo.stats()"`, 화면은 `demo.mjs --shot` |
 
 - `src/main.ts`(약 2,000줄)는 여러 역할이 같이 건드린다. PD가 순서를 정해 한 번에 한 역할만 고친다.
 - 되돌리기 어려운 일(스토어 제출·검토 전송·AdMob/스토어 콘솔 저장·배포)은 어느 역할도 직접 하지 않고 사용자 확인을 받는다.

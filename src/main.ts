@@ -1954,6 +1954,8 @@ if (DEV)
         }
         return { maxedAt, cleared: meta.cleared, log };
       },
+      /** 강화 단계를 바로 정한다(강화별 효과를 봇으로 비교할 때) */
+      setPerks: (p: Partial<Record<MT.Perk, number>>) => { meta = { ...meta, perks: { ...MT.freshMeta().perks, ...p } }; },
       sweep,
       /** 스테이지 번호(0~149)로 바로 가서 장 모델을 불러온다 */
       goStage: (no: number) => enterStage(no).then(() => showTitle()),

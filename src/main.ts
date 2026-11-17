@@ -6,6 +6,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { L } from './i18n';
 import * as sfx from './audio';
 import * as R from './game/rules';
@@ -54,19 +55,13 @@ function resize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   camDist = Math.max(9.5 / (2 * t * camera.aspect), 15 / (2 * t)); // 가로 9.5칸은 항상 보이게
-  tilt.uniforms.v.value = 2.4 / h;
+  tilt.uniforms.v.value = 3.2 / h;
 }
 addEventListener('resize', resize);
 resize();
 
-// ───────── 모양: 색을 꼭짓점에 구워 한 덩어리로 합친다(그리기 횟수 절약) ─────────
+// ───────── 모양 ─────────
 const flat = (color: number, extra = {}) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra });
-const painted = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-function part(geo: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0) {
-  const c = new THREE.Color(color), n = geo.attributes.position.count, a = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) c.toArray(a, i * 3);
-  return geo.translate(x, y, z).setAttribute('color', new THREE.BufferAttribute(a, 3));
-}
 function instanced(geo: THREE.BufferGeometry, mat: THREE.Material, max: number, shadow = false) {
   const m = new THREE.InstancedMesh(geo, mat, max);
   m.frustumCulled = false; // 인스턴스가 계속 움직여 경계 구가 맞지 않는다
@@ -90,60 +85,80 @@ const cliff = new THREE.Mesh(new THREE.CylinderGeometry(R.ISLAND_R - 0.6, 3, 9, 
 cliff.position.y = -5.5;
 scene.add(grass, cliff);
 
-const trees = instanced(
-  mergeGeometries([
-    part(new THREE.CylinderGeometry(0.16, 0.24, 0.9, 6), 0x8a5a3c, 0, 0.45),
-    part(new THREE.ConeGeometry(0.95, 1.5, 7), 0x4fae62, 0, 1.5),
-    part(new THREE.ConeGeometry(0.7, 1.2, 7), 0x67c474, 0, 2.3),
-  ]),
-  painted, 9, true,
-);
-const stones = instanced(new THREE.DodecahedronGeometry(0.5), flat(0xb9bfc9), 10, true);
-const flowers = instanced(new THREE.SphereGeometry(0.09, 6, 4), flat(0xffffff), 70);
+// 모델(Kenney CC0, public/models). 여러 조각을 한 덩어리로 구워 인스턴스로 그린다
+const loader = new GLTFLoader();
+const model = (path: string) => loader.loadAsync(`${import.meta.env.BASE_URL}models/${path}.glb`);
+/** 바닥 가운데를 원점으로 옮기고 높이를 맞춘다 */
+function fit(geo: THREE.BufferGeometry, height: number) {
+  geo.computeBoundingBox();
+  const b = geo.boundingBox!, k = height / (b.max.y - b.min.y);
+  return geo.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2).scale(k, k, k);
+}
+async function bake(path: string, height: number) {
+  const { scene: root } = await model(path);
+  root.updateMatrixWorld(true);
+  const parts: THREE.BufferGeometry[] = [];
+  let map: THREE.Texture | null = null;
+  root.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const geo = new THREE.BufferGeometry();
+    for (const k of ['position', 'normal', 'uv']) geo.setAttribute(k, o.geometry.attributes[k]);
+    geo.setIndex(o.geometry.index);
+    parts.push(geo.applyMatrix4(o.matrixWorld));
+    map ??= (o.material as THREE.MeshStandardMaterial).map;
+  });
+  return { geo: fit(mergeGeometries(parts), height), mat: new THREE.MeshLambertMaterial({ map }) };
+}
+function prop(b: { geo: THREE.BufferGeometry; mat: THREE.Material }, n: number, min: number, max: number, s0: number, s1: number) {
+  const m = instanced(b.geo, b.mat, n, true);
+  for (let i = 0; i < n; i++) put(m, i, ...insert(onIsland(min, max)), rnd(0, 6), rnd(s0, s1));
+  m.count = n;
+}
 const onIsland = (min: number, max: number) => {
   const a = rnd(0, Math.PI * 2), d = R.ISLAND_R * rnd(min, max);
   return [Math.cos(a) * d, Math.sin(a) * d] as const;
 };
-for (let i = 0; i < 9; i++) put(trees, i, ...insert(onIsland(0.82, 0.96)), rnd(0, 6), rnd(0.8, 1.3)); // 가장자리에만 둬서 싸움터를 가리지 않는다
-for (let i = 0; i < 10; i++) put(stones, i, ...insert(onIsland(0.3, 0.95), 0.1), rnd(0, 6), rnd(0.5, 1.2), rnd(0.4, 0.8));
+function insert([x, z]: readonly [number, number], y = 0) {
+  return [x, y, z] as const;
+}
+const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, heroGltf] = await Promise.all([
+  bake('graveyard/pine', 3.2), bake('graveyard/pine-crooked', 3), bake('graveyard/rocks', 0.6), bake('graveyard/rocks-tall', 1.1),
+  bake('graveyard/trunk', 0.5), bake('graveyard/pumpkin', 0.5), bake('graveyard/character-skeleton', 1.05),
+  bake('graveyard/character-zombie', 1.05), model('dungeon/character-human'),
+]);
+// 나무는 가장자리에만 둬서 싸움터를 가리지 않는다
+prop(pine, 6, 0.82, 0.96, 0.8, 1.2);
+prop(pine2, 4, 0.8, 0.96, 0.8, 1.2);
+prop(rocks, 6, 0.45, 0.95, 0.6, 1);
+prop(rocksTall, 3, 0.75, 0.95, 0.8, 1.2);
+prop(trunk, 3, 0.4, 0.9, 1, 1.3);
+prop(pumpkin, 5, 0.3, 0.95, 0.8, 1.3);
+const flowers = instanced(new THREE.SphereGeometry(0.09, 6, 4), flat(0xffffff), 70);
 for (let i = 0; i < 70; i++) {
   put(flowers, i, ...insert(onIsland(0.05, 0.97), 0.08));
   flowers.setColorAt(i, new THREE.Color([0xffffff, 0xffe27a, 0xff9fb8][i % 3]));
 }
-trees.count = 9;
-stones.count = 10;
 flowers.count = 70;
-function insert([x, z]: readonly [number, number], y = 0) {
-  return [x, y, z] as const;
-}
 const clouds = instanced(new THREE.IcosahedronGeometry(1, 1), flat(0xffffff), 9);
 for (let i = 0; i < 9; i++) put(clouds, i, rnd(-24, 24), rnd(-13, -6), rnd(-26, 14), 0, rnd(3, 6), rnd(1.2, 2), rnd(2.5, 4));
 clouds.count = 9;
 
-// 주인공(임시 모양, 에셋으로 바꿀 자리). +z를 본다
-const hero = new THREE.Mesh(
-  mergeGeometries([
-    part(new THREE.CylinderGeometry(0.22, 0.34, 0.6, 8), 0x4f7de0, 0, 0.3),
-    part(new THREE.SphereGeometry(0.28, 10, 8), 0xffd9b5, 0, 0.82),
-    part(new THREE.ConeGeometry(0.3, 0.42, 8), 0xe2574c, 0, 1.22),
-    part(new THREE.SphereGeometry(0.05, 6, 4), 0x2a2233, 0.1, 0.86, 0.25),
-    part(new THREE.SphereGeometry(0.05, 6, 4), 0x2a2233, -0.1, 0.86, 0.25),
-  ]),
-  painted,
-);
-hero.castShadow = true;
+// 주인공: 한 명뿐이라 뼈대 애니메이션을 그대로 쓴다. +z를 본다
+const hero = heroGltf.scene;
+hero.scale.setScalar(1.25 / new THREE.Box3().setFromObject(hero).getSize(P).y);
+hero.traverse((o) => (o.castShadow = true));
 scene.add(hero);
+const mixer = new THREE.AnimationMixer(hero);
+const clip = (name: string) => mixer.clipAction(THREE.AnimationClip.findByName(heroGltf.animations, name)!);
+const heroIdle = clip('idle'), heroWalk = clip('sprint');
+heroIdle.play();
+heroWalk.play().setEffectiveWeight(0);
 
-// 적: 눈이 달린 말랑한 덩어리. 몸은 흰색으로 굽고 인스턴스 색을 곱해 종류·피격 번쩍임을 낸다
-const enemyMesh = instanced(
-  mergeGeometries([
-    part(new THREE.SphereGeometry(0.5, 12, 8).scale(1, 0.8, 1), 0xffffff, 0, 0.4),
-    part(new THREE.SphereGeometry(0.09, 6, 4), 0x1c1626, 0.17, 0.5, 0.42),
-    part(new THREE.SphereGeometry(0.09, 6, 4), 0x1c1626, -0.17, 0.5, 0.42),
-  ]),
-  painted, R.MAX_ENEMIES, true,
-);
-const C_SMALL = new THREE.Color(0xff8fa3), C_BIG = new THREE.Color(0x8a7cf5), C_FLASH = new THREE.Color(3, 3, 3);
+// 적: 작은 놈은 해골, 큰 놈은 좀비. 인스턴스 색을 곱해 피격 번쩍임을 낸다
+const smallMesh = instanced(skel.geo, skel.mat, R.MAX_ENEMIES, true);
+const bigMesh = instanced(zombie.geo, zombie.mat, R.MAX_ENEMIES, true);
+const C_PLAIN = new THREE.Color(1, 1, 1), C_FLASH = new THREE.Color(3, 3, 3);
+const C_SMALL = new THREE.Color(0xe9e4d4), C_BIG = new THREE.Color(0x7fae6a); // 터질 때 조각 색
 const shotMesh = instanced(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff1a0 }), 64);
 const gemMesh = instanced(new THREE.OctahedronGeometry(0.2), flat(0x55e6d6, { emissive: 0x55e6d6, emissiveIntensity: 0.7 }), 400);
 const bladeMesh = instanced(new THREE.BoxGeometry(0.6, 0.08, 0.18), flat(0xf4f7ff), 6, true);
@@ -168,7 +183,7 @@ const newGame = () => ({
 });
 let g = newGame();
 let mode: 'title' | 'play' | 'pick' | 'over' = 'title';
-const eScale = (e: Enemy) => (e.big ? 1.6 : 0.9);
+const eScale = (e: Enemy) => (e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 
 // ───────── 입력: 화면 어디든 누른 자리가 조이스틱 원점 ─────────
@@ -464,16 +479,23 @@ function sync(mesh: THREE.InstancedMesh, n: number) {
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
 }
 function draw(dt: number, now: number) {
-  hero.position.set(g.px, g.moving ? Math.abs(Math.sin(now * 0.014)) * 0.14 : 0, g.pz);
+  const w = heroWalk.getEffectiveWeight() + (g.moving ? dt : -dt) * 8, ww = Math.min(1, Math.max(0, w));
+  heroWalk.setEffectiveWeight(ww);
+  heroIdle.setEffectiveWeight(1 - ww);
+  mixer.update(mode === 'play' && g.stop <= 0 ? dt : 0);
+  hero.position.set(g.px, 0, g.pz);
   hero.rotation.y = g.face;
   hero.visible = g.inv <= 0 || Math.floor(g.inv * 14) % 2 === 0;
 
-  g.enemies.forEach((e, i) => {
-    const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), sc = eScale(e) * Math.min(1, e.age * 4), wide = sc * (1.12 - hop * 0.2);
-    put(enemyMesh, i, e.x, e.y + hop * 0.28, e.z, Math.atan2(g.px - e.x, g.pz - e.z), wide, sc * (0.82 + hop * 0.34), wide);
-    enemyMesh.setColorAt(i, e.flash > 0 ? C_FLASH : e.big ? C_BIG : C_SMALL);
-  });
-  sync(enemyMesh, g.enemies.length);
+  let ns = 0, nb = 0;
+  for (const e of g.enemies) {
+    const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), sc = eScale(e) * Math.min(1, e.age * 4);
+    const mesh = e.big ? bigMesh : smallMesh, i = e.big ? nb++ : ns++;
+    put(mesh, i, e.x, e.y + hop * 0.22, e.z, Math.atan2(g.px - e.x, g.pz - e.z), sc * (1.04 - hop * 0.08), sc * (0.94 + hop * 0.12));
+    mesh.setColorAt(i, e.flash > 0 ? C_FLASH : C_PLAIN);
+  }
+  sync(smallMesh, ns);
+  sync(bigMesh, nb);
   g.shots.forEach((b, i) => put(shotMesh, i, b.x, 0.6, b.z));
   sync(shotMesh, Math.min(64, g.shots.length));
   g.gems.forEach((m, i) => put(gemMesh, i, m.x, 0.35 + Math.sin(now * 0.005 + i) * 0.08, m.z, now * 0.003 + i));
@@ -607,6 +629,13 @@ if (DEV)
       stress: (n = R.MAX_ENEMIES) => { while (g.enemies.length < n) spawn(); },
       charge: () => (g.charge = 99),
       sweep,
+      // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다
+      bench: (n = 30) => {
+        const gl = renderer.getContext(), t0 = performance.now();
+        for (let i = 0; i < n; i++) { draw(1 / 60, t0 + i * 16); composer.render(); }
+        gl.finish();
+        return +((performance.now() - t0) / n).toFixed(2);
+      },
       // 화면이 가려져 프레임이 안 돌 때도 규칙을 시험하려고 시간을 직접 흘린다
       step: (sec: number, mx = 0, mz = 0) => {
         jx = mx;

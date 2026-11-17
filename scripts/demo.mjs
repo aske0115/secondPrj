@@ -7,7 +7,8 @@
 //   --meta '{"cleared":60,"coins":5000}'              진행 상태를 넣고 시작(해금된 장·코인 있는 상점 화면 확인용)
 // 실행할 때마다 임시 프로필이라 늘 새 사용자로 시작한다(평소 Chrome 저장값과 별개).
 // --eval은 세미콜론으로 문장을 나누므로 문자열 안에 ';'를 쓰면 안 된다.
-// 예: 처음~끝 밸런스  --eval "await __demo.campaign(300)"
+// 예: 처음~끝 밸런스  --eval "await __demo.campaign(300)"   (하루 6판 중 3판 코인 2배: campaign(300, 0.85, 3))
+//     장 규칙 끄고 비교 --eval "__demo.setRule(''); await __demo.bot(40, 0.85, 60, true)"
 //     강화별 비교     --eval "__demo.setPerks({shove:10}); await __demo.bot(20, 0.85, 50, true)"
 //     스테이지 화면   --eval "await __demo.goStage(45)" --shot /tmp/ch4.png
 // 브라우저는 이 맥의 Google Chrome을 쓴다(Playwright 브라우저를 따로 받지 않음).

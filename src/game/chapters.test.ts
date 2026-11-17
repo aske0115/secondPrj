@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { CHAPTERS, STAGE_COUNT, allModels, stageDef } from './chapters';
+import { CHAPTERS, RULE_TOUGH, STAGE_COUNT, allModels, stageDef } from './chapters';
 import { BONUS_AT, BOSS_AT, seeded } from './rules';
 
 const def = (no: number) => stageDef(no, seeded(no * 9973 + 17));
@@ -26,11 +26,17 @@ test('모든 스테이지: 섬 크기·무너짐이 안전한 범위이고 보�
   }
 });
 
-test('뒤 스테이지일수록 어렵다(장 처음끼리 비교)', () => {
-  for (let ch = 1; ch < CHAPTERS.length; ch++) {
-    const a = def((ch - 1) * 15), b = def(ch * 15);
-    for (const k of ['spawn', 'big', 'hp', 'speed', 'dmg'] as const) expect(b[k]).toBeGreaterThan(a[k]);
-  }
+test('뒤 스테이지일수록 어렵다(장 처음끼리 비교, 장 규칙 보정은 빼고)', () => {
+  const plain = (ch: number, k: 'spawn' | 'big' | 'hp' | 'speed' | 'dmg') =>
+    def(ch * 15)[k] / (k === 'spawn' || k === 'dmg' ? RULE_TOUGH[CHAPTERS[ch].rule ?? ''] ?? 1 : 1);
+  for (let ch = 1; ch < CHAPTERS.length; ch++)
+    for (const k of ['spawn', 'big', 'hp', 'speed', 'dmg'] as const) expect(plain(ch, k)).toBeGreaterThan(plain(ch - 1, k));
+});
+
+test('장 규칙 4개: 규칙이 있는 장은 안내 문구가 한국어·영어 둘 다 있다(결정 078)', () => {
+  const ruled = CHAPTERS.filter((c) => c.rule);
+  expect(ruled.map((c) => c.rule).sort()).toEqual(['ice', 'lowGrav', 'springs', 'wind2']);
+  for (const c of ruled) expect(c.ruleText?.every((t) => t.length > 0)).toBe(true);
 });
 
 test('장에서 쓰는 모델 파일이 모두 저장소에 있다', () => {

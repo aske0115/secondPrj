@@ -39,6 +39,7 @@ const camera = new THREE.PerspectiveCamera(26, 1, 10, 200); // 좁은 화각으�
 const CAM_DIR = new THREE.Vector3(0, 0.8, 0.6).normalize();
 let camDist = 50;
 const camTarget = new THREE.Vector3();
+const CAM_PULL_X = 0.8, CAM_PULL_Z = 0.7; // 카메라가 주인공을 따라가는 정도(1이면 그대로). 가로는 폰 화면이 좁아 0.7이면 동·서쪽으로 떨어지는 적이 잘려서 0.8
 
 const hemi = new THREE.HemisphereLight(0xffffff, 0x8fb0c8, 1.25);
 scene.add(hemi);
@@ -291,7 +292,7 @@ const springMesh = instanced(
     tint(new THREE.SphereGeometry(0.07, 6, 4).translate(0.18, 0.55, 0.12), 0xffffff),
     tint(new THREE.SphereGeometry(0.06, 6, 4).translate(-0.15, 0.56, -0.1), 0xffffff),
   ]),
-  new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), R.GADGET_COUNT, true,
+  new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), R.GADGET_COUNT * R.SPRINGS_MUL, true,
 );
 const barrelMesh = instanced(barrel.geo, barrel.mat, R.GADGET_COUNT, true);
 const lanternMesh = instanced(lantern.geo, lantern.mat, R.GADGET_COUNT, true);
@@ -398,6 +399,8 @@ function toStage(d: CH.StageDef): R.Stage {
   };
 }
 const stage = () => curStage;
+let ruleOverride: R.Rule | '' | undefined; // 개발 훅에서 규칙 켜고 끄기 비교용
+const rule = () => (ruleOverride === undefined ? CH.CHAPTERS[curDef.chapter].rule : ruleOverride || undefined); // 장 규칙(결정 078)
 /** 장 모델(적·소품)을 불러와 끼운다. 이미 불러온 장은 바로 */
 let stageReady: Promise<void> = Promise.resolve();
 function enterStage(no: number) {
@@ -446,7 +449,8 @@ const newGame = () => ({
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
   swings: 0, misses: 0, sweepLock: 0, helperUsed: false,
-  gadgets: [] as Gadget[], weather: '' as R.Weather | '', wt: 0, wx: 0, wz: 0, weatherDone: false,
+  gadgets: [] as Gadget[], weather: '' as R.Weather | '', wt: 0, wx: 0, wz: 0, weatherN: 0,
+  need: R.xpNeed(0), xpRecent: 0, xpTot: 0, calm: 0, // 카드 간격·보너스 뒤 숨 고르기(결정 078)
   opened: 0, slams: 0, done: [] as string[], bestChain: 0, // 미션(결정 060)·베스트 컷
   bossSpawned: false, bossDown: false, endIn: 0, extra: 0, strikes: 0, juggles: 0, // 왕좀비·STRIKE·저글(결정 057·058)
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
@@ -598,7 +602,8 @@ function hit(i: number, dmg: number, kx: number, kz: number, byHammer = false) {
   }
   e.kx += kx * km;
   e.kz += kz * km;
-  if (e.kind !== 'boss' && Math.hypot(kx, kz) * km > 7 && e.y <= 0.01) e.vy = 4.5; // 세게 맞으면 살짝 떠오른다
+  const low = rule() === 'lowGrav';
+  if (e.kind !== 'boss' && Math.hypot(kx, kz) * km > (low ? R.LOW_GRAV_KNOCK : 7) && e.y <= 0.01) e.vy = low ? R.LOW_GRAV_LIFT : 4.5; // 세게 맞으면 살짝 떠오른다
   if (e.hp > 0) return;
   if (e.kind === 'bomb') blast(e.x, e.z);
   reward(R.KILL_CHARGE);
@@ -679,10 +684,13 @@ function crumble(r: number) {
 
 function gainXp(n: number) {
   g.xp += n;
-  while (g.xp >= R.xpNeed(g.level)) {
-    g.xp -= R.xpNeed(g.level);
+  g.xpTot += n;
+  g.xpRecent += n;
+  while (g.xp >= g.need) {
+    g.xp -= g.need;
     g.level++;
     g.picks++;
+    g.need = R.cardNeed(g.level, g.xpRecent);
   }
   if (g.picks && mode === 'play') showPick();
 }
@@ -792,7 +800,9 @@ function endBonus() {
   resetInput();
   mode = 'play';
   toast(L(`보너스 끝! +${g.bonusFalls * R.BONUS_COIN} 코인`, `Bonus over! +${g.bonusFalls * R.BONUS_COIN} coins`));
-  g.inv = 1;
+  g.inv = R.BONUS_INV;
+  g.calm = R.BONUS_CALM;
+  g.spawnCd = R.spawnInterval(g.t) / stage().spawn / R.calmSpawn(g.calm); // 보너스 중 줄어든 대기를 되돌려 끝나자마자 몰려오지 않게
   if (g.picks) showPick();
 }
 
@@ -1021,9 +1031,10 @@ function gadgets(dt: number) {
   }
 }
 function weather(dt: number) {
-  if (!g.weatherDone && g.t >= R.WEATHER_AT) {
-    g.weatherDone = true;
-    g.weather = Math.random() < 0.5 ? 'wind' : 'quake';
+  const wind2 = rule() === 'wind2', at = wind2 ? R.WIND2_AT : [R.WEATHER_AT];
+  if (g.weatherN < at.length && g.t >= at[g.weatherN]) {
+    g.weatherN++;
+    g.weather = wind2 || Math.random() < 0.5 ? 'wind' : 'quake';
     g.wt = R.WEATHER_SECONDS;
     const a = rnd(0, Math.PI * 2);
     g.wx = Math.cos(a);
@@ -1074,6 +1085,11 @@ function update(dt: number) {
   }
   g.inv -= dt;
   g.chainT -= dt;
+  g.xpRecent *= Math.exp(-dt / R.XP_WINDOW);
+  if (!bonus && g.calm > 0) {
+    if (g.calm > R.BONUS_CALM - 1) { const k = Math.exp(-0.5 * dt); g.px *= k; g.pz *= k; } // 첫 1초 동안 섬 가운데 쪽으로 미끄러진다(가장자리에서 끝나도 숨 돌리게)
+    g.calm -= dt;
+  }
   g.sweepLock -= dt;
   const isl = R.islandRadius(g.t, stage());
   if (isl < g.isl) crumble(isl);
@@ -1118,12 +1134,12 @@ function update(dt: number) {
   // 적이 올라온다
   g.spawnCd -= dt;
   if (!bonus && g.spawnCd <= 0) {
-    g.spawnCd = R.spawnInterval(g.t) / stage().spawn;
+    g.spawnCd = R.spawnInterval(g.t) / stage().spawn / R.calmSpawn(g.calm);
     for (let i = Math.round(R.spawnBatch(g.t) * stage().spawn); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn();
   }
 
   // 적 이동·낙하·접촉
-  const decay = Math.exp((bonus ? -1.4 : -4.5) * dt); // 보너스 판은 볼링 레인처럼 멀리 미끄러진다
+  const decay = Math.exp((bonus ? -1.4 : rule() === 'ice' ? -R.ICE_DECAY : -4.5) * dt); // 보너스 판·얼음 바닥은 볼링 레인처럼 멀리 미끄러진다
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     const e = g.enemies[i];
     e.age += dt;
@@ -1138,7 +1154,7 @@ function update(dt: number) {
       continue;
     }
     if (e.y > 0 || e.vy > 0) { // 맞아서 살짝 뜬 적(저글 기회)
-      e.vy -= 22 * dt;
+      e.vy -= (rule() === 'lowGrav' ? R.LOW_GRAV : 22) * dt;
       e.y = Math.max(0, e.y + e.vy * dt);
       if (e.y === 0) e.vy = 0;
     }
@@ -1367,7 +1383,7 @@ function draw(dt: number, now: number) {
   (ring.material as THREE.MeshBasicMaterial).opacity = 1 - g.ringT;
 
   g.shake = Math.max(0, g.shake - dt * 3);
-  camTarget.lerp(P.set(g.px, 0, g.pz), 1 - Math.exp(-6 * dt));
+  camTarget.lerp(P.set(g.px * CAM_PULL_X, 0, g.pz * CAM_PULL_Z), 1 - Math.exp(-6 * dt)); // 섬 가운데 쪽으로 당겨 가장자리 너머 떨어지는 적이 보이게(결정 079)
   camera.position.copy(camTarget).addScaledVector(CAM_DIR, camDist);
   camera.position.x += rnd(-1, 1) * g.shake * 0.5;
   camera.position.y += rnd(-1, 1) * g.shake * 0.5;
@@ -1410,19 +1426,28 @@ function show(html: string, cls = '') {
   overlay.innerHTML = html;
   overlay.hidden = false;
 }
+// 레벨 업 시트(결정 079): 아래 절반에 뜨고, 쌓인 카드는 닫지 않고 이어 고른다. 뜬 뒤 0.3초는 눌러도 무시(달리던 손가락이 잘못 누르지 않게)
+let pickAt = 0, pickTotal = 0;
 function showPick() {
   const picks = R.pickUpgrades(g.lv, g.hp >= g.maxHp);
-  if (!picks.length) return void (g.picks = 0);
+  if (!picks.length) {
+    g.picks = 0;
+    if (mode === 'pick') { overlay.hidden = true; mode = 'play'; }
+    return;
+  }
+  if (mode !== 'pick') { pickTotal = g.picks; sfx.fanfare(); }
   mode = 'pick';
   resetInput();
-  sfx.fanfare();
+  pickAt = performance.now();
   const cards = picks.map((id) => {
     const [name, desc, c] = UPS[id], lv = id === 'heart' ? 0 : g.lv[id];
     const tag = id === 'heart' ? '' : lv ? `<em>Lv ${lv} → ${lv + 1}</em>` : `<em class="new">NEW</em>`;
     return `<button class="card" data-id="${id}" style="--c:${c}"><div class="ico">${svg(ICON[id])}</div><b>${name}</b>${tag}<span>${desc}</span></button>`;
   });
-  const start = g.t === 0, again = g.rerolls > 0 ? `<button class="sub" data-act="reroll">${L(`다시 고르기 (${g.rerolls})`, `Reroll (${g.rerolls})`)}</button>` : '';
-  show(`<h2 class="big-title" style="font-size:34px">${start ? L('들고 갈 스킬', 'Starting skill') : L('레벨 업!', 'Level up!')}</h2><p class="tag">${L('하나를 고르세요', 'Pick one')}</p><div class="cards">${cards.join('')}</div>${again}`);
+  const again = g.rerolls > 0 ? `<button class="sub" data-act="reroll">${L(`다시 고르기 (${g.rerolls})`, `Reroll (${g.rerolls})`)}</button>` : '';
+  const head = g.t === 0 ? L('들고 갈 스킬', 'Starting skill') : L('레벨 업!', 'Level up!');
+  const count = pickTotal > 1 ? ` <small>×${pickTotal} · ${pickTotal - g.picks + 1}/${pickTotal}</small>` : '';
+  show(`<div class="sheet"><h2>${head}${count}</h2><div class="cards">${cards.join('')}</div>${again}</div>`, 'pick');
 }
 // 상점 설명은 "다음 단계에서 무엇이 되는지"를 보여 준다(결정 072)
 const PERK_UI: Record<MT.Perk, [string, (next: number) => string, string, string]> = {
@@ -1439,8 +1464,9 @@ const coinPill = () => `<div class="coins"><i></i>${meta.coins.toLocaleString()}
 
 function placeGadgets() {
   g.gadgets = [];
-  for (let k = 0; k < R.GADGET_COUNT; k++) { // 120도씩 벌려 놓는다
-    const a = (k / R.GADGET_COUNT) * Math.PI * 2 + rnd(-0.4, 0.4), r = stage().r * rnd(0.38, 0.6);
+  const n = R.GADGET_COUNT * (rule() === 'springs' ? R.SPRINGS_MUL : 1);
+  for (let k = 0; k < n; k++) { // 고르게 벌려 놓는다
+    const a = (k / n) * Math.PI * 2 + rnd(-0.4, 0.4), r = stage().r * rnd(0.38, 0.6);
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
     g.gadgets.push({ x, z, hx: x, hz: z, cd: 0, squash: 0, vx: 0, vz: 0, left: 0, gone: 0, on: 0 });
   }
@@ -1511,9 +1537,12 @@ function showTitle() {
   if (curDef.no !== stageIdx) void enterStage(stageIdx); // 고른 스테이지의 장 모델을 불러와 끼운다
   else { applyStage(); resetIsland(); }
   const locked = stageIdx > meta.cleared;
+  // 시작 화면(결정 079): 미션은 한 줄로 접고(가장 쉬운 것 = 보상이 가장 적은 것을 앞에), 주인공이 가려지지 않게 메뉴를 아래로 모은다
+  const ms = meta.missions.map((id) => MS.missionById(id)!).filter(Boolean), easy = [...ms].sort((a, b) => a.coins - b.coins)[0];
+  const daily = loadDaily();
   show(
     `<div class="top">${coinPill()}<h1 class="big-title">${L('망치섬', 'Tumble<br>Isle')}</h1><p class="tag">${L('망치로 쳐서 섬 밖으로 날려 버리세요', 'Bonk the horde off your tiny island')}</p></div>` +
-      `<div style="display:grid;gap:12px;justify-items:center;width:100%">` +
+      `<div class="menu">` +
       `<div class="stage"><button data-act="prevCh" ${curDef.chapter ? '' : 'disabled'} aria-label="${L('이전 장', 'Previous chapter')}">«</button>` +
       `<button data-act="prev" ${stageIdx ? '' : 'disabled'} aria-label="${L('이전 스테이지', 'Previous stage')}">‹</button>` +
       `<div><small>${L(`${curDef.chapter + 1}장 · ${curDef.inChapter + 1}/${CH.STAGES_PER_CHAPTER}`, `Ch.${curDef.chapter + 1} · ${curDef.inChapter + 1}/${CH.STAGES_PER_CHAPTER}`)}${curDef.finale ? L(' · 장 보스', ' · boss') : ''}</small><b>${locked ? '🔒 ' : ''}${L(...CH.CHAPTERS[curDef.chapter].name)}</b></div>` +
@@ -1521,10 +1550,10 @@ function showTitle() {
       `<button data-act="nextCh" ${curDef.chapter < CH.CHAPTERS.length - 1 ? '' : 'disabled'} aria-label="${L('다음 장', 'Next chapter')}">»</button></div>` +
       (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을(를) 지키면 열립니다`, `Clear ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
       `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>` +
-      missionList(meta.missions) +
+      (easy ? `<details class="fold"><summary>${L(`미션 1/${ms.length}`, `Mission 1/${ms.length}`)} · ${L(easy.ko, easy.en)}</summary>${missionList(meta.missions)}</details>` : '') +
       `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
-      `<button class="sub daily" data-act="daily">${L('오늘의 섬', "Today's isle")} · ${stageName(R.dailyStage(today()))}${loadDaily().best ? L(` · 최고 ${loadDaily().best}마리`, ` · best ${loadDaily().best}`) : ''}</button>` +
-      `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button>` +
+      `<div class="row"><button class="sub daily" data-act="daily">${L('오늘의 섬', "Today's isle")}<small>${stageName(R.dailyStage(today()))}${daily.best ? L(` · 최고 ${daily.best}`, ` · best ${daily.best}`) : ''}</small></button>` +
+      `<button class="sub" data-act="shop">${L('상점', 'Shop')}</button>` +
       `<button class="sub" data-act="settings">${L('설정', 'Settings')}</button></div></div>`,
     'title',
   );
@@ -1572,36 +1601,51 @@ function resume() {
 // ───── 보상형 광고(결정 073): 직접 누를 때만, 판 밖에서만 ─────
 /** 광고 보고 이어하기: 판당 1번, 60초를 넘겼거나 왕좀비가 나왔을 때만(아까운 순간). 오늘의 섬은 공정하게 뺀다 */
 const canContinue = () => !g.continued && !dailyRun && ads.adReady() && (g.t >= 60 || g.bossSpawned);
-function offerContinue(note = '') {
+function offerContinue(note = '', withAd = true) {
   pausedFrom = 'play';
   mode = 'pause';
   resetInput();
   show(
     `<h2 class="big-title" style="font-size:32px">${L('쓰러졌다!', 'Down!')}</h2><p class="tag">${note || L('광고를 보면 체력 50%로 이어 할 수 있어요 (판당 1번)', 'Watch an ad to get up with 50% HP (once a run)')}</p>` +
-      `<button class="ad" data-act="adContinue">▶ ${L('이어 하기', 'Continue')}</button><button class="sub" data-act="quit">${L('그만하기', 'Give up')}</button>`,
+      (withAd ? `<div class="slot">${ads.adReady() ? continueAdBtn() : adWait()}</div>` : '') + `<button class="sub" data-act="quit">${L('그만하기', 'Give up')}</button>`,
     'shop',
   );
 }
-async function watchAd(btn: HTMLButtonElement) {
+const continueAdBtn = () => `<button class="ad" data-act="adContinue">▶ ${L('이어 하기', 'Continue')}</button>`;
+const adWait = () => `<span class="ad-wait">${L('광고 준비 중…', 'Loading ad…')}</span>`;
+async function watchAd(btn: HTMLButtonElement): Promise<ads.AdResult> {
   overlay.querySelectorAll('button').forEach((b) => (b.disabled = true)); // 광고 중엔 「그만하기」도 잠근다(QA: 광고 중 그만하기 → 판이 되살아나 코인 두 번)
   sfx.setMuted(true);
   try {
     return await ads.showAd();
   } catch {
-    return false;
+    return 'failed';
   } finally {
     sfx.setMuted(false); // SDK가 예외로 끝나도 소리는 되살린다
   }
 }
 let lastCoins = 0;
+const doubleAdBtn = () => `<button class="ad" data-act="adDouble">▶ ${L(`광고 보고 코인 2배 (+${lastCoins})`, `Watch ad: double coins (+${lastCoins})`)}</button>`;
+/** 코인 2배 자리(결정 079): 조건이 맞으면 광고 준비 전에도 같은 높이 칸을 미리 잡아 둔다(준비되어 버튼이 생겨도 아래가 밀리지 않게) */
 const doubleBtn = () =>
-  meta.cleared >= 2 && lastCoins > 0 && ads.adReady() && ads.adDaily().doubles < ads.DOUBLES_PER_DAY // 처음 두 섬을 깨기 전에는 광고를 보여 주지 않는다
-    ? `<button class="ad" data-act="adDouble">▶ ${L(`광고 보고 코인 2배 (+${lastCoins})`, `Watch ad: double coins (+${lastCoins})`)}</button>` : '';
+  meta.cleared >= 2 && lastCoins > 0 && ads.adDaily().doubles < ads.DOUBLES_PER_DAY // 처음 두 섬을 깨기 전에는 광고를 보여 주지 않는다
+    ? `<div class="slot" data-slot="double">${ads.adReady()
+      ? doubleAdBtn()
+      : adWait()}</div>` : '';
+// 늦게 준비된 광고(결정 080): 열린 결과 화면의 「광고 준비 중…」 칸을 버튼으로, 상점은 다시 그린다(같은 화면이라 애니메이션 없음)
+ads.onAdReady(() => {
+  if (overlay.hidden) return;
+  const wait = overlay.querySelector('.slot .ad-wait'); // 결과 화면 2배 칸 또는 이어하기 창(광고를 닫은 뒤)
+  if (wait) wait.outerHTML = wait.closest('[data-slot="double"]') ? doubleAdBtn() : continueAdBtn();
+  else if (overlay.querySelector('[data-act="adCapsule"]:disabled') && !ads.adDaily().capsule) showShop();
+});
 async function onAd(act: string, btn: HTMLButtonElement) {
   if (act === 'adContinue') {
-    const ok = await watchAd(btn);
+    const res = await watchAd(btn);
     if (mode !== 'pause' || g.hp > 0) return; // 그사이 다른 화면으로 넘어갔으면 아무것도 하지 않는다
-    if (!ok) return ads.adReady() ? offerContinue(L('광고를 끝까지 보면 이어 할 수 있어요', 'Finish the ad to continue')) : end(false);
+    // 닫았으면 다음 광고가 준비되는 대로 버튼이 살아나고(onAdReady), 보여 주지 못했으면 그만하기만
+    if (res === 'closed') return offerContinue(L('광고를 끝까지 보면 이어 할 수 있어요', 'Finish the ad to continue'));
+    if (res === 'failed') return offerContinue(L('광고를 불러오지 못했어요', "Couldn't load the ad"), false);
     g.continued = true;
     g.hp = Math.round(g.maxHp * 0.5);
     g.inv = 2.5;
@@ -1609,14 +1653,18 @@ async function onAd(act: string, btn: HTMLButtonElement) {
     resume();
     toast(L('다시 일어남!', 'Back on your feet!'));
   } else if (act === 'adDouble') {
-    if (!(await watchAd(btn))) { btn.disabled = !ads.adReady(); overlay.querySelectorAll<HTMLButtonElement>('button:not(.ad)').forEach((b) => (b.disabled = false)); return; }
+    if ((await watchAd(btn)) !== 'earned') { // 실패·닫음: 칸을 「광고 준비 중…」으로 되돌려 다음 광고가 준비되면 버튼으로(onAdReady)
+      btn.outerHTML = ads.adReady() ? doubleAdBtn() : adWait();
+      overlay.querySelectorAll<HTMLButtonElement>('button:not(.ad)').forEach((b) => (b.disabled = false));
+      return;
+    }
     meta = { ...meta, coins: meta.coins + lastCoins };
     saveMeta();
     ads.useAdDaily('doubles');
     sfx.coins();
     btn.outerHTML = `<span class="badge">${L(`+${lastCoins} 코인 더 받음!`, `+${lastCoins} bonus coins!`)}</span>`;
   } else if (act === 'adCapsule') {
-    if (!(await watchAd(btn))) return showShop(); // 잠갔던 버튼을 다시 그려서 푼다
+    if ((await watchAd(btn)) !== 'earned') return showShop(); // 잠갔던 버튼을 다시 그려서 푼다
     const r = MT.rollCapsule({ ...meta, coins: meta.coins + MT.CAPSULE_COST })!;
     meta = r.meta;
     saveMeta();
@@ -1637,6 +1685,7 @@ const toggleRow = (act: string, label: string, on: boolean) =>
 /** 언어를 바꾸면 다시 불러오므로 판 도중(일시정지)에는 빼고 보여 준다 */
 const settingsRows = (withLang: boolean) =>
   `<div class="settings">${toggleRow('music', L('음악', 'Music'), sfx.isMusicOn())}${toggleRow('sound', L('효과음', 'Sound effects'), sfx.isSfxOn())}${toggleRow('haptic', L('진동', 'Vibration'), sfx.isHapticOn())}` +
+  (withLang && ads.privacyRequired() ? `<button class="set" data-act="privacy"><span>${L('개인정보 설정', 'Privacy settings')}</span><b>›</b></button>` : '') +
   (withLang ? `<button class="set" data-act="lang"><span>${L('언어', 'Language')}</span><b>${lang === 'ko' ? '한국어' : 'English'}</b></button>` : '') + `</div>`;
 function showPause() {
   show(
@@ -1655,27 +1704,30 @@ function showSettings() {
 }
 function showShop() {
   mode = 'title';
+  // 상점 한 화면(결정 079): 강화는 2열 타일, 캡슐 두 버튼은 한 줄에 같은 크기, 돌아가기는 왼쪽 위 ‹
   const cards = MT.PERKS.map((id) => {
     const [name, descOf, c, ico] = PERK_UI[id], lv = meta.perks[id], max = MT.PERK_MAX[id], cost = MT.perkCost(id, lv), desc = descOf(Math.min(max, lv + 1));
     const btn = lv >= max ? `<button class="buy" disabled>MAX</button>` : `<button class="buy" data-act="buy" data-perk="${id}" ${meta.coins < cost ? 'disabled' : ''}><i></i>${cost}</button>`;
-    return `<div class="card perk" style="--c:${c}"><div class="ico">${svg(ico)}</div><b>${name}</b><em style="--p:${(lv / max) * 100}%">Lv ${lv}/${max}</em><span>${desc}</span>${btn}</div>`;
+    return `<div class="perk" style="--c:${c}"><div class="ico">${svg(ico)}</div><b>${name}</b><em style="--p:${(lv / max) * 100}%">Lv ${lv}/${max}</em><span>${desc}</span>${btn}</div>`;
   });
+  const adUsed = ads.adDaily().capsule > 0, adOk = ads.adReady() && !adUsed;
   const chars = MT.CHARS.map((c) => {
     const [name, perk] = CHAR_UI[c], own = meta.chars.includes(c), on = meta.hero === c;
     return `<button class="char ${on ? 'on' : ''}" data-act="hero" data-char="${c}" ${own ? '' : 'disabled'}><img src="${portraits[c]}" alt=""><b>${own ? name : '???'}</b><small>${perk}</small></button>`;
   });
   show(
-    `<h2 class="big-title" style="font-size:30px">${L('상점', 'Shop')}</h2>${coinPill()}` +
-      `<div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST} ${L('캡슐 돌리기', 'Spin capsule')}</button>` +
-      // 자리를 늘 차지해 사고 나서 아래 버튼이 밀려 올라가지 않게(결정 074)
-      `<button class="ad small" data-act="adCapsule" ${ads.adReady() && ads.adDaily().capsule < 1 ? '' : 'disabled'}>▶ ${ads.adDaily().capsule ? L('무료 캡슐: 내일 또 받아요', 'Free capsule: back tomorrow') : L('광고 보고 무료 캡슐 (하루 1번)', 'Free capsule with an ad (1/day)')}</button></div>` +
-      `<div class="chars">${chars.join('')}</div><div class="cards">${cards.join('')}</div><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`,
-    'shop',
+    `<div class="shopbox"><header><button class="back" data-act="title" aria-label="${L('돌아가기', 'Back')}">‹</button><h2>${L('상점', 'Shop')}</h2>${coinPill()}</header>` +
+      `<div class="side"><div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST}<small>${L('캡슐 돌리기', 'Spin capsule')}</small></button>` +
+      // 자리를 늘 차지해 사고 나서 아래 버튼이 밀려 올라가지 않게(결정 074). 준비 전·다 쓴 날은 회색으로 자리만
+      `<button class="ad" data-act="adCapsule" ${adOk ? '' : 'disabled'}>${adUsed ? L('무료 캡슐', 'Free capsule') : `▶ ${L('광고', 'Ad')}`}<small>${adUsed ? L('내일 또', 'Back tomorrow') : adOk ? L('무료 캡슐 (하루 1번)', 'Free capsule (1/day)') : L('광고 준비 중', 'Loading ad')}</small></button></div>` +
+      `<div class="chars">${chars.join('')}</div></div><div class="perks">${cards.join('')}</div></div>`,
+    'store',
   );
 }
 overlay.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
   if (!btn || btn.disabled) return;
+  if (mode === 'pick' && ev.isTrusted && performance.now() - pickAt < 300) return; // 시트가 뜬 직후 누름 막기(봇의 .click()은 통과)
   sfx.unlockAudio();
   sfx.tap();
   const act = btn.dataset.act, id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
@@ -1694,6 +1746,7 @@ overlay.addEventListener('click', (ev) => {
     (act === 'music' ? sfx.toggleMusic : act === 'sound' ? sfx.toggleSfx : sfx.toggleHaptic)();
     return mode === 'pause' ? showPause() : showSettings();
   }
+  if (act === 'privacy') return void ads.openPrivacy().then(showSettings);
   if (act === 'lang') return setLang(lang === 'ko' ? 'en' : 'ko');
   if (act === 'resume') return resume();
   if (act === 'adContinue' || act === 'adDouble' || act === 'adCapsule') return void onAd(act, btn);
@@ -1737,10 +1790,10 @@ overlay.addEventListener('click', (ev) => {
   if (!id) return;
   if (id === 'heart') g.hp = Math.min(g.maxHp, g.hp + R.HEAL);
   else g.lv[id]++;
+  g.inv = Math.max(g.inv, 0.6);
+  if (--g.picks > 0) return showPick(); // 시트를 닫지 않고 다음 장
   overlay.hidden = true;
   mode = 'play';
-  g.inv = Math.max(g.inv, 0.6);
-  if (--g.picks > 0) showPick();
 });
 
 // 섬마다 최고 기록(기기에만 저장)
@@ -1772,7 +1825,6 @@ function end(win: boolean) {
   const doneMs = g.done.map((id) => MS.missionById(id)!);
   const missionCoins = doneMs.reduce((a, m) => a + m.coins, 0);
   const coins = Math.round((MT.coinsFor(g.kills, g.falls, win, curDef.chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins) * MT.coinMul(meta));
-  const missionsNow = meta.missions;
   lastCoins = coins;
   ads.initAds(); // 첫 판이 끝난 뒤에야 광고 준비(추적 허용 창)를 시작한다
   const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < CH.STAGE_COUNT;
@@ -1783,20 +1835,24 @@ function end(win: boolean) {
   };
   saveMeta();
   const hasNext = win && !dailyNote && stageIdx + 1 < CH.STAGE_COUNT;
-  const cell = (label: string, v: string | number, hi = false) => `<div class="${hi ? 'hi' : ''}"><small>${label}</small><strong>${v}</strong></div>`;
+  // 결과(결정 079): 떨어뜨린 수를 크게, 나머지는 작은 한 줄. 미션은 이번 판 달성한 것만 펼치고 없으면 접는다
+  const badges = (unlocked && hasNext ? `<span class="badge">${L(`다음: ${stageName(stageIdx + 1)}`, `Next: ${stageName(stageIdx + 1)}`)}</span>` : '') +
+    (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') + (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + dailyNote;
+  const missions = doneMs.length ? missionList(g.done, g.done)
+    : `<details class="fold"><summary>${L(`다음 미션 ${meta.missions.length}개`, `${meta.missions.length} next missions`)}</summary>${missionList(meta.missions)}</details>`;
   show(
-    `<h1 class="big-title" style="font-size:36px">${g.bossDown ? L('왕좀비 격파!', 'King zombie down!') : win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
-      `<div class="panel"><div class="stats">` +
-      cell(L('버틴 시간', 'Survived'), clock(sec)) + cell(L('레벨', 'Level'), g.level + 1) +
-      cell(L('처치', 'KOs'), g.kills) + cell(L('떨어뜨림', 'Knocked off'), g.falls, true) +
-      `</div><div class="earn"><i></i>+${coins}</div>${doubleBtn()}` +
-      (unlocked && hasNext ? `<span class="badge">${L(`다음: ${stageName(stageIdx + 1)}`, `Next: ${stageName(stageIdx + 1)}`)}</span>` : '') +
-      (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') +
-      (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + dailyNote + missionList(missionsNow, g.done) + `</div>` +
-      (bestShot ? `<figure class="bestcut"><img src="${bestShot}" alt=""><figcaption><b>${L('베스트 컷', 'Best shot')}</b>${L(`낙하 ×${g.bestChain}`, `Drop ×${g.bestChain}`)}<button class="sub" data-act="share">${L('공유', 'Share')}</button></figcaption></figure>` : '') +
+    `<h1 class="big-title" style="font-size:32px">${g.bossDown ? L('왕좀비 격파!', 'King zombie down!') : win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
+      `<div class="panel result"><small>${L('떨어뜨림', 'Knocked off')}</small><strong class="falls">${g.falls}</strong>` +
+      `<p class="line">${clock(sec)} · ${L('처치', 'KOs')} ${g.kills} · Lv ${g.level + 1}</p>` +
+      `<div class="earn"><i></i>+${coins}</div>${doubleBtn()}` +
+      (badges ? `<div class="badges">${badges}</div>` : '') + missions + `</div>` +
+      (bestShot ? `<button class="bestcut" data-act="share" aria-label="${L('베스트 컷 공유', 'Share best shot')}"><img src="${bestShot}" alt=""><span><b>${L('베스트 컷', 'Best shot')}</b>${L(`낙하 ×${g.bestChain}`, `Drop ×${g.bestChain}`)}</span>` +
+        `${svg('<path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>', 'share')}</button>` : '') +
+      `<div class="actions">` +
       (hasNext ? `<button class="go" data-act="nextIsle">${L('다음 섬으로', 'Next isle')}</button><button class="sub" data-act="start">${L('한 번 더', 'Once more')}</button>`
         : `<button class="go" data-act="start">${L('한 번 더', 'Once more')}</button>`) +
-      `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div>`,
+      `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div></div>`,
+    'over',
   );
 }
 $('sweep').querySelector('span')!.textContent = L('쾅!', 'SLAM!');
@@ -1846,14 +1902,16 @@ function drawHud() {
     if (shown.level >= 0) void hud.lvl.offsetWidth, hud.lvl.classList.add('up'); // 애니메이션 다시 틀기
     shown.level = g.level;
   }
-  const xp = Math.round((g.xp / R.xpNeed(g.level)) * 100);
+  const xp = Math.round((g.xp / g.need) * 100);
   if (shown.xp !== xp) hud.xp.style.width = `${(shown.xp = xp)}%`;
   if (shown.falls !== g.falls) {
     hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
     if (g.chain >= R.STRIKE_CHAIN) toast(`STRIKE! ×${g.chain}`);
     else if (g.chain >= 2) toast(L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`)); // 이어서 떨어뜨리면 가운데에 크게
   }
-  const hint = mode === 'bonus' ? `${L('끌었다 놓으면 돌진!', 'Drag & release to dash!')} · ${L('떨어뜨림', 'Knocked')} ${g.bonusFalls} (+${g.bonusFalls * R.BONUS_COIN})` : '';
+  const ruleText = CH.CHAPTERS[curDef.chapter].ruleText; // 장 규칙 안내 띠: 판 시작 3초(결정 079)
+  const hint = mode === 'bonus' ? `${L('끌었다 놓으면 돌진!', 'Drag & release to dash!')} · ${L('떨어뜨림', 'Knocked')} ${g.bonusFalls} (+${g.bonusFalls * R.BONUS_COIN})`
+    : mode === 'play' && g.t < 3 && rule() && ruleText ? L(...ruleText) : '';
   if (shown.hint !== hint) {
     shown.hint = hint;
     hud.hint.hidden = !hint;
@@ -1874,7 +1932,9 @@ function drawHud() {
   }
 }
 
-const DEV = import.meta.env.MODE !== 'release'; // 실기기 성능을 눈으로 보려고 출시 빌드가 아니면 프레임 수를 띄운다
+const DEV = import.meta.env.MODE !== 'release';
+const DEBUG = DEV && new URLSearchParams(location.search).has('debug'); // 프레임 수 글씨는 주소에 ?debug일 때만(결정 079)
+hud.dev.hidden = !DEBUG;
 let last = performance.now(), frames = 0, fpsAt = last, fps = 0;
 function frame(now: number) {
   requestAnimationFrame(frame);
@@ -1894,7 +1954,7 @@ function frame(now: number) {
     fps = Math.round((frames * 1000) / (now - fpsAt));
     frames = 0;
     fpsAt = now;
-    hud.dev.textContent = `${fps}fps · ${g.enemies.length} · ${renderer.info.render.calls}dc · in ${joyId === -1 ? '-' : `${jx.toFixed(1)},${jz.toFixed(1)}`}`;
+    if (DEBUG) hud.dev.textContent = `${fps}fps · ${g.enemies.length} · ${renderer.info.render.calls}dc · in ${joyId === -1 ? '-' : `${jx.toFixed(1)},${jz.toFixed(1)}`}`;
   }
 }
 await enterStage(stageIdx);
@@ -1908,6 +1968,10 @@ setTimeout(() => boot.remove(), 500);
 if (DEV)
   Object.assign(window, {
     __demo: {
+      ads: ads.adDev, // 광고 흐름 시험: __demo.ads.failNext·closeNext = true, __demo.ads.setReady(false)
+      /** 광고 자리 시험: 판을 시작해 60초 지난 것으로 하고 쓰러지게(이어하기 창) 또는 이기게(결과 화면) */
+      down: async () => { await stageReady; startRun(); g.t = 61; g.revived = true; hurt(1e9); return overlay.innerText; },
+      win: async () => { await stageReady; startRun(); g.t = 61; end(true); return overlay.innerText; },
       /** 촬영 모드: 연출 장면을 정해진 크기로 렌더해 docs/art/<kind>.png로 저장(개발 서버 vite.config.ts) */
       shot: async (kind: 'icon' | 'splash') => {
         const size = kind === 'icon' ? 1024 : 2732;
@@ -1968,13 +2032,16 @@ if (DEV)
        *  sloppy(0~1)가 클수록 반응이 늦고 가끔 멈칫한다(사람형 0.6). 강화는 지금 저장된 그대로 쓴다 */
       /** chaseBoss: 왕좀비가 나오면 사람처럼 노린다(왕좀비와 섬 중심 사이에서 바깥으로 치기, 근처에서 쾅!) */
       bot: async (runs = 10, sloppy = 0.6, stageNo = 0, chaseBoss = false) => {
-        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number; bossSecs: number; bossPct: number; diedVsBoss: boolean }[] = [];
+        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number; bossSecs: number; bossPct: number; diedVsBoss: boolean; lvT: number[]; xpAt: number[] }[] = [];
         for (let r = 0; r < runs; r++) {
           let lastBossPct = 0;
+          const lvT: number[] = [], xpAt: number[] = []; // 레벨 업 시각, 10초마다 모은 경험치 합(카드 간격 측정)
           await enterStage(stageNo);
           startRun();
           let lag = [0, 0];
           for (;;) {
+            while (lvT.length < g.level) lvT.push(g.t);
+            if (g.t >= (xpAt.length + 1) * 10) xpAt.push(g.xpTot);
             if (mode === 'pick') {
               const picks = [...overlay.querySelectorAll<HTMLButtonElement>('.card')];
               (picks.find((c) => c.dataset.id === 'heart' && g.hp <= g.maxHp * 0.5) ?? picks.find((c) => R.ATTACKS.includes(c.dataset.id as R.UpgradeId)) ?? picks[0]).click();
@@ -2018,7 +2085,7 @@ if (DEV)
             resetInput();
           }
           const win = g.t >= R.RUN_SECONDS - 0.1 || g.bossDown;
-          out.push({ win, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes, bossSecs: g.bossDown ? g.t - R.BOSS_AT : 0, bossPct: g.bossDown ? lastBossPct : 0, diedVsBoss: !win && g.t >= R.BOSS_AT });
+          out.push({ win, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes, bossSecs: g.bossDown ? g.t - R.BOSS_AT : 0, bossPct: g.bossDown ? lastBossPct : 0, diedVsBoss: !win && g.t >= R.BOSS_AT, lvT, xpAt });
           await new Promise((res) => setTimeout(res, 0));
         }
         const avg = (f: (x: (typeof out)[number]) => number) => +(out.reduce((a, x) => a + f(x), 0) / runs).toFixed(2);
@@ -2026,16 +2093,22 @@ if (DEV)
         return { wins: `${out.filter((x) => x.win).length}/${runs}`, avgT: avg((x) => x.t), avgLv: avg((x) => x.lv), fallShare: avg((x) => x.falls / Math.max(1, x.kills)), missShare: avg((x) => x.misses / Math.max(1, x.swings)), bossDowns: out.filter((x) => x.boss).length, strikes: avg((x) => x.strikes),
           bossSecs: +(out.filter((x) => x.boss).reduce((a, x) => a + x.bossSecs, 0) / Math.max(1, out.filter((x) => x.boss).length)).toFixed(1),
           bossPct: Math.round(out.filter((x) => x.boss).reduce((a, x) => a + x.bossPct, 0) / Math.max(1, out.filter((x) => x.boss).length)),
-          diedVsBoss: out.filter((x) => x.diedVsBoss).length };
+          diedVsBoss: out.filter((x) => x.diedVsBoss).length,
+          // 카드 수(레벨 업 횟수)·첫 세 장 받은 시각·보너스 직후(65~80초) 쓰러진 판 수(결정 078)
+          cards: avg((x) => x.lv - 1), cardT: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((k) => { const ts = out.filter((x) => x.lvT[k] !== undefined).map((x) => x.lvT[k]); return ts.length ? Math.round(ts.reduce((a, b) => a + b, 0) / ts.length) : null; }),
+          xpAt: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((k) => { const v = out.filter((x) => x.xpAt[k] !== undefined).map((x) => x.xpAt[k]); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; }),
+          diedAfterBonus: out.filter((x) => !x.win && x.t >= R.BONUS_AT && x.t < R.BONUS_AT + 15).length };
       },
       /** 처음부터 끝까지(결정 068): 늘 다음 스테이지를 하고, 판마다 가장 싼 강화를 살 수 있는 만큼 산다. 다 사는 판·도달 스테이지를 잰다 */
-      campaign: async (runs = 200, sloppy = 0.85) => {
+      /** doubles: 6판마다 앞 몇 판에 결과 화면 코인 2배 광고를 본다(하루 6판 중 3판이면 3, 버튼 조건과 같이 두 섬을 깬 뒤부터) */
+      campaign: async (runs = 200, sloppy = 0.85, doubles = 0) => {
         meta = MT.freshMeta(); saveMeta();
         const log: string[] = [];
         let maxedAt = 0;
         for (let r = 1; r <= runs; r++) {
           const no = Math.min(meta.cleared, CH.STAGE_COUNT - 1);
           await (window as unknown as { __demo: { bot: (n: number, s: number, no: number, c: boolean) => Promise<unknown> } }).__demo.bot(1, sloppy, no, true);
+          if ((r - 1) % 6 < doubles && meta.cleared >= 2) meta = { ...meta, coins: meta.coins + lastCoins };
           for (;;) {
             const id = MT.PERKS.filter((p) => meta.perks[p] < MT.PERK_MAX[p]).sort((a, b) => MT.perkCost(a, meta.perks[a]) - MT.perkCost(b, meta.perks[b]))[0];
             const next = id && MT.buy(meta, id);
@@ -2050,6 +2123,8 @@ if (DEV)
       },
       /** 강화 단계를 바로 정한다(강화별 효과를 봇으로 비교할 때) */
       setPerks: (p: Partial<Record<MT.Perk, number>>) => { meta = { ...meta, perks: { ...MT.freshMeta().perks, ...p } }; },
+      /** 장 규칙을 바꿔 비교: '' 끔, undefined 장 그대로 */
+      setRule: (r?: R.Rule | '') => { ruleOverride = r; },
       sweep,
       /** 스테이지 번호(0~149)로 바로 가서 장 모델을 불러온다 */
       goStage: (no: number) => enterStage(no).then(() => showTitle()),

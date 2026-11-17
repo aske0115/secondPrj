@@ -139,3 +139,17 @@ test('왕좀비는 때릴수록 더 멀리 날아간다', () => {
   expect(bossKnock(100)).toBeGreaterThan(1);
   expect(bossKnock(200)).toBeGreaterThan(bossKnock(100));
 });
+
+import { cardNeed, calmSpawn, BONUS_CALM, CARD_GAP, XP_WINDOW } from './rules';
+test('카드 간격: 첫 두 장은 고정 표, 그 뒤는 최근 경험치 속도로 늘어난다(결정 078)', () => {
+  expect(cardNeed(0, 999)).toBe(xpNeed(0));
+  expect(cardNeed(1, 999)).toBe(xpNeed(1));
+  expect(cardNeed(5, 0)).toBe(xpNeed(5)); // 느린 판은 표대로
+  expect(cardNeed(5, 100 * XP_WINDOW)).toBe(100 * CARD_GAP); // 초당 100이면 CARD_GAP초어치
+});
+test('보너스 뒤 숨 고르기: 적 생성이 4분의 1에서 시작해 원래대로', () => {
+  expect(calmSpawn(BONUS_CALM)).toBe(0.25);
+  expect(calmSpawn(0)).toBe(1);
+  expect(calmSpawn(-1)).toBe(1);
+  expect(calmSpawn(BONUS_CALM / 2)).toBeCloseTo(0.5);
+});

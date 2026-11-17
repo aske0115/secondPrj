@@ -19,6 +19,12 @@ export const enemySpeed = (t: number, big: boolean) => (big ? 1.3 : 1.8 + t * 0.
 
 // 뒤 레벨일수록 가파르게: 무너짐으로 한꺼번에 떨어질 때 모든 스킬이 만렙이 되던 폭주를 막는다
 export const xpNeed = (level: number) => Math.round(4 + level * 3 + level * level * 0.4);
+// 카드 간격(결정 078): 첫 두 장은 위 표대로 빨리, 그 뒤는 "최근 경험치 속도 × CARD_GAP초"만큼 모아야 한 장.
+// 강한 판(뒤 장·강화)은 경험치가 10배 넘게 쏟아져 한 판 20장까지 나오던 것을 어느 섬에서나 약 15초에 1장으로 맞춘다
+export const CARD_GAP = 24; // 경험치가 판 안에서 빠르게 불어나 최근 속도가 늘 뒤처진다: 24로 둬야 실제 약 15초(봇 측정)
+export const XP_WINDOW = 10; // recent = 최근 경험치의 지수 합(이 초를 시간 상수로 줄어든다) ≈ 초당 경험치 × XP_WINDOW
+export const cardNeed = (level: number, recent: number) =>
+  level < 2 ? xpNeed(level) : Math.max(xpNeed(level), Math.round((recent / XP_WINDOW) * CARD_GAP));
 
 // 스킬은 모두 "밀어내기"다: 쏘아 맞히는 무기 대신 장난감 섬의 물건으로 친다(쓸어킬과 겹치지 않게, 결정 039)
 export const UPGRADES = ['hammer', 'log', 'pumpkin', 'sweep', 'knock', 'speed'] as const;
@@ -27,28 +33,34 @@ export type UpgradeId = (typeof UPGRADES)[number];
 export type Levels = Record<UpgradeId, number>;
 export const startLevels = (): Levels => ({ hammer: 1, log: 0, pumpkin: 0, sweep: 0, knock: 0, speed: 0 });
 
+// 카드가 한 판 약 15장 → 7~8장으로 줄어(결정 078) 한 장의 효과를 약 1.5배로 키웠다
 /** 망치: 가까운 적 쪽으로 부채꼴을 휘둘러 크게 날린다 */
-export const hammerCooldown = (lv: number) => 0.9 * 0.86 ** (lv - 1);
-export const hammerRadius = (lv: number) => 1.9 + 0.22 * lv;
+export const hammerCooldown = (lv: number) => 0.9 * 0.8 ** (lv - 1);
+export const hammerRadius = (lv: number) => 1.8 + 0.32 * lv;
 export const hammerArc = (lv: number) => ((100 + 20 * (lv - 1)) * Math.PI) / 180;
 /** 통나무: 섬을 가로질러 굴러가며 길 위의 적을 줄줄이 민다 */
-export const logInterval = (lv: number) => 6.5 * 0.8 ** (lv - 1);
-export const logCount = (lv: number) => (lv >= 4 ? 2 : 1);
+export const logInterval = (lv: number) => 6.5 * 0.72 ** (lv - 1);
+export const logCount = (lv: number) => (lv >= 3 ? 2 : 1);
 /** 호박 폭탄: 적 쪽으로 던지면 떨어진 자리에서 터져 둥글게 민다 */
-export const pumpkinInterval = (lv: number) => 3.4 * 0.85 ** (lv - 1);
-export const pumpkinCount = (lv: number) => 1 + Math.floor((lv - 1) / 2);
-export const pumpkinRadius = (lv: number) => 2.1 + 0.25 * lv;
+export const pumpkinInterval = (lv: number) => 3.4 * 0.78 ** (lv - 1);
+export const pumpkinCount = (lv: number) => 1 + Math.floor(lv / 2);
+export const pumpkinRadius = (lv: number) => 2.0 + 0.35 * lv;
 
-export const sweepRadius = (lv: number) => 5 + lv * 0.6;
-export const sweepCost = (lv: number) => 25 - lv * 2; // 처치 수로 채운다
-export const knockMul = (lv: number) => 1 + 0.35 * lv; // 모든 공격의 밀어내는 힘
-export const moveSpeed = (lv: number) => 5.5 * (1 + 0.08 * lv);
+export const sweepRadius = (lv: number) => 5 + lv * 0.9;
+export const sweepCost = (lv: number) => 25 - lv * 3; // 처치 수로 채운다
+export const knockMul = (lv: number) => 1 + 0.5 * lv; // 모든 공격의 밀어내는 힘
+export const moveSpeed = (lv: number) => 5.5 * (1 + 0.12 * lv);
 
 // 박치기 보너스: 판 중간에 한 번, 생존 시계를 멈추고 튕겨서 돌진하는 미니게임
 export const BONUS_AT = 65;
 export const BONUS_SECONDS = 15;
 export const BONUS_COIN = 3; // 보너스 중 떨어뜨린 한 마리당
 /** 손가락을 튕긴 길이(px)로 돌진 속도를 정한다. 너무 짧으면 무시 */
+/** 보너스가 끝난 뒤 숨 고르기(결정 078): 이 시간 동안 무적, 적은 천천히 다시 늘어난다 */
+export const BONUS_CALM = 3;
+export const BONUS_INV = 2;
+/** 남은 숨 고르기 시간 → 적 생성 속도 배수(0.25에서 1까지) */
+export const calmSpawn = (left: number) => Math.max(0.25, Math.min(1, 1 - left / BONUS_CALM));
 export const dashSpeed = (px: number) => (px < 18 ? 0 : Math.min(24, 6 + px * 0.12));
 
 /** 레벨업 3택. 공격 스킬이 패시브보다 3배 잘 나오고, 공격 스킬이 남아 있으면 적어도 하나는 넣는다.
@@ -164,6 +176,15 @@ export const WEATHER_AT = 55;
 export const WEATHER_SECONDS = 6;
 export const WEATHER_PUSH = 12; // 넉백으로 더해 가장자리 적은 떨어진다(자기들끼리 밀린 것과 구분되는 기준 2를 넘김)
 export type Weather = 'wind' | 'quake';
+
+// ───── 장 규칙(결정 078): 장마다 몸으로 바로 느끼는 규칙 하나. 장 데이터의 rule 칸으로 켠다 ─────
+export type Rule = 'ice' | 'lowGrav' | 'springs' | 'wind2';
+export const ICE_DECAY = 2.5; // 얼음 바닥: 밀린 적이 멀리 미끄러진다(평소 4.5, 보너스 판 1.4는 봇 승률 15→40/40이라 너무 쉬웠다)
+export const LOW_GRAV = 12; // 저중력: 맞아 뜬 적이 천천히 내려온다(평소 22)
+export const LOW_GRAV_LIFT = 6; // 뜨는 힘(평소 4.5): 떠 있는 동안 0.4초 → 1초
+export const LOW_GRAV_KNOCK = 5; // 이 넉백부터 뜬다(평소 7): 망치 한 번에도 떠서 공중 콤보가 쉽다
+export const SPRINGS_MUL = 2; // 스프링 버섯 수 배수
+export const WIND2_AT = [8, WEATHER_AT] as const; // 강풍 두 번: 첫 10초 안에 한 번 느끼게
 
 // ───── 오늘의 섬(결정 062): 날마다 모두 같은 섬·같은 무작위(적·상자·날씨) ─────
 export const DAILY_COINS = 50; // 그날 처음 버티면

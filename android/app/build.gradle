@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// 출시 서명: 업로드 키와 비밀번호는 저장소 밖 파일에서만 읽는다(키·비밀번호를 절대 커밋하지 않기 위함, 쓸어킬과 같은 방식).
+// 기본 위치 ~/keys/tumble-isle-signing.properties (환경 변수 TUMBLE_SIGNING으로 바꿀 수 있음). 내용은 docs/STORE_RELEASE.md 참고.
+// 파일이 없으면 서명 없이 빌드된다(Play에 올릴 수 없는 AAB).
+def signingProps = new Properties()
+def signingFile = file(System.getenv("TUMBLE_SIGNING") ?: "${System.getProperty('user.home')}/keys/tumble-isle-signing.properties")
+if (signingFile.exists()) signingFile.withInputStream { signingProps.load(it) }
+def hasSigning = signingProps['storeFile'] && signingProps['storePassword'] && signingProps['keyAlias'] && signingProps['keyPassword']
+
 android {
     namespace = "kr.co.daeun.tumbleisle"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,7 +16,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +24,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasSigning) {
+                storeFile file(signingProps['storeFile'])
+                storePassword signingProps['storePassword']
+                keyAlias signingProps['keyAlias']
+                keyPassword signingProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasSigning) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -1,0 +1,39 @@
+import { expect, test } from 'vitest';
+import { CHAPTERS, STAGE_COUNT, allModels, stageDef } from './chapters';
+import { BONUS_AT, BOSS_AT, seeded } from './rules';
+
+const def = (no: number) => stageDef(no, seeded(no * 9973 + 17));
+
+test('장 10개 × 15 = 150스테이지, 같은 번호는 늘 같은 스테이지', () => {
+  expect(CHAPTERS.length).toBe(10);
+  expect(STAGE_COUNT).toBe(150);
+  expect(def(37)).toEqual(def(37));
+});
+
+test('모든 스테이지: 섬 크기·무너짐이 안전한 범위이고 보너스·왕좀비와 겹치지 않는다', () => {
+  for (let no = 0; no < STAGE_COUNT; no++) {
+    const s = def(no);
+    expect(s.r).toBeGreaterThanOrEqual(9.5);
+    expect(s.r).toBeLessThanOrEqual(13);
+    let prev = s.r;
+    for (const c of s.crumbles) {
+      expect(c.r).toBeLessThan(prev);
+      expect(c.r).toBeGreaterThanOrEqual(8.4);
+      expect(Math.abs(c.at - BONUS_AT)).toBeGreaterThan(4);
+      expect(Math.abs(c.at - BOSS_AT)).toBeGreaterThan(4);
+      prev = c.r;
+    }
+  }
+});
+
+test('뒤 스테이지일수록 어렵다(장 처음끼리 비교)', () => {
+  for (let ch = 1; ch < CHAPTERS.length; ch++) {
+    const a = def((ch - 1) * 15), b = def(ch * 15);
+    for (const k of ['spawn', 'big', 'hp', 'speed', 'dmg'] as const) expect(b[k]).toBeGreaterThan(a[k]);
+  }
+});
+
+test('장에서 쓰는 모델 파일이 모두 저장소에 있다', () => {
+  const files = new Set(Object.keys(import.meta.glob('/public/models/**/*.{glb,obj}')));
+  for (const m of allModels()) expect(files.has(`/public/models/${m}.glb`) || files.has(`/public/models/${m}.obj`), m).toBe(true);
+});

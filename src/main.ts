@@ -7,6 +7,9 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import * as CH from './game/chapters';
 import { L } from './i18n';
 import * as sfx from './audio';
 import * as R from './game/rules';
@@ -97,35 +100,57 @@ function fit(geo: THREE.BufferGeometry, height: number) {
   const b = geo.boundingBox!, k = height / (b.max.y - b.min.y);
   return geo.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2).scale(k, k, k);
 }
-async function bake(path: string, height: number) {
-  const { scene: root } = await model(path);
+/** 우주 팩은 OBJ+MTL, 나머지는 GLB */
+async function loadRoot(path: string): Promise<THREE.Object3D> {
+  if (!path.startsWith('space/')) return (await model(path)).scene;
+  const mtl = await new MTLLoader().loadAsync(`${import.meta.env.BASE_URL}models/${path}.mtl`);
+  mtl.preload();
+  return new OBJLoader().setMaterials(mtl).loadAsync(`${import.meta.env.BASE_URL}models/${path}.obj`);
+}
+type Baked = { geo: THREE.BufferGeometry; mat: THREE.Material };
+const baked = new Map<string, Promise<Baked>>();
+/** 여러 조각을 한 덩어리로 굽는다. 그림(텍스처)이 있으면 그 그림을, 없으면 조각마다의 색을 꼭짓점 색으로 */
+function bake(path: string, height: number): Promise<Baked> {
+  const key = `${path}|${height}`;
+  if (!baked.has(key)) baked.set(key, bakeNow(path, height));
+  return baked.get(key)!;
+}
+async function bakeNow(path: string, height: number): Promise<Baked> {
+  const root = await loadRoot(path);
   root.updateMatrixWorld(true);
   const parts: THREE.BufferGeometry[] = [];
   let map: THREE.Texture | null = null;
-  root.traverse((o) => {
-    if (!(o instanceof THREE.Mesh)) return;
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((o) => { if (o instanceof THREE.Mesh) meshes.push(o); });
+  for (const o of meshes) map ??= ((Array.isArray(o.material) ? o.material[0] : o.material) as THREE.MeshStandardMaterial).map ?? null;
+  for (const o of meshes) {
+    let src = o.geometry as THREE.BufferGeometry;
+    if (!map && src.index) src = src.toNonIndexed(); // 조각 색을 꼭짓점마다 칠하려면 인덱스를 푼다
     const geo = new THREE.BufferGeometry();
-    for (const k of ['position', 'normal', 'uv']) geo.setAttribute(k, o.geometry.attributes[k]);
-    geo.setIndex(o.geometry.index);
+    geo.setAttribute('position', src.attributes.position);
+    geo.setAttribute('normal', src.attributes.normal);
+    if (map) {
+      geo.setAttribute('uv', src.attributes.uv);
+      geo.setIndex(src.index);
+    } else {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const col = new Float32Array(src.attributes.position.count * 3), c = new THREE.Color();
+      const groups = src.groups.length ? src.groups : [{ start: 0, count: src.attributes.position.count, materialIndex: 0 }];
+      for (const gr of groups) {
+        c.copy((mats[gr.materialIndex ?? 0] as THREE.MeshStandardMaterial).color ?? c.set(0xffffff));
+        for (let v = gr.start; v < gr.start + gr.count; v++) c.toArray(col, v * 3);
+      }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    }
     parts.push(geo.applyMatrix4(o.matrixWorld));
-    map ??= (o.material as THREE.MeshStandardMaterial).map;
-  });
-  return { geo: fit(mergeGeometries(parts), height), mat: new THREE.MeshLambertMaterial({ map }) };
+  }
+  return { geo: fit(mergeGeometries(parts), height), mat: map ? new THREE.MeshLambertMaterial({ map }) : new THREE.MeshLambertMaterial({ vertexColors: true }) };
 }
 type Prop = { m: THREE.InstancedMesh; i: number; bx: number; bz: number; x: number; z: number; yaw: number; s: number; y: number; vy: number };
 const props: Prop[] = [];
 function place(p: Prop) {
   put(p.m, p.i, p.x, p.y, p.z, p.yaw, p.s, p.s, p.s, p.y * -0.08);
   p.m.instanceMatrix.needsUpdate = true;
-}
-function prop(b: { geo: THREE.BufferGeometry; mat: THREE.Material }, n: number, min: number, max: number, s0: number, s1: number) {
-  const m = instanced(b.geo, b.mat, n, true);
-  for (let i = 0; i < n; i++) {
-    const [x, z] = onIsland(min, max), p = { m, i, bx: x, bz: z, x, z, yaw: rnd(0, 6), s: rnd(s0, s1), y: 0, vy: 0 };
-    props.push(p);
-    place(p);
-  }
-  m.count = n;
 }
 const onIsland = (min: number, max: number) => {
   const a = rnd(0, Math.PI * 2), d = R.ISLAND_R * rnd(min, max);
@@ -134,19 +159,32 @@ const onIsland = (min: number, max: number) => {
 function insert([x, z]: readonly [number, number], y = 0) {
   return [x, y, z] as const;
 }
-const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, keeper, barrel, lantern] = await Promise.all([
-  bake('graveyard/pine', 3.2), bake('graveyard/pine-crooked', 3), bake('graveyard/rocks', 0.6), bake('graveyard/rocks-tall', 1.1),
-  bake('graveyard/trunk', 0.5), bake('graveyard/pumpkin', 0.5), bake('graveyard/character-skeleton', 1.05),
+const [pumpkin, skel, zombie, keeper, barrel, lantern] = await Promise.all([
+  bake('graveyard/pumpkin', 0.5), bake('graveyard/character-skeleton', 1.05),
   bake('graveyard/character-zombie', 1.05), bake('graveyard/character-keeper', 1.15),
   bake('dungeon/barrel', 0.8), bake('graveyard/lantern-candle', 1.3),
 ]);
-// 나무는 가장자리에만 둬서 싸움터를 가리지 않는다
-prop(pine, 6, 0.82, 0.96, 0.8, 1.2);
-prop(pine2, 4, 0.8, 0.96, 0.8, 1.2);
-prop(rocks, 6, 0.45, 0.95, 0.6, 1);
-prop(rocksTall, 3, 0.75, 0.95, 0.8, 1.2);
-prop(trunk, 3, 0.4, 0.9, 1, 1.3);
-prop(pumpkin, 5, 0.3, 0.95, 0.8, 1.3);
+// 장마다 바뀌는 소품(결정 067): 스테이지 번호로 정해진 무작위로 종류별 개수·자리를 정한다. 나무 같은 큰 것은 가장자리에만
+let propMeshes: THREE.InstancedMesh[] = [];
+async function buildProps(def: CH.StageDef) {
+  const ch = CH.CHAPTERS[def.chapter], rand = R.seeded(def.seed);
+  const specs = await Promise.all(ch.props.map(async (sp) => ({ sp, b: await bake(sp.m, sp.h) })));
+  for (const m of propMeshes) scene.remove(m);
+  propMeshes = [];
+  props.length = 0;
+  for (const { sp, b } of specs) {
+    const n = sp.n[0] + Math.floor(rand() * (sp.n[1] - sp.n[0] + 1));
+    if (!n) continue;
+    const m = instanced(b.geo, b.mat, n, true);
+    propMeshes.push(m);
+    for (let i = 0; i < n; i++) {
+      const a = rand() * Math.PI * 2, d = R.ISLAND_R * (sp.edge ? 0.8 + rand() * 0.17 : 0.22 + rand() * 0.66);
+      const x = Math.cos(a) * d, z = Math.sin(a) * d;
+      props.push({ m, i, bx: x, bz: z, x, z, yaw: rand() * 6.28, s: 0.85 + rand() * 0.35, y: 0, vy: 0 });
+    }
+    m.count = n;
+  }
+}
 const flowers = instanced(new THREE.SphereGeometry(0.09, 6, 4), flat(0xffffff), 70);
 const flowerAt = Array.from({ length: 70 }, () => onIsland(0.05, 0.9));
 for (let i = 0; i < 70; i++) {
@@ -187,6 +225,7 @@ function setHero(id: MT.CharId) {
 // 적: 작은 놈은 해골, 큰 놈은 좀비. 인스턴스 색을 곱해 피격 번쩍임을 낸다
 const smallMesh = instanced(skel.geo, skel.mat, R.MAX_ENEMIES, true);
 const bigMesh = instanced(zombie.geo, zombie.mat, R.MAX_ENEMIES, true);
+const small2Mesh = instanced(skel.geo, skel.mat, R.MAX_ENEMIES, true); // 작은 적이 두 종류인 장
 const C_PLAIN = new THREE.Color(1, 1, 1), C_FLASH = new THREE.Color(3, 3, 3);
 const C_PUMPKIN = new THREE.Color(0xf08a2a);
 const C_SMALL = new THREE.Color(0xe9e4d4), C_BIG = new THREE.Color(0x7fae6a), C_DIRT = new THREE.Color(0x9c7550); // 터질 때 조각 색
@@ -239,8 +278,8 @@ const statueMesh = instanced(zombie.geo, goldMat, 3, true);
 const goldPumpkinMesh = instanced(pumpkin.geo, goldMat, 8, true);
 const STATUE_AT = [[-2.6, -3.4], [2.8, -3.2], [0, -5]] as const;
 // 왕좀비: 좀비 모양을 크게, 초록빛 + 금관
-const bossMat = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xd8ffc0 });
-const bossFlash = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
+let bossMat = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xd8ffc0 });
+let bossFlash = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
 const bossBody = new THREE.Mesh(zombie.geo, bossMat);
 const crown = new THREE.Mesh(
   mergeGeometries([0, 1, 2, 3, 4].map((k): THREE.BufferGeometry => new THREE.ConeGeometry(0.07, 0.16, 4).translate(Math.sin((k / 5) * Math.PI * 2) * 0.17, 0.12, Math.cos((k / 5) * Math.PI * 2) * 0.17)).concat([new THREE.CylinderGeometry(0.2, 0.2, 0.1, 10)])),
@@ -313,14 +352,48 @@ const store = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* 저장 실패 시 이번 실행에서만 */ } },
 };
-let meta = MT.loadMeta(store.get('meta'), R.STAGES.length);
+let meta = MT.loadMeta(store.get('meta'), CH.STAGE_COUNT);
 meta.missions = MS.fillMissions(meta.missions);
 setHero(meta.hero);
 const saveMeta = () => store.set('meta', JSON.stringify(meta));
-let stageIdx = Math.min(meta.cleared, R.STAGES.length - 1);
-const stage = () => R.STAGES[stageIdx];
+// 스테이지(결정 067): stageIdx는 0~149. 나머지 코드는 예전 섬 데이터 모양(R.Stage)을 그대로 쓰도록 맞춰 만든다
+let stageIdx = Math.min(meta.cleared, CH.STAGE_COUNT - 1);
+const defOf = (no: number) => CH.stageDef(no, R.seeded(no * 9973 + 17));
+const stageName = (no: number) => { const c = CH.CHAPTERS[Math.floor(no / CH.STAGES_PER_CHAPTER)]; return `${L(...c.name)} ${(no % CH.STAGES_PER_CHAPTER) + 1}`; };
+let curDef = defOf(stageIdx);
+let curStage: R.Stage = toStage(curDef);
+function toStage(d: CH.StageDef): R.Stage {
+  const c = CH.CHAPTERS[d.chapter], dusk = d.time === 'dusk';
+  return {
+    name: [stageName(d.no), stageName(d.no)], r: d.r, crumbles: d.crumbles, gadget: c.gadget,
+    grass: c.grass, cliff: c.cliff, sky: dusk ? 0xf3b98f : c.sky, sun: dusk ? 0xffb07a : c.sun,
+    spawn: d.spawn, big: d.big, hp: d.hp, speed: d.speed, dmg: d.dmg,
+  };
+}
+const stage = () => curStage;
+/** 장 모델(적·소품)을 불러와 끼운다. 이미 불러온 장은 바로 */
+let stageReady: Promise<void> = Promise.resolve();
+function enterStage(no: number) {
+  stageIdx = no;
+  curDef = defOf(no);
+  curStage = toStage(curDef);
+  const ch = CH.CHAPTERS[curDef.chapter], d = curDef;
+  stageReady = (async () => {
+    const [a, b, big] = await Promise.all([bake(ch.small[0], 1.05), bake(ch.small[1] ?? ch.small[0], 1.05), bake(ch.big, 1.05), buildProps(d)]);
+    if (stageIdx !== no) return; // 그 사이 다른 스테이지를 골랐다
+    smallMesh.geometry = a.geo; smallMesh.material = a.mat;
+    small2Mesh.geometry = b.geo; small2Mesh.material = b.mat;
+    bigMesh.geometry = big.geo; bigMesh.material = big.mat;
+    bossBody.geometry = big.geo;
+    bossMat = (big.mat as THREE.MeshLambertMaterial).clone(); bossMat.color.set(0xd8ffc0);
+    bossFlash = (big.mat as THREE.MeshLambertMaterial).clone(); bossFlash.emissive.set(0xffffff); bossFlash.emissiveIntensity = 0.6;
+    applyStage();
+    resetIsland();
+  })();
+  return stageReady;
+}
 function applyStage() {
-  const st = stage(), night = stageIdx === 2;
+  const st = stage(), night = CH.CHAPTERS[curDef.chapter].night || curDef.time === 'night';
   (grass.material as THREE.MeshLambertMaterial).color.set(st.grass);
   (cliff.material as THREE.MeshLambertMaterial).color.set(st.cliff);
   (scene.background as THREE.Color).set(st.sky);
@@ -332,7 +405,7 @@ function applyStage() {
 }
 
 // ───────── 상태 ─────────
-type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind; pct?: number; stag?: number };
+type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind; pct?: number; stag?: number; v?: number };
 type Drop = { x: number; z: number; y: number; type: R.DropId; life: number };
 type Helper = { x: number; z: number; t: number; cd: number; face: number; hop: number };
 type Gadget = { x: number; z: number; hx: number; hz: number; cd: number; squash: number; vx: number; vz: number; left: number; gone: number; on: number };
@@ -354,7 +427,7 @@ const newGame = () => ({
 });
 let g = newGame();
 let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' = 'title';
-const eScale = (e: Enemy) => (e.kind === 'boss' ? R.BOSS_SCALE : e.big ? 1.5 : 1);
+const eScale = (e: Enemy) => (e.kind === 'boss' ? R.BOSS_SCALE * (curDef.finale ? 1.25 : 1) : e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 /** 밀리는 정도: 왕좀비는 맞을수록(%) 더 멀리 */
 const knockOf = (e: Enemy) => (e.kind === 'boss' ? R.bossKnock(e.pct ?? 0) : R.KIND_KNOCK[e.kind]);
@@ -444,7 +517,7 @@ function spawn() {
     if (Math.hypot(Math.cos(a) * g.isl - g.px, Math.sin(a) * g.isl - g.pz) > 5) break;
   }
   const st = stage(), big = Math.random() < Math.min(0.6, R.bigChance(g.t) * st.big), d = g.isl - 0.8, kind = R.pickKind(g.t, big);
-  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp * R.KIND_HP[kind], big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0, kind });
+  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp * R.KIND_HP[kind], big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0, kind, v: Math.random() < 0.5 ? 1 : 0 });
 }
 
 function burst(x: number, z: number, color: THREE.Color, n: number) {
@@ -537,7 +610,7 @@ function fall(e: Enemy, byCrumble = false) {
   if (e.kind === 'bomb') blast(e.x, e.z);
   if (e.kind === 'boss' && !g.bossDown) { // 왕좀비를 떨어뜨리면 그 자리에서 클리어
     g.bossDown = true;
-    g.extra += R.bossCoins(stageIdx);
+    g.extra += R.bossCoins(curDef.chapter);
     g.endIn = 1.8;
     g.stop = 0.45;
     g.shake = 1.2;
@@ -1091,7 +1164,7 @@ function draw(dt: number, now: number) {
   hero.rotation.y = g.face;
   hero.visible = g.inv <= 0 || Math.floor(g.inv * 14) % 2 === 0;
 
-  let ns = 0, nb = 0, nBal = 0, nBomb = 0, nSh = 0;
+  let ns = 0, ns2 = 0, nb = 0, nBal = 0, nBomb = 0, nSh = 0;
   bossMesh.visible = false;
   for (const e of g.enemies) {
     const yaw = Math.atan2(g.px - e.x, g.pz - e.z);
@@ -1100,7 +1173,7 @@ function draw(dt: number, now: number) {
       bossMesh.visible = true;
       bossMesh.position.set(e.x, e.y + Math.abs(Math.sin(now * 0.004)) * 0.15, e.z);
       bossMesh.rotation.set(-roll, yaw, 0, 'YXZ');
-      bossMesh.scale.setScalar(R.BOSS_SCALE * Math.min(1, e.age * 2));
+      bossMesh.scale.setScalar(eScale(e) * Math.min(1, e.age * 2));
       bossBody.material = e.flash > 0 ? bossFlash : bossMat;
       continue;
     }
@@ -1109,12 +1182,13 @@ function draw(dt: number, now: number) {
     if (e.kind === 'bomb') put(bombMesh, nBomb++, e.x, top + 0.12, e.z, yaw);
     if (e.kind === 'shield') put(shieldMesh, nSh++, e.x + Math.sin(yaw) * 0.75, e.y + 0.75, e.z + Math.cos(yaw) * 0.75, yaw);
     const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), sc = eScale(e) * Math.min(1, e.age * 4);
-    const mesh = e.big ? bigMesh : smallMesh, i = e.big ? nb++ : ns++;
+    const mesh = e.big ? bigMesh : e.v ? small2Mesh : smallMesh, i = e.big ? nb++ : e.v ? ns2++ : ns++;
     const roll = e.out ? Math.min(2.6, -e.y * 0.35 + 0.6) : 0; // 떨어질 때 뒤로 넘어가며 구른다
     put(mesh, i, e.x, e.y + hop * 0.22, e.z, Math.atan2(g.px - e.x, g.pz - e.z), sc * (1.04 - hop * 0.08), sc * (0.94 + hop * 0.12), sc * (1.04 - hop * 0.08), -roll);
     mesh.setColorAt(i, e.flash > 0 ? C_FLASH : C_PLAIN);
   }
   sync(smallMesh, ns);
+  sync(small2Mesh, ns2);
   sync(bigMesh, nb);
   sync(balloonMesh, nBal);
   sync(bombMesh, nBomb);
@@ -1294,13 +1368,12 @@ function showPick() {
   show(`<h2 class="big-title" style="font-size:34px">${L('레벨 업!', 'Level up!')}</h2><p class="tag">${L('하나를 고르세요', 'Pick one')}</p><div class="cards">${cards.join('')}</div>`);
 }
 const PERK_UI: Record<MT.Perk, [string, string, string, string]> = {
-  vigor: [L('튼튼한 몸', 'Sturdy'), L('최대 체력 +20', 'Max HP +20'), '#ff5a6e', ICON.heart],
-  shove: [L('묵직한 손', 'Heavy hands'), L('모든 넉백 +12%', 'All knockback +12%'), '#b06ee8', ICON.knock],
-  charge: [L('미리 충전', 'Head start'), L('쾅! 게이지 15%를 채우고 시작', 'Start with 15% Slam charge'), '#ff8a4c', ICON.sweep],
-  wisdom: [L('지혜', 'Wisdom'), L('경험치 +10%', 'XP +10%'), '#35b9ab', '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>'],
+  vigor: [L('튼튼한 몸', 'Sturdy'), L('최대 체력 +12', 'Max HP +12'), '#ff5a6e', ICON.heart],
+  shove: [L('묵직한 손', 'Heavy hands'), L('모든 넉백 +6%', 'All knockback +6%'), '#b06ee8', ICON.knock],
+  charge: [L('미리 충전', 'Head start'), L('쾅! 게이지 8%를 채우고 시작', 'Start with 8% Slam charge'), '#ff8a4c', ICON.sweep],
+  wisdom: [L('지혜', 'Wisdom'), L('경험치 +5%', 'XP +5%'), '#35b9ab', '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>'],
 };
 const coinPill = () => `<div class="coins"><i></i>${meta.coins.toLocaleString()}</div>`;
-const stageName = (i: number) => L(...R.STAGES[i].name);
 
 function placeGadgets() {
   g.gadgets = [];
@@ -1320,10 +1393,9 @@ const loadDaily = (): { day: number; best: number; cleared: boolean } => {
     return d.day === today() ? { day: d.day, best: +d.best || 0, cleared: !!d.cleared } : { day: today(), best: 0, cleared: false };
   } catch { return { day: today(), best: 0, cleared: false }; }
 };
-function startDaily() {
+async function startDaily() {
   stageBeforeDaily = stageIdx;
-  stageIdx = R.dailyStage(today());
-  applyStage();
+  await enterStage(R.dailyStage(today()));
   Math.random = R.seeded(today() * 7919);
   dailyRun = true;
   startRun();
@@ -1373,16 +1445,18 @@ async function shareShot() {
 }
 function showTitle() {
   mode = 'title';
-  applyStage();
-  resetIsland();
+  if (curDef.no !== stageIdx) void enterStage(stageIdx); // 고른 스테이지의 장 모델을 불러와 끼운다
+  else { applyStage(); resetIsland(); }
   const locked = stageIdx > meta.cleared;
   show(
     `<div class="top">${coinPill()}<h1 class="big-title">${L('망치섬', 'Tumble<br>Isle')}</h1><p class="tag">${L('망치로 쳐서 섬 밖으로 날려 버리세요', 'Bonk the horde off your tiny island')}</p></div>` +
       `<div style="display:grid;gap:12px;justify-items:center;width:100%">` +
-      `<div class="stage"><button data-act="prev" ${stageIdx ? '' : 'disabled'} aria-label="${L('이전 섬', 'Previous isle')}">‹</button>` +
-      `<div><small>${L('섬', 'Isle')} ${stageIdx + 1} / ${R.STAGES.length}</small><b>${locked ? '🔒 ' : ''}${stageName(stageIdx)}</b></div>` +
-      `<button data-act="next" ${stageIdx < R.STAGES.length - 1 ? '' : 'disabled'} aria-label="${L('다음 섬', 'Next isle')}">›</button></div>` +
-      (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을 지키면 열립니다`, `Defend ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
+      `<div class="stage"><button data-act="prevCh" ${curDef.chapter ? '' : 'disabled'} aria-label="${L('이전 장', 'Previous chapter')}">«</button>` +
+      `<button data-act="prev" ${stageIdx ? '' : 'disabled'} aria-label="${L('이전 스테이지', 'Previous stage')}">‹</button>` +
+      `<div><small>${L(`${curDef.chapter + 1}장 · ${curDef.inChapter + 1}/${CH.STAGES_PER_CHAPTER}`, `Ch.${curDef.chapter + 1} · ${curDef.inChapter + 1}/${CH.STAGES_PER_CHAPTER}`)}${curDef.finale ? L(' · 장 보스', ' · boss') : ''}</small><b>${locked ? '🔒 ' : ''}${L(...CH.CHAPTERS[curDef.chapter].name)}</b></div>` +
+      `<button data-act="next" ${stageIdx < CH.STAGE_COUNT - 1 ? '' : 'disabled'} aria-label="${L('다음 스테이지', 'Next stage')}">›</button>` +
+      `<button data-act="nextCh" ${curDef.chapter < CH.CHAPTERS.length - 1 ? '' : 'disabled'} aria-label="${L('다음 장', 'Next chapter')}">»</button></div>` +
+      (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을(를) 지키면 열립니다`, `Clear ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
       `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>` +
       missionList(meta.missions) +
       `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
@@ -1425,7 +1499,7 @@ overlay.addEventListener('click', (ev) => {
   sfx.unlockAudio();
   sfx.tap();
   const act = btn.dataset.act, id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
-  if (act === 'start') return startRun();
+  if (act === 'start') return void stageReady.then(startRun);
   if (act === 'daily') return startDaily();
   if (act === 'share') return void shareShot();
   if (act === 'bonusGo') {
@@ -1441,13 +1515,17 @@ overlay.addEventListener('click', (ev) => {
   }
   if (act === 'title') return showTitle();
   if (act === 'prev' || act === 'next') {
-    stageIdx = Math.max(0, Math.min(R.STAGES.length - 1, stageIdx + (act === 'next' ? 1 : -1)));
+    stageIdx = Math.max(0, Math.min(CH.STAGE_COUNT - 1, stageIdx + (act === 'next' ? 1 : -1)));
+    return showTitle();
+  }
+  if (act === 'prevCh' || act === 'nextCh') { // 장 단위로 건너뛰되 열린 곳까지만
+    const ch = Math.max(0, Math.min(CH.CHAPTERS.length - 1, curDef.chapter + (act === 'nextCh' ? 1 : -1)));
+    stageIdx = Math.min(ch * CH.STAGES_PER_CHAPTER, Math.max(meta.cleared, 0));
+    if (ch * CH.STAGES_PER_CHAPTER > meta.cleared) stageIdx = ch * CH.STAGES_PER_CHAPTER; // 잠긴 장도 둘러는 볼 수 있게
     return showTitle();
   }
   if (act === 'nextIsle') {
-    stageIdx++;
-    applyStage();
-    return startRun();
+    return void enterStage(stageIdx + 1).then(startRun);
   }
   if (act === 'capsule') {
     const r = MT.rollCapsule(meta);
@@ -1502,21 +1580,21 @@ function end(win: boolean) {
     store.set('daily', JSON.stringify({ day: d.day, best: Math.max(d.best, g.falls), cleared: d.cleared || win }));
     if (firstClear) g.extra += R.DAILY_COINS;
     dailyNote = `<span class="badge">${L('오늘의 섬', "Today's isle")}${firstClear ? ` +${R.DAILY_COINS}` : ''}${g.falls > d.best ? L(' · 오늘 최고!', ' · Today best!') : ''}</span>`;
-    stageIdx = stageBeforeDaily; // 오늘의 섬은 섬 해금·기록과 따로 간다
+    void enterStage(stageBeforeDaily); // 오늘의 섬은 섬 해금·기록과 따로 간다
   }
   checkMissions();
   const doneMs = g.done.map((id) => MS.missionById(id)!);
   const missionCoins = doneMs.reduce((a, m) => a + m.coins, 0);
-  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins;
+  const coins = MT.coinsFor(g.kills, g.falls, win, curDef.chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins;
   const missionsNow = meta.missions;
-  const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < R.STAGES.length;
+  const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < CH.STAGE_COUNT;
   meta = {
     ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared,
     missionsDone: meta.missionsDone + g.done.length, bossDowns: meta.bossDowns + (g.bossDown ? 1 : 0),
     missions: MS.fillMissions(meta.missions.filter((id) => !g.done.includes(id))), // 달성한 미션은 새 것으로
   };
   saveMeta();
-  const hasNext = win && !dailyNote && stageIdx + 1 < R.STAGES.length;
+  const hasNext = win && !dailyNote && stageIdx + 1 < CH.STAGE_COUNT;
   const cell = (label: string, v: string | number, hi = false) => `<div class="${hi ? 'hi' : ''}"><small>${label}</small><strong>${v}</strong></div>`;
   show(
     `<h1 class="big-title" style="font-size:36px">${g.bossDown ? L('왕좀비 격파!', 'King zombie down!') : win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
@@ -1524,7 +1602,7 @@ function end(win: boolean) {
       cell(L('버틴 시간', 'Survived'), clock(sec)) + cell(L('레벨', 'Level'), g.level + 1) +
       cell(L('처치', 'KOs'), g.kills) + cell(L('떨어뜨림', 'Knocked off'), g.falls, true) +
       `</div><div class="earn"><i></i>+${coins}</div>` +
-      (unlocked && hasNext ? `<span class="badge">${L(`새 섬: ${stageName(stageIdx + 1)}`, `New isle: ${stageName(stageIdx + 1)}`)}</span>` : '') +
+      (unlocked && hasNext ? `<span class="badge">${L(`다음: ${stageName(stageIdx + 1)}`, `Next: ${stageName(stageIdx + 1)}`)}</span>` : '') +
       (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') +
       (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + dailyNote + missionList(missionsNow, g.done) + `</div>` +
       (bestShot ? `<figure class="bestcut"><img src="${bestShot}" alt=""><figcaption><b>${L('베스트 컷', 'Best shot')}</b>${L(`낙하 ×${g.bestChain}`, `Drop ×${g.bestChain}`)}<button class="sub" data-act="share">${L('공유', 'Share')}</button></figcaption></figure>` : '') +
@@ -1631,6 +1709,7 @@ function frame(now: number) {
     hud.dev.textContent = `${fps}fps · ${g.enemies.length} · ${renderer.info.render.calls}dc · in ${joyId === -1 ? '-' : `${jx.toFixed(1)},${jz.toFixed(1)}`}`;
   }
 }
+await enterStage(stageIdx);
 showTitle();
 requestAnimationFrame(frame);
 const boot = $('boot');
@@ -1644,8 +1723,7 @@ if (DEV)
       /** 촬영 모드: 연출 장면을 정해진 크기로 렌더해 docs/art/<kind>.png로 저장(개발 서버 vite.config.ts) */
       shot: async (kind: 'icon' | 'splash') => {
         const size = kind === 'icon' ? 1024 : 2732;
-        stageIdx = 0;
-        applyStage();
+        await enterStage(0);
         startRun();
         mode = 'title'; // 시간을 멈춘다
         document.body.dataset.mode = 'shot';
@@ -1705,8 +1783,7 @@ if (DEV)
         const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number; bossSecs: number; bossPct: number; diedVsBoss: boolean }[] = [];
         for (let r = 0; r < runs; r++) {
           let lastBossPct = 0;
-          stageIdx = stageNo;
-          applyStage();
+          await enterStage(stageNo);
           startRun();
           let lag = [0, 0];
           for (;;) {
@@ -1762,7 +1839,29 @@ if (DEV)
           bossPct: Math.round(out.filter((x) => x.boss).reduce((a, x) => a + x.bossPct, 0) / Math.max(1, out.filter((x) => x.boss).length)),
           diedVsBoss: out.filter((x) => x.diedVsBoss).length };
       },
+      /** 처음부터 끝까지(결정 068): 늘 다음 스테이지를 하고, 판마다 가장 싼 강화를 살 수 있는 만큼 산다. 다 사는 판·도달 스테이지를 잰다 */
+      campaign: async (runs = 200, sloppy = 0.85) => {
+        meta = MT.freshMeta(); saveMeta();
+        const log: string[] = [];
+        let maxedAt = 0;
+        for (let r = 1; r <= runs; r++) {
+          const no = Math.min(meta.cleared, CH.STAGE_COUNT - 1);
+          await (window as unknown as { __demo: { bot: (n: number, s: number, no: number, c: boolean) => Promise<unknown> } }).__demo.bot(1, sloppy, no, true);
+          for (;;) {
+            const id = MT.PERKS.filter((p) => meta.perks[p] < MT.PERK_MAX[p]).sort((a, b) => MT.perkCost(a, meta.perks[a]) - MT.perkCost(b, meta.perks[b]))[0];
+            const next = id && MT.buy(meta, id);
+            if (!next) break;
+            meta = next;
+          }
+          saveMeta();
+          if (!maxedAt && MT.PERKS.every((p) => meta.perks[p] >= MT.PERK_MAX[p])) maxedAt = r;
+          if (r % 10 === 0) log.push(`${r}판: ${meta.cleared}스테이지 깸, 코인 ${meta.coins}, 강화 ${MT.PERKS.map((p) => meta.perks[p]).join('/')}`);
+        }
+        return { maxedAt, cleared: meta.cleared, log };
+      },
       sweep,
+      /** 스테이지 번호(0~149)로 바로 가서 장 모델을 불러온다 */
+      goStage: (no: number) => enterStage(no).then(() => showTitle()),
       /** 그리기 한 번 + 베스트 컷 찍기(화면 갱신이 멈춘 미리보기에서 시험용) */
       renderOnce: () => { draw(1 / 60, performance.now()); composer.render(); captureShot(); drawHud(); return bestShot.length; },
       // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다

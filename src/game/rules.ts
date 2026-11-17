@@ -169,7 +169,7 @@ export type Weather = 'wind' | 'quake';
 export const DAILY_COINS = 50; // 그날 처음 버티면
 /** 한국 시간 기준 날짜 번호(같은 날이면 같은 값) */
 export const dayNumber = (ms: number) => Math.floor((ms + 9 * 3600e3) / 86400e3);
-export const dailyStage = (day: number) => day % STAGES.length;
+export const dailyStage = (day: number) => (day * 7) % 30; // 앞 두 장(30스테이지) 중 하나, 날마다 다르게
 /** 같은 씨앗이면 늘 같은 수열(mulberry32) */
 export function seeded(seed: number) {
   let a = seed >>> 0;

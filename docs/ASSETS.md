@@ -7,6 +7,22 @@
 | Kenney Mini Dungeon 2.0 | https://opengameart.org/sites/default/files/kenney_mini-dungeon_2.0.zip (1,796,820 B) | zip 안 `License.txt`: "License: (Creative Commons Zero, CC0)" | `public/models/dungeon/` character-human·character-orc·barrel, `Textures/colormap.png` |
 | Kenney Graveyard Kit 5.0 | https://opengameart.org/sites/default/files/kenney_graveyard-kit_5.0.zip (3,623,408 B) | 같음 | `public/models/graveyard/` 해골·좀비·묘지기(character-keeper, 도우미·캐릭터)·유령·흡혈귀(캐릭터)·lantern-candle(등불)·pine·pine-crooked·rocks·rocks-tall·trunk·pumpkin, `Textures/colormap.png` |
 
+### 장 10개용 팩(결정 067)
+쓰는 모델 목록은 `src/game/chapters.ts`가 정본이고, 테스트(`chapters.test.ts`)가 파일이 다 있는지 확인합니다. 라이선스 원문은 모두 팩 안 `License.txt`: "License: (Creative Commons Zero, CC0)"이고, 각 폴더에 그대로 넣었습니다.
+
+| 팩 | 받은 곳 | 폴더 |
+|---|---|---|
+| Kenney Nature Kit 2.1 | https://opengameart.org/sites/default/files/Nature%20Kit%20%282.1%29.zip | `public/models/nature/`(꼭짓점 색, 텍스처 없음) |
+| Kenney Mini Characters 2.0 | https://opengameart.org/sites/default/files/kenney_mini-characters_2.0.zip | `public/models/chars/`(장별 작은 적) |
+| Kenney Holiday Kit 2.0 | https://opengameart.org/sites/default/files/kenney_holiday-kit.zip | `public/models/holiday/` |
+| Kenney Pirate Kit 2.1 | https://opengameart.org/sites/default/files/kenney_pirate-kit_2.1.zip | `public/models/pirate/` |
+| Kenney Castle Kit 2.0 | https://opengameart.org/sites/default/files/kenney_castle-kit.zip | `public/models/castle/` |
+| Kenney Fantasy Town Kit 2.0 | https://opengameart.org/sites/default/files/kenney_fantasy-town-kit_2.0.zip | `public/models/town/` |
+| Kenney Food Kit 2.0 | https://opengameart.org/sites/default/files/kenney_food-kit.zip | `public/models/food/` |
+| Kenney Space Kit 1.0 | https://opengameart.org/sites/default/files/space-kit-1.0.zip | `public/models/space/`(OBJ+MTL, 재질 색을 꼭짓점 색으로 구움) |
+
+- 모델 전체 `public/models/`는 약 5.9MB입니다. 장마다 그 장 모델만 불러옵니다.
+
 - kenney.nl 본 사이트는 직접 내려받기 주소가 막혀 있어(2026-11-17) Kenney가 직접 올린 OpenGameArt 사본을 씁니다.
 - 두 팩의 `colormap.png`는 이름이 같고 내용이 달라 폴더를 나눴습니다. GLB는 `Textures/colormap.png`를 상대 경로로 찾습니다.
 - 모델에는 걷기·달리기·죽기 등 애니메이션(`idle`, `walk`, `sprint`, `die` …)이 들어 있습니다. 적은 수백 마리를 한 번에 그리려고 애니메이션 없이 굳힌 모양을 씁니다.

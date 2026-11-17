@@ -3,9 +3,10 @@ import { MAX_HP } from './rules';
 
 export const PERKS = ['vigor', 'shove', 'charge', 'wisdom'] as const;
 export type Perk = (typeof PERKS)[number];
-export const PERK_MAX: Record<Perk, number> = { vigor: 3, shove: 5, charge: 5, wisdom: 5 };
+// 장 10개·150스테이지에 맞춰 단계를 늘리고 값을 가파르게(결정 068): 최대 효과는 예전과 같고, 다 사는 데 한 달쯤
+export const PERK_MAX: Record<Perk, number> = { vigor: 5, shove: 10, charge: 10, wisdom: 10 };
 const PERK_BASE: Record<Perk, number> = { vigor: 80, shove: 40, charge: 40, wisdom: 40 };
-export const perkCost = (id: Perk, lv: number) => Math.round(PERK_BASE[id] * (1 + lv) ** 1.6);
+export const perkCost = (id: Perk, lv: number) => Math.round(PERK_BASE[id] * (1 + lv) ** 2.8);
 
 // 캐릭터(결정 061): 캡슐로 얻는 Kenney 캐릭터, 저마다 작은 특성 하나
 export const CHARS = ['human', 'orc', 'keeper', 'vampire', 'ghost'] as const;
@@ -24,14 +25,14 @@ export const freshMeta = (): Meta => ({
 });
 
 // 효과
-export const maxHp = (m: Meta) => MAX_HP + 20 * m.perks.vigor + (m.hero === 'orc' ? 20 : 0);
-export const shoveMul = (m: Meta) => (1 + 0.12 * m.perks.shove) * (m.hero === 'keeper' ? 1.15 : 1);
-export const startChargeFrac = (m: Meta) => 0.15 * m.perks.charge;
-export const xpMul = (m: Meta) => 1 + 0.1 * m.perks.wisdom;
+export const maxHp = (m: Meta) => MAX_HP + 12 * m.perks.vigor + (m.hero === 'orc' ? 20 : 0);
+export const shoveMul = (m: Meta) => (1 + 0.06 * m.perks.shove) * (m.hero === 'keeper' ? 1.15 : 1);
+export const startChargeFrac = (m: Meta) => 0.08 * m.perks.charge;
+export const xpMul = (m: Meta) => 1 + 0.05 * m.perks.wisdom;
 
-/** 판 보상. 처치 수에는 떨어뜨린 수가 들어 있어 떨어뜨리기는 두 번 센다. 뒤 섬일수록 많이 준다 */
-export const coinsFor = (kills: number, falls: number, win: boolean, stage: number) =>
-  Math.round((kills + falls) * (1 + 0.5 * stage) + (win ? 60 * (stage + 1) : 0));
+/** 판 보상. 처치 수에는 떨어뜨린 수가 들어 있어 떨어뜨리기는 두 번 센다. 뒤 장일수록 많이 준다(chapter 0~9) */
+export const coinsFor = (kills: number, falls: number, win: boolean, chapter: number) =>
+  Math.round((kills + falls) * (1 + 0.3 * chapter) + (win ? 60 * (chapter + 1) : 0));
 
 export const speedMul = (m: Meta) => (m.hero === 'ghost' ? 1.12 : 1);
 /** 흡혈귀: 이만큼 처치할 때마다 체력 1(0이면 없음) */

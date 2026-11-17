@@ -4,8 +4,8 @@
 
 | 팩 | 받은 곳 | 라이선스 원문 | 쓰는 파일 |
 |---|---|---|---|
-| Kenney Mini Dungeon 2.0 | https://opengameart.org/sites/default/files/kenney_mini-dungeon_2.0.zip (1,796,820 B) | zip 안 `License.txt`: "License: (Creative Commons Zero, CC0)" | `public/models/dungeon/character-human.glb`, `Textures/colormap.png` |
-| Kenney Graveyard Kit 5.0 | https://opengameart.org/sites/default/files/kenney_graveyard-kit_5.0.zip (3,623,408 B) | 같음 | `public/models/graveyard/` 해골·좀비·묘지기(character-keeper, 도우미)·pine·pine-crooked·rocks·rocks-tall·trunk·pumpkin, `Textures/colormap.png` |
+| Kenney Mini Dungeon 2.0 | https://opengameart.org/sites/default/files/kenney_mini-dungeon_2.0.zip (1,796,820 B) | zip 안 `License.txt`: "License: (Creative Commons Zero, CC0)" | `public/models/dungeon/` character-human·character-orc·barrel, `Textures/colormap.png` |
+| Kenney Graveyard Kit 5.0 | https://opengameart.org/sites/default/files/kenney_graveyard-kit_5.0.zip (3,623,408 B) | 같음 | `public/models/graveyard/` 해골·좀비·묘지기(character-keeper, 도우미·캐릭터)·유령·흡혈귀(캐릭터)·lantern-candle(등불)·pine·pine-crooked·rocks·rocks-tall·trunk·pumpkin, `Textures/colormap.png` |
 
 - kenney.nl 본 사이트는 직접 내려받기 주소가 막혀 있어(2026-11-17) Kenney가 직접 올린 OpenGameArt 사본을 씁니다.
 - 두 팩의 `colormap.png`는 이름이 같고 내용이 달라 폴더를 나눴습니다. GLB는 `Textures/colormap.png`를 상대 경로로 찾습니다.

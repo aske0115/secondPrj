@@ -213,6 +213,10 @@ export function setMusicFast(fast: boolean) {
   tempo = fast ? 1.3 : 1;
 }
 export const isMusicOn = () => musicOn;
+/** 광고가 소리를 내는 동안 게임 소리를 모두 끈다 */
+export function setMuted(m: boolean) {
+  if (master) master.gain.value = m ? 0 : 0.6;
+}
 export function toggleMusic() {
   musicOn = !musicOn;
   saveOn('music', musicOn);

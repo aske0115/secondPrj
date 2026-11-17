@@ -14,6 +14,7 @@
     "native:release": "npm run build:release && npx cap sync"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.4.1",
     "@capacitor/android": "^8.6.2",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.2",

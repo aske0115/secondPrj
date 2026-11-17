@@ -230,3 +230,10 @@ body:not([data-mode="play"]):not([data-mode="bonus"]) #pause { visibility: hidde
 .set[aria-pressed="true"] b { background: var(--teal); color: #fff; }
 .credit { margin: 4px 0 0; font-size: 12px; color: #fff; opacity: .75; text-align: center; }
 .reveal .sub { color: var(--ink); } /* 캡슐 화면은 글자가 흰색이라 밝은 버튼 글자를 되돌린다 */
+
+/* 보상형 광고 버튼(결정 073): 게임 버튼과 구분되는 보라색, 무엇을 받는지 글로 먼저 보여 준다 */
+.ad { width: min(100%, 300px); border: 0; border-radius: 16px; padding: 12px 14px; font: inherit; font-size: 16px; font-weight: 900; color: #fff;
+  background: linear-gradient(#9d8bff, #6f59ea); box-shadow: 0 4px 0 #4a3aa8; }
+.ad:active { transform: translateY(3px); box-shadow: 0 1px 0 #4a3aa8; }
+.ad:disabled { opacity: .6; }
+.ad.small { width: auto; padding: 8px 14px; font-size: 13px; }

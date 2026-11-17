@@ -1,2 +1,4 @@
 /* 홈 화면 앱 이름(결정 054) */
 "CFBundleDisplayName" = "망치섬";
+/* 광고 추적 허용 요청 문구(결정 073) */
+"NSUserTrackingUsageDescription" = "허용하시면 관심사에 더 맞는 광고가 표시돼요. 허용하지 않아도 게임과 보상은 똑같이 이용할 수 있어요.";

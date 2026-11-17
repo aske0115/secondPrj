@@ -14,6 +14,7 @@ import { App } from '@capacitor/app';
 import * as CH from './game/chapters';
 import { L, lang, setLang } from './i18n';
 import * as sfx from './audio';
+import * as ads from './ads';
 import * as R from './game/rules';
 import * as MT from './game/meta';
 import * as MS from './game/missions';
@@ -439,7 +440,7 @@ type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: n
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
 const newGame = () => ({
   t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: MT.startPicks(meta.perks.cards),
-  charge: 0, kills: 0, falls: 0, rerolls: MT.rerolls(meta.perks.cards), revived: false,
+  charge: 0, kills: 0, falls: 0, rerolls: MT.rerolls(meta.perks.cards), revived: false, continued: false,
   lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
@@ -697,7 +698,7 @@ function hurt(dmg: number) {
   }
   if (g.hp > 0) return;
   const back = g.revived ? 0 : MT.revivePct(meta.perks.revive);
-  if (!back) return end(false);
+  if (!back) return canContinue() ? offerContinue() : end(false);
   g.revived = true; // 두 번째 기회(결정 072): 판당 1번 일어나며 주변을 밀어낸다
   g.hp = Math.round(g.maxHp * back);
   g.inv = 2;
@@ -1552,8 +1553,59 @@ function pause() {
   showPause();
 }
 function resume() {
+  if (g.hp <= 0) return end(false); // 이어하기 창에서 뒤로 가기
   overlay.hidden = true;
   mode = pausedFrom;
+}
+// ───── 보상형 광고(결정 073): 직접 누를 때만, 판 밖에서만 ─────
+/** 광고 보고 이어하기: 판당 1번, 60초를 넘겼거나 왕좀비가 나왔을 때만(아까운 순간). 오늘의 섬은 공정하게 뺀다 */
+const canContinue = () => !g.continued && !dailyRun && ads.adReady() && (g.t >= 60 || g.bossSpawned);
+function offerContinue(note = '') {
+  pausedFrom = 'play';
+  mode = 'pause';
+  resetInput();
+  show(
+    `<h2 class="big-title" style="font-size:32px">${L('쓰러졌다!', 'Down!')}</h2><p class="tag">${note || L('광고를 보면 체력 50%로 이어 할 수 있어요 (판당 1번)', 'Watch an ad to get up with 50% HP (once a run)')}</p>` +
+      `<button class="ad" data-act="adContinue">▶ ${L('이어 하기', 'Continue')}</button><button class="sub" data-act="quit">${L('그만하기', 'Give up')}</button>`,
+    'shop',
+  );
+}
+async function watchAd(btn: HTMLButtonElement) {
+  btn.disabled = true;
+  sfx.setMuted(true);
+  const ok = await ads.showAd();
+  sfx.setMuted(false);
+  btn.disabled = false;
+  return ok;
+}
+let lastCoins = 0;
+const doubleBtn = () =>
+  meta.cleared >= 2 && lastCoins > 0 && ads.adReady() && ads.adDaily().doubles < ads.DOUBLES_PER_DAY // 처음 두 섬을 깨기 전에는 광고를 보여 주지 않는다
+    ? `<button class="ad" data-act="adDouble">▶ ${L(`광고 보고 코인 2배 (+${lastCoins})`, `Watch ad: double coins (+${lastCoins})`)}</button>` : '';
+async function onAd(act: string, btn: HTMLButtonElement) {
+  if (act === 'adContinue') {
+    if (!(await watchAd(btn))) return offerContinue(L('광고를 끝까지 보면 이어 할 수 있어요', 'Finish the ad to continue'));
+    g.continued = true;
+    g.hp = Math.round(g.maxHp * 0.5);
+    g.inv = 2.5;
+    blast(g.px, g.pz);
+    resume();
+    toast(L('다시 일어남!', 'Back on your feet!'));
+  } else if (act === 'adDouble') {
+    if (!(await watchAd(btn))) return;
+    meta = { ...meta, coins: meta.coins + lastCoins };
+    saveMeta();
+    ads.useAdDaily('doubles');
+    sfx.coins();
+    btn.outerHTML = `<span class="badge">${L(`+${lastCoins} 코인 더 받음!`, `+${lastCoins} bonus coins!`)}</span>`;
+  } else if (act === 'adCapsule') {
+    if (!(await watchAd(btn))) return;
+    const r = MT.rollCapsule({ ...meta, coins: meta.coins + MT.CAPSULE_COST })!;
+    meta = r.meta;
+    saveMeta();
+    ads.useAdDaily('capsule');
+    showCapsule(r.got, r.dup);
+  }
 }
 // 안드로이드 뒤로 가기(결정 071): 판 도중 → 일시정지, 일시정지 → 이어 하기, 상점·설정·결과 → 시작 화면, 시작 화면 → 묻고 종료
 void App.addListener('backButton', () => {
@@ -1597,7 +1649,8 @@ function showShop() {
   });
   show(
     `<h2 class="big-title" style="font-size:30px">${L('상점', 'Shop')}</h2>${coinPill()}` +
-      `<div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST} ${L('캡슐 돌리기', 'Spin capsule')}</button></div>` +
+      `<div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST} ${L('캡슐 돌리기', 'Spin capsule')}</button>` +
+      (ads.adReady() && ads.adDaily().capsule < 1 ? `<button class="ad small" data-act="adCapsule">▶ ${L('광고 보고 무료 캡슐 (하루 1번)', 'Free capsule with an ad (1/day)')}</button>` : '') + `</div>` +
       `<div class="chars">${chars.join('')}</div><div class="cards">${cards.join('')}</div><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`,
     'shop',
   );
@@ -1625,6 +1678,7 @@ overlay.addEventListener('click', (ev) => {
   }
   if (act === 'lang') return setLang(lang === 'ko' ? 'en' : 'ko');
   if (act === 'resume') return resume();
+  if (act === 'adContinue' || act === 'adDouble' || act === 'adCapsule') return void onAd(act, btn);
   if (act === 'reroll') {
     g.rerolls--;
     return showPick();
@@ -1701,6 +1755,7 @@ function end(win: boolean) {
   const missionCoins = doneMs.reduce((a, m) => a + m.coins, 0);
   const coins = Math.round((MT.coinsFor(g.kills, g.falls, win, curDef.chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins) * MT.coinMul(meta));
   const missionsNow = meta.missions;
+  lastCoins = coins;
   const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < CH.STAGE_COUNT;
   meta = {
     ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared,
@@ -1715,7 +1770,7 @@ function end(win: boolean) {
       `<div class="panel"><div class="stats">` +
       cell(L('버틴 시간', 'Survived'), clock(sec)) + cell(L('레벨', 'Level'), g.level + 1) +
       cell(L('처치', 'KOs'), g.kills) + cell(L('떨어뜨림', 'Knocked off'), g.falls, true) +
-      `</div><div class="earn"><i></i>+${coins}</div>` +
+      `</div><div class="earn"><i></i>+${coins}</div>${doubleBtn()}` +
       (unlocked && hasNext ? `<span class="badge">${L(`다음: ${stageName(stageIdx + 1)}`, `Next: ${stageName(stageIdx + 1)}`)}</span>` : '') +
       (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') +
       (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + dailyNote + missionList(missionsNow, g.done) + `</div>` +
@@ -1908,6 +1963,7 @@ if (DEV)
             }
             if (mode === 'bonusIntro') { overlay.querySelector<HTMLButtonElement>('[data-act="bonusGo"]')!.click(); continue; }
             if (mode === 'bonus') { for (let i = 0; i < 30; i++) update(1 / 60); continue; }
+            if (mode === 'pause') { overlay.querySelector<HTMLButtonElement>('[data-act="quit"]')!.click(); continue; } // 이어하기 광고 창: 봇은 보지 않는다
             if (mode !== 'play') break;
             let mx = 0, mz = 0, near: Enemy | null = null, nd = 99;
             const boss = chaseBoss ? g.enemies.find((e) => e.kind === 'boss' && !e.out) : undefined;

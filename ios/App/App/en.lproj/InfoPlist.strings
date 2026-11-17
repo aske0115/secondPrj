@@ -1,2 +1,3 @@
 /* 홈 화면 앱 이름(결정 054) */
 "CFBundleDisplayName" = "Tumble Isle";
+"NSUserTrackingUsageDescription" = "Allowing this shows ads that better match your interests. The game and its rewards work the same either way.";

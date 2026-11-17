@@ -24,18 +24,24 @@ test('쓸어내기 충전량은 끝까지 올려도 양수다', () => {
   expect(sweepCost(MAX_LEVEL)).toBeGreaterThan(0);
 });
 
-test.each(STAGES.map((st, i) => [i, st] as const))('섬 %i: 줄어들기만 하고, 끝까지 싸울 자리가 남고, 무너짐 전에 경고한다', (_, st) => {
+test.each(STAGES.map((st, i) => [i, st] as const))('섬 %i: 처음 크기에서 줄어들기만 하고, 끝까지 싸울 자리가 남고, 무너짐 전에 경고한다', (_, st) => {
   const cs = st.crumbles;
-  expect(islandRadius(0, cs)).toBe(ISLAND_R);
-  for (let t = 1; t <= RUN_SECONDS; t++) expect(islandRadius(t, cs)).toBeLessThanOrEqual(islandRadius(t - 1, cs));
-  expect(islandRadius(RUN_SECONDS, cs)).toBeGreaterThanOrEqual(8);
+  expect(st.r).toBeLessThanOrEqual(ISLAND_R);
+  expect(islandRadius(0, st)).toBe(st.r);
+  for (let t = 1; t <= RUN_SECONDS; t++) expect(islandRadius(t, st)).toBeLessThan(islandRadius(t - 1, st) + 1e-9);
+  expect(islandRadius(RUN_SECONDS, st)).toBeGreaterThanOrEqual(8);
   cs.forEach((c, k) => {
+    expect(c.r).toBeLessThan(k ? cs[k - 1].r : st.r);
     expect(c.at).toBeLessThan(RUN_SECONDS);
-    expect(crumbleWarning(c.at - 1, cs)).toBe(k);
-    expect(crumbleWarning(c.at, cs)).toBe(-1);
-    if (k) expect(c.at - cs[k - 1].at).toBeGreaterThan(10); // 경고가 겹치지 않게
+    expect(crumbleWarning(c.at - 1, st)).toBe(k);
+    expect(crumbleWarning(c.at, st)).toBe(-1);
+    if (k) expect(c.at - cs[k - 1].at).toBeGreaterThan(10);
   });
-  expect(crumbleWarning(cs[0].at - 10, cs)).toBe(-1);
+  expect(crumbleWarning(cs[0].at - 10, st)).toBe(-1);
+});
+
+test('뒤 섬일수록 좁다(떨어뜨리기가 늘어난다)', () => {
+  for (let i = 1; i < STAGES.length; i++) expect(STAGES[i].r).toBeLessThan(STAGES[i - 1].r);
 });
 
 test('뒤 섬일수록 어렵다', () => {

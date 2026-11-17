@@ -111,7 +111,7 @@ async function bake(path: string, height: number) {
   });
   return { geo: fit(mergeGeometries(parts), height), mat: new THREE.MeshLambertMaterial({ map }) };
 }
-type Prop = { m: THREE.InstancedMesh; i: number; x: number; z: number; yaw: number; s: number; y: number; vy: number };
+type Prop = { m: THREE.InstancedMesh; i: number; bx: number; bz: number; x: number; z: number; yaw: number; s: number; y: number; vy: number };
 const props: Prop[] = [];
 function place(p: Prop) {
   put(p.m, p.i, p.x, p.y, p.z, p.yaw, p.s, p.s, p.s, p.y * -0.08);
@@ -120,7 +120,7 @@ function place(p: Prop) {
 function prop(b: { geo: THREE.BufferGeometry; mat: THREE.Material }, n: number, min: number, max: number, s0: number, s1: number) {
   const m = instanced(b.geo, b.mat, n, true);
   for (let i = 0; i < n; i++) {
-    const [x, z] = onIsland(min, max), p = { m, i, x, z, yaw: rnd(0, 6), s: rnd(s0, s1), y: 0, vy: 0 };
+    const [x, z] = onIsland(min, max), p = { m, i, bx: x, bz: z, x, z, yaw: rnd(0, 6), s: rnd(s0, s1), y: 0, vy: 0 };
     props.push(p);
     place(p);
   }
@@ -146,8 +146,9 @@ prop(rocksTall, 3, 0.75, 0.95, 0.8, 1.2);
 prop(trunk, 3, 0.4, 0.9, 1, 1.3);
 prop(pumpkin, 5, 0.3, 0.95, 0.8, 1.3);
 const flowers = instanced(new THREE.SphereGeometry(0.09, 6, 4), flat(0xffffff), 70);
+const flowerAt = Array.from({ length: 70 }, () => onIsland(0.05, 0.9));
 for (let i = 0; i < 70; i++) {
-  put(flowers, i, ...insert(onIsland(0.05, 0.74), 0.08));
+  put(flowers, i, ...insert(flowerAt[i], 0.08));
   flowers.setColorAt(i, new THREE.Color([0xffffff, 0xffe27a, 0xff9fb8][i % 3]));
 }
 flowers.count = 70;
@@ -224,11 +225,12 @@ ring.position.y = 0.06;
 ring.visible = false;
 scene.add(ring);
 let warnRings: THREE.Mesh[] = [];
-function buildWarnRings(cs: readonly R.Crumble[]) {
+function buildWarnRings(st: R.Stage) {
+  const cs = st.crumbles;
   for (const m of warnRings) { scene.remove(m); m.geometry.dispose(); }
   warnRings = cs.map((c, k) => {
     const m = new THREE.Mesh(
-      new THREE.RingGeometry(c.r, k ? cs[k - 1].r : R.ISLAND_R, 64).rotateX(-Math.PI / 2),
+      new THREE.RingGeometry(c.r, k ? cs[k - 1].r : st.r, 64).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: 0xff5a3c, transparent: true, depthWrite: false }),
     );
     m.position.y = 0.03;
@@ -257,7 +259,7 @@ function applyStage() {
   sun.color.set(st.sun);
   hemi.intensity = night ? 0.8 : 1.25;
   document.body.style.background = `#${st.sky.toString(16).padStart(6, '0')}`;
-  buildWarnRings(st.crumbles);
+  buildWarnRings(st);
 }
 
 // ───────── 상태 ─────────
@@ -274,15 +276,18 @@ const newGame = () => ({
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
-  isl: R.ISLAND_R as number, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
+  isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
 let g = newGame();
 let mode: 'title' | 'play' | 'bonus' | 'pick' | 'over' = 'title';
 const eScale = (e: Enemy) => (e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 function resetIsland() {
-  islandVis = R.ISLAND_R;
-  for (const p of props) { p.y = p.vy = 0; place(p); }
+  const r = stage().r, k = r / R.ISLAND_R;
+  islandVis = r;
+  for (const p of props) { p.x = p.bx * k; p.z = p.bz * k; p.y = p.vy = 0; place(p); }
+  flowerAt.forEach(([x, z], i) => put(flowers, i, x * k, 0.08, z * k));
+  flowers.instanceMatrix.needsUpdate = true;
 }
 
 // ───────── 입력: 화면 어디든 누른 자리가 조이스틱 원점 ─────────
@@ -682,7 +687,7 @@ function update(dt: number) {
   }
   g.inv -= dt;
   g.chainT -= dt;
-  const isl = R.islandRadius(g.t, stage().crumbles);
+  const isl = R.islandRadius(g.t, stage());
   if (isl < g.isl) crumble(isl);
 
   if (bonus) { // 돌진: 미끄러지다 멈추고, 가장자리에서는 튕겨 나온다
@@ -894,7 +899,7 @@ function draw(dt: number, now: number) {
     p.y += p.vy * dt;
     place(p);
   }
-  const warn = mode === 'play' ? R.crumbleWarning(g.t, stage().crumbles) : -1;
+  const warn = mode === 'play' ? R.crumbleWarning(g.t, stage()) : -1;
   warnRings.forEach((m, i) => {
     m.visible = i === warn;
     if (m.visible) (m.material as THREE.MeshBasicMaterial).opacity = 0.25 + 0.3 * Math.abs(Math.sin(now * 0.008));
@@ -1103,7 +1108,7 @@ function drawHud() {
     hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
     if (g.chain >= 2) toast(L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`)); // 이어서 떨어뜨리면 가운데에 크게
   }
-  const warn = mode === 'play' ? R.crumbleWarning(g.t, stage().crumbles) : -1;
+  const warn = mode === 'play' ? R.crumbleWarning(g.t, stage()) : -1;
   if (shown.warn !== warn) {
     shown.warn = warn;
     hud.warn.hidden = warn < 0;

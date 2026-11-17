@@ -71,9 +71,9 @@ function instanced(geo: THREE.BufferGeometry, mat: THREE.Material, max: number, 
   return m;
 }
 const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3();
-const UP = new THREE.Vector3(0, 1, 0);
-function put(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, yaw = 0, sx = 1, sy = sx, sz = sx) {
-  M.compose(P.set(x, y, z), Q.setFromAxisAngle(UP, yaw), S.set(sx, sy, sz));
+const EUL = new THREE.Euler(0, 0, 0, 'YXZ');
+function put(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, yaw = 0, sx = 1, sy = sx, sz = sx, pitch = 0) {
+  M.compose(P.set(x, y, z), Q.setFromEuler(EUL.set(pitch, yaw, 0)), S.set(sx, sy, sz));
   mesh.setMatrixAt(i, M);
 }
 
@@ -109,9 +109,19 @@ async function bake(path: string, height: number) {
   });
   return { geo: fit(mergeGeometries(parts), height), mat: new THREE.MeshLambertMaterial({ map }) };
 }
+type Prop = { m: THREE.InstancedMesh; i: number; x: number; z: number; yaw: number; s: number; y: number; vy: number };
+const props: Prop[] = [];
+function place(p: Prop) {
+  put(p.m, p.i, p.x, p.y, p.z, p.yaw, p.s, p.s, p.s, p.y * -0.08);
+  p.m.instanceMatrix.needsUpdate = true;
+}
 function prop(b: { geo: THREE.BufferGeometry; mat: THREE.Material }, n: number, min: number, max: number, s0: number, s1: number) {
   const m = instanced(b.geo, b.mat, n, true);
-  for (let i = 0; i < n; i++) put(m, i, ...insert(onIsland(min, max)), rnd(0, 6), rnd(s0, s1));
+  for (let i = 0; i < n; i++) {
+    const [x, z] = onIsland(min, max), p = { m, i, x, z, yaw: rnd(0, 6), s: rnd(s0, s1), y: 0, vy: 0 };
+    props.push(p);
+    place(p);
+  }
   m.count = n;
 }
 const onIsland = (min: number, max: number) => {
@@ -135,7 +145,7 @@ prop(trunk, 3, 0.4, 0.9, 1, 1.3);
 prop(pumpkin, 5, 0.3, 0.95, 0.8, 1.3);
 const flowers = instanced(new THREE.SphereGeometry(0.09, 6, 4), flat(0xffffff), 70);
 for (let i = 0; i < 70; i++) {
-  put(flowers, i, ...insert(onIsland(0.05, 0.97), 0.08));
+  put(flowers, i, ...insert(onIsland(0.05, 0.74), 0.08));
   flowers.setColorAt(i, new THREE.Color([0xffffff, 0xffe27a, 0xff9fb8][i % 3]));
 }
 flowers.count = 70;
@@ -158,7 +168,7 @@ heroWalk.play().setEffectiveWeight(0);
 const smallMesh = instanced(skel.geo, skel.mat, R.MAX_ENEMIES, true);
 const bigMesh = instanced(zombie.geo, zombie.mat, R.MAX_ENEMIES, true);
 const C_PLAIN = new THREE.Color(1, 1, 1), C_FLASH = new THREE.Color(3, 3, 3);
-const C_SMALL = new THREE.Color(0xe9e4d4), C_BIG = new THREE.Color(0x7fae6a); // 터질 때 조각 색
+const C_SMALL = new THREE.Color(0xe9e4d4), C_BIG = new THREE.Color(0x7fae6a), C_DIRT = new THREE.Color(0x9c7550); // 터질 때 조각 색
 const shotMesh = instanced(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff1a0 }), 64);
 const gemMesh = instanced(new THREE.OctahedronGeometry(0.2), flat(0x55e6d6, { emissive: 0x55e6d6, emissiveIntensity: 0.7 }), 400);
 const bladeMesh = instanced(new THREE.BoxGeometry(0.6, 0.08, 0.18), flat(0xf4f7ff), 6, true);
@@ -170,6 +180,18 @@ const ring = new THREE.Mesh(
 ring.position.y = 0.06;
 ring.visible = false;
 scene.add(ring);
+const warnRings = R.CRUMBLES.map((c, k) => {
+  const outer = k ? R.CRUMBLES[k - 1].r : R.ISLAND_R;
+  const m = new THREE.Mesh(
+    new THREE.RingGeometry(c.r, outer, 64).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0xff5a3c, transparent: true, depthWrite: false }),
+  );
+  m.position.y = 0.03;
+  m.visible = false;
+  scene.add(m);
+  return m;
+});
+let islandVis: number = R.ISLAND_R; // 보이는 반지름은 실제 값을 부드럽게 따라간다
 
 // ───────── 상태 ─────────
 type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number };
@@ -180,11 +202,16 @@ const newGame = () => ({
   t: 0, px: 0, pz: 0, face: 0, hp: R.MAX_HP, inv: 0, level: 0, xp: 0, picks: 0, charge: 0, kills: 0, falls: 0,
   lv: R.startLevels(), enemies: [] as Enemy[], shots: [] as Shot[], gems: [] as Gem[], bits: [] as Bit[],
   shotCd: 0.4, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, orbitA: 0, moving: false,
+  isl: R.ISLAND_R as number, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
 let g = newGame();
 let mode: 'title' | 'play' | 'pick' | 'over' = 'title';
 const eScale = (e: Enemy) => (e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
+function resetIsland() {
+  islandVis = R.ISLAND_R;
+  for (const p of props) { p.y = p.vy = 0; place(p); }
+}
 
 // ───────── 입력: 화면 어디든 누른 자리가 조이스틱 원점 ─────────
 let joyId = -1, jox = 0, joy = 0, jx = 0, jz = 0;
@@ -235,9 +262,9 @@ function spawn() {
   let a = 0;
   for (let tries = 0; tries < 6; tries++) { // 주인공 코앞에서는 올라오지 않게
     a = rnd(0, Math.PI * 2);
-    if (Math.hypot(Math.cos(a) * R.ISLAND_R - g.px, Math.sin(a) * R.ISLAND_R - g.pz) > 5) break;
+    if (Math.hypot(Math.cos(a) * g.isl - g.px, Math.sin(a) * g.isl - g.pz) > 5) break;
   }
-  const big = Math.random() < R.bigChance(g.t), d = R.ISLAND_R - 0.8;
+  const big = Math.random() < R.bigChance(g.t), d = g.isl - 0.8;
   g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big), big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0 });
 }
 
@@ -247,9 +274,9 @@ function burst(x: number, z: number, color: THREE.Color, n: number) {
 }
 
 let lastPop = 0, combo = 0;
-function reward(e: Enemy) {
+function reward(charge: number) {
   g.kills++;
-  g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + 1);
+  g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge);
   const now = performance.now();
   if (now - lastPop > 45) { // 한꺼번에 죽을 때 소리가 뭉개지지 않게, 이어 죽이면 음이 올라간다
     combo = now - lastPop < 500 ? combo + 1 : 0;
@@ -266,14 +293,44 @@ function hit(i: number, dmg: number, kx: number, kz: number) {
   const e = g.enemies[i];
   e.hp -= dmg;
   e.flash = 0.1;
-  e.kx += kx;
-  e.kz += kz;
+  const km = R.knockMul(g.lv.knock);
+  e.kx += kx * km;
+  e.kz += kz * km;
   if (e.hp > 0) return;
-  reward(e);
-  g.gems.push({ x: e.x, z: e.z, xp: e.big ? 3 : 1 });
+  reward(R.KILL_CHARGE);
+  g.gems.push({ x: e.x, z: e.z, xp: R.killXp(e.big) });
   if (g.gems.length > 400) gainXp(g.gems.shift()!.xp);
   burst(e.x, e.z, e.big ? C_BIG : C_SMALL, e.big ? 12 : 6);
   drop(i);
+}
+
+let lastFallSfx = 0;
+function fall(e: Enemy) {
+  e.out = true;
+  e.vy = 4; // 살짝 튀었다가 떨어진다
+  g.falls++;
+  g.chain = g.chainT > 0 ? g.chain + 1 : 1;
+  g.chainT = 1.2;
+  reward(R.FALL_CHARGE);
+  gainXp(R.fallXp(e.big));
+  const now = performance.now();
+  if (now - lastFallSfx > 70) {
+    lastFallSfx = now;
+    sfx.whoosh();
+  }
+}
+
+function crumble(r: number) {
+  g.isl = r;
+  g.shake = 1;
+  g.stop = 0.1;
+  sfx.rumble();
+  sfx.buzz(40);
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2;
+    burst(Math.cos(a) * (r + 0.8), Math.sin(a) * (r + 0.8), C_DIRT, 3);
+  }
+  for (const e of g.enemies) if (!e.out && Math.hypot(e.x, e.z) > r) fall(e); // 무너진 땅 위의 적은 같이 떨어진다
 }
 
 function gainXp(n: number) {
@@ -323,6 +380,9 @@ function update(dt: number) {
   g.t += dt;
   if (g.t >= R.RUN_SECONDS) return end(true);
   g.inv -= dt;
+  g.chainT -= dt;
+  const isl = R.islandRadius(g.t);
+  if (isl < g.isl) crumble(isl);
 
   // 주인공
   let mx = jx, mz = jz;
@@ -339,7 +399,7 @@ function update(dt: number) {
     g.px += mx * sp * dt;
     g.pz += mz * sp * dt;
     g.face = Math.atan2(mx, mz);
-    const d = Math.hypot(g.px, g.pz), lim = R.ISLAND_R - 0.7;
+    const d = Math.hypot(g.px, g.pz), lim = g.isl - 0.7;
     if (d > lim) { g.px *= lim / d; g.pz *= lim / d; }
   }
 
@@ -373,15 +433,11 @@ function update(dt: number) {
     e.kz *= decay;
     e.hop += dt * (e.big ? 6 : 9);
     const off = Math.hypot(e.x, e.z);
-    if (off > R.ISLAND_R && Math.hypot(e.kx, e.kz) < 2) { // 자기들끼리 밀려서는 떨어지지 않는다
-      e.x *= R.ISLAND_R / off;
-      e.z *= R.ISLAND_R / off;
-    } else if (off > R.ISLAND_R) { // 맞아서 섬 밖으로 밀리면 떨어진다. 보석을 못 남기니 경험치는 바로 준다
-      e.out = true;
-      g.falls++;
-      reward(e);
-      gainXp(e.big ? 3 : 1);
-    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt();
+    if (off > g.isl && Math.hypot(e.kx, e.kz) < 2) { // 자기들끼리 밀려서는 떨어지지 않는다
+      e.x *= g.isl / off;
+      e.z *= g.isl / off;
+    } else if (off > g.isl) fall(e); // 맞아서 섬 밖으로 밀리면 떨어진다. 보석을 못 남기니 경험치는 바로 준다
+    else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt();
   }
   // 서로 겹치지 않게 밀어낸다
   // shortcut: 모든 쌍을 비교한다(300마리면 4.5만 쌍), 적 상한을 올리면 격자 나누기로 바꾼다
@@ -494,7 +550,8 @@ function draw(dt: number, now: number) {
   for (const e of g.enemies) {
     const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), sc = eScale(e) * Math.min(1, e.age * 4);
     const mesh = e.big ? bigMesh : smallMesh, i = e.big ? nb++ : ns++;
-    put(mesh, i, e.x, e.y + hop * 0.22, e.z, Math.atan2(g.px - e.x, g.pz - e.z), sc * (1.04 - hop * 0.08), sc * (0.94 + hop * 0.12));
+    const roll = e.out ? Math.min(2.6, -e.y * 0.35 + 0.6) : 0; // 떨어질 때 뒤로 넘어가며 구른다
+    put(mesh, i, e.x, e.y + hop * 0.22, e.z, Math.atan2(g.px - e.x, g.pz - e.z), sc * (1.04 - hop * 0.08), sc * (0.94 + hop * 0.12), sc * (1.04 - hop * 0.08), -roll);
     mesh.setColorAt(i, e.flash > 0 ? C_FLASH : C_PLAIN);
   }
   sync(smallMesh, ns);
@@ -514,6 +571,22 @@ function draw(dt: number, now: number) {
     bitMesh.setColorAt(i, b.color);
   });
   sync(bitMesh, g.bits.length);
+
+  islandVis += (g.isl - islandVis) * Math.min(1, dt * 5);
+  const k = islandVis / R.ISLAND_R;
+  grass.scale.set(k, 1, k);
+  cliff.scale.set(k, 1, k);
+  for (const p of props) {
+    if (p.y < -30 || Math.hypot(p.x, p.z) < g.isl - 0.3) continue;
+    p.vy -= 25 * dt;
+    p.y += p.vy * dt;
+    place(p);
+  }
+  const warn = mode === 'play' ? R.crumbleWarning(g.t) : -1;
+  warnRings.forEach((m, i) => {
+    m.visible = i === warn;
+    if (m.visible) (m.material as THREE.MeshBasicMaterial).opacity = 0.25 + 0.3 * Math.abs(Math.sin(now * 0.008));
+  });
 
   g.ringT = Math.min(1, g.ringT + dt * 3.2);
   ring.visible = g.ringT < 1;
@@ -535,6 +608,7 @@ const ICON: Record<R.UpgradeId | 'heart', string> = {
   shot: '<circle cx="15" cy="12" r="5.5"/><path d="M3 8h6M2 12h6M3 16h6"/>',
   orbit: '<circle cx="12" cy="12" r="3"/><path d="M12 3a9 9 0 0 1 9 9M12 21a9 9 0 0 1-9-9"/>',
   sweep: '<path d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0M9 12a3 3 0 0 1 6 0"/>',
+  knock: '<path d="M3 12h11M10 6l6 6-6 6M20 5v14"/>',
   speed: '<path d="M5 6l6 6-6 6M12 6l6 6-6 6"/>',
   magnet: '<path d="M6 4v8a6 6 0 0 0 12 0V4M6 8h4M14 8h4"/>',
   heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
@@ -543,6 +617,7 @@ const UPS: Record<R.UpgradeId | 'heart', [string, string, string]> = {
   shot: [L('돌팔매', 'Sling'), L('더 빨리, 더 많이 던집니다', 'Throws faster and more'), '#f0a24a'],
   orbit: [L('회전 칼날', 'Orbit blades'), L('주위를 도는 칼날이 하나 늘어납니다', 'One more blade circles you'), '#7d8cf0'],
   sweep: [L('쓸어내기', 'Sweep'), L('더 넓게 쓸고 더 빨리 찹니다', 'Wider sweep, charges faster'), '#ff8a4c'],
+  knock: [L('밀치기', 'Shove'), L('모든 공격이 적을 더 멀리 밀어냅니다', 'Every hit knocks enemies farther'), '#b06ee8'],
   speed: [L('가벼운 신발', 'Light boots'), L('더 빨리 움직입니다', 'Move faster'), '#3fc1a5'],
   magnet: [L('자석', 'Magnet'), L('보석을 더 멀리서 끌어옵니다', 'Pull gems from farther away'), '#e2577a'],
   heart: [L('회복', 'Heal'), L('체력을 하나 채웁니다', 'Restore one heart'), '#ff5a6e'],
@@ -575,6 +650,7 @@ overlay.addEventListener('click', (ev) => {
   if (!id) { // 시작·다시 하기
     g = newGame();
     camTarget.set(0, 0, 0);
+    resetIsland();
   } else if (id === 'heart') g.hp++;
   else g.lv[id]++;
   overlay.hidden = true;
@@ -618,8 +694,8 @@ show(
 $('sweep').querySelector('span')!.textContent = L('쓸어!', 'Sweep!');
 
 // 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
-const hud = { hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
-const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '' };
+const hud = { toast: $('toast'), warn: $('warn'), hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
+const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '', warn: -1 };
 const HEART = '<path d="M12 21s-8-5-8-11.5A4.5 4.5 0 0 1 12 6.6a4.5 4.5 0 0 1 8 2.9C20 16 12 21 12 21z"/>';
 function drawHud() {
   if (shown.mode !== mode) document.body.dataset.mode = shown.mode = mode;
@@ -641,7 +717,21 @@ function drawHud() {
   }
   const xp = Math.round((g.xp / R.xpNeed(g.level)) * 100);
   if (shown.xp !== xp) hud.xp.style.width = `${(shown.xp = xp)}%`;
-  if (shown.falls !== g.falls) hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
+  if (shown.falls !== g.falls) {
+    hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
+    if (g.chain >= 2) { // 이어서 떨어뜨리면 가운데에 크게
+      hud.toast.textContent = L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`);
+      hud.toast.className = '';
+      void hud.toast.offsetWidth;
+      hud.toast.className = 'pop';
+    }
+  }
+  const warn = mode === 'play' ? R.crumbleWarning(g.t) : -1;
+  if (shown.warn !== warn) {
+    shown.warn = warn;
+    hud.warn.hidden = warn < 0;
+    hud.warn.textContent = L('가장자리가 무너집니다!', 'The edge is crumbling!');
+  }
   const p = Math.round((g.charge / R.sweepCost(g.lv.sweep)) * 100);
   if (shown.p !== p) {
     hud.sweep.style.setProperty('--p', String((shown.p = p)));

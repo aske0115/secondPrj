@@ -167,3 +167,32 @@ export function coin() {
   tone(1319, 0.08, 'square', 0.05);
   tone(1976, 0.22, 'square', 0.05, 0.07);
 }
+
+/** 섬 밖으로 떨어질 때: 높은 데서 낮게 미끄러지는 휘파람 */
+export function whoosh() {
+  if (!ctx) return;
+  const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(1100, t);
+  o.frequency.exponentialRampToValueAtTime(160, t + 0.5);
+  g.gain.setValueAtTime(0.07, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+  o.connect(g).connect(master);
+  o.start(t);
+  o.stop(t + 0.6);
+}
+
+/** 땅이 무너질 때: 낮게 우르르 */
+export function rumble() {
+  if (!ctx) return;
+  const t = ctx.currentTime, src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+  src.buffer = noiseBuffer(ctx);
+  f.type = 'lowpass';
+  f.frequency.value = 320;
+  g.gain.setValueAtTime(0.45, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+  src.connect(f).connect(g).connect(master);
+  src.start(t);
+  src.stop(t + 1.2);
+  tone(55, 0.8, 'sine', 0.25);
+}

@@ -13,16 +13,17 @@ export const enemyHp = (t: number, big: boolean) => (big ? 40 + t * 0.5 : 10 + t
 
 export const xpNeed = (level: number) => 4 + level * 3;
 
-export const UPGRADES = ['shot', 'orbit', 'sweep', 'speed', 'magnet'] as const;
+export const UPGRADES = ['shot', 'orbit', 'sweep', 'knock', 'speed', 'magnet'] as const;
 export type UpgradeId = (typeof UPGRADES)[number];
 export type Levels = Record<UpgradeId, number>;
-export const startLevels = (): Levels => ({ shot: 1, orbit: 0, sweep: 0, speed: 0, magnet: 0 });
+export const startLevels = (): Levels => ({ shot: 1, orbit: 0, sweep: 0, knock: 0, speed: 0, magnet: 0 });
 
 export const shotCooldown = (lv: number) => 0.55 * 0.86 ** (lv - 1);
 export const shotCount = (lv: number) => 1 + Math.floor((lv - 1) / 2);
 export const orbitCount = (lv: number) => (lv ? lv + 1 : 0);
 export const sweepRadius = (lv: number) => 5 + lv * 0.6;
 export const sweepCost = (lv: number) => 25 - lv * 2; // 처치 수로 채운다
+export const knockMul = (lv: number) => 1 + 0.35 * lv; // 모든 공격의 밀어내는 힘
 export const moveSpeed = (lv: number) => 5.5 * (1 + 0.08 * lv);
 export const magnetRadius = (lv: number) => 1.6 * (1 + 0.3 * lv);
 
@@ -36,3 +37,19 @@ export function pickUpgrades(lv: Levels, hpFull: boolean, rand = Math.random): (
   }
   return pool.slice(0, 3);
 }
+
+// 밀어 떨어뜨리기가 그냥 처치보다 이득이어야 벼랑 쪽으로 몰 이유가 생긴다
+export const KILL_CHARGE = 1;
+export const FALL_CHARGE = 2;
+export const killXp = (big: boolean) => (big ? 3 : 1);
+export const fallXp = (big: boolean) => killXp(big) * 2;
+
+// 섬 가장자리가 정해진 때 무너진다. 그 전에 경고를 띄운다
+export const CRUMBLES = [
+  { at: 40, r: 11.5 },
+  { at: 80, r: 10 },
+] as const;
+export const CRUMBLE_WARN = 3;
+export const islandRadius = (t: number) => CRUMBLES.reduce((r, c) => (t >= c.at ? c.r : r), ISLAND_R as number);
+/** 곧 무너질 단계의 번호(경고 중일 때만), 없으면 -1 */
+export const crumbleWarning = (t: number) => CRUMBLES.findIndex((c) => t >= c.at - CRUMBLE_WARN && t < c.at);

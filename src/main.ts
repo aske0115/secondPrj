@@ -394,6 +394,7 @@ function hit(i: number, dmg: number, kx: number, kz: number) {
   const e = g.enemies[i];
   e.hp -= dmg;
   e.flash = 0.1;
+  sfx.bonk();
   const km = R.knockMul(g.lv.knock) * MT.shoveMul(meta);
   e.kx += kx * km;
   e.kz += kz * km;
@@ -417,7 +418,7 @@ function fall(e: Enemy, byCrumble = false) {
   const now = performance.now();
   if (now - lastFallSfx > 70) {
     lastFallSfx = now;
-    sfx.whoosh();
+    sfx.fall();
   }
 }
 
@@ -448,7 +449,7 @@ function hurt() {
   g.hp--;
   g.inv = 1.2;
   g.shake = 0.6;
-  sfx.thud();
+  sfx.clang();
   sfx.buzz(30);
   for (const e of g.enemies) { // 맞은 직후 숨 쉴 틈
     const dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
@@ -473,8 +474,8 @@ function sweep() {
   ringAtHero = true;
   g.shake = 0.7;
   g.stop = 0.07; // 짧게 멈춰 타격감을 준다
-  sfx.thud();
-  sfx.splash();
+  sfx.swish(true);
+  sfx.squish(0.6);
   sfx.buzz(30);
 }
 
@@ -484,7 +485,7 @@ function dash(dx: number, dy: number) {
   if (!sp) return;
   g.vx = (dx / len) * sp;
   g.vz = (dy / len) * sp;
-  sfx.snap();
+  sfx.swish();
   sfx.buzz(12);
 }
 /** 볼링핀처럼 세모로 모인 해골 무리 */
@@ -508,11 +509,13 @@ function startBonus() {
   g.logs.length = g.pumpkins.length = 0;
   for (let i = 0; i < 3; i++) spawnPins();
   toast(L('보너스! 튕겨서 박치기', 'Bonus! Flick to ram'));
-  sfx.sparkle();
+  sfx.fanfare();
+  sfx.setMusicFast(true);
 }
 function endBonus() {
   for (const e of g.enemies) if (!e.out) { e.out = true; e.vy = 6; }
   g.bonusDone = true;
+  sfx.setMusicFast(false);
   g.vx = g.vz = 0;
   resetInput();
   mode = 'play';
@@ -537,17 +540,19 @@ function weapons(dt: number) {
   if (target) {
     g.hammerCd = R.hammerCooldown(g.lv.hammer) * (gold ? 0.35 : 1);
     const yaw = Math.atan2(target.x - g.px, target.z - g.pz), half = R.hammerArc(g.lv.hammer) / 2;
+    let hits = 0;
     for (let i = es.length - 1; i >= 0; i--) {
       const e = es[i], dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
       let da = Math.atan2(dx, dz) - yaw;
       da = Math.atan2(Math.sin(da), Math.cos(da));
       if (e.out || d > rad + eRadius(e) || Math.abs(da) > half) continue;
       hit(i, gold ? 24 : 14, (dx / d) * (gold ? 12 : 9), (dz / d) * (gold ? 12 : 9));
+      hits++;
     }
     g.swingT = 0;
     g.swingYaw = yaw;
     g.face = yaw;
-    sfx.snap();
+    hits ? sfx.whack() : sfx.swish();
   }
   // 통나무: 주인공 근처를 지나가게 섬 끝에서 굴려 보낸다
   if (g.lv.log) {
@@ -559,7 +564,7 @@ function weapons(dt: number) {
         const sx = g.px - dx * (g.isl + 2) + dz * off, sz = g.pz - dz * (g.isl + 2) - dx * off;
         g.logs.push({ x: sx, z: sz, dx, dz, left: (g.isl + 2) * 2 + 4, roll: 0 });
       }
-      sfx.rumble();
+      sfx.creak();
     }
   }
   for (let k = g.logs.length - 1; k >= 0; k--) {
@@ -608,7 +613,7 @@ function weapons(dt: number) {
     ring.position.set(pk.x, 0.06, pk.z);
     ringAtHero = false;
     g.shake = Math.max(g.shake, 0.25);
-    sfx.thud();
+    sfx.squish();
   }
 }
 
@@ -622,8 +627,8 @@ function openDrop(d: Drop) {
   else g.helper = { x: g.px + 1.2, z: g.pz, t: R.HELPER_SECONDS, cd: 0.4, face: 0, hop: 0 };
   burst(d.x, d.z, new THREE.Color(DROP_COLOR[d.type]), 14);
   toast(DROP_NAME[d.type]);
-  sfx.coin();
-  sfx.sparkle();
+  sfx.coins();
+  sfx.chime();
   sfx.buzz(15);
 }
 function supplies(dt: number) {
@@ -635,7 +640,11 @@ function supplies(dt: number) {
   }
   for (let k = g.drops.length - 1; k >= 0; k--) {
     const d = g.drops[k];
-    if (d.y > 0) { d.y = Math.max(0, d.y - (12 / R.DROP_FALL) * dt); continue; }
+    if (d.y > 0) {
+      d.y = Math.max(0, d.y - (12 / R.DROP_FALL) * dt);
+      if (d.y === 0) sfx.squish(0.7);
+      continue;
+    }
     d.life -= dt;
     const gone = d.life <= 0 || Math.hypot(d.x, d.z) > g.isl;
     if (!gone && Math.hypot(d.x - g.px, d.z - g.pz) < 1.1) openDrop(d);
@@ -671,7 +680,7 @@ function supplies(dt: number) {
       const e = g.enemies[i], ex = e.x - h.x, ez = e.z - h.z, ed = Math.hypot(ex, ez) || 1;
       if (!e.out && ed < 1.9 + eRadius(e)) hit(i, 12, (ex / ed) * 11, (ez / ed) * 11);
     }
-    sfx.snap();
+    sfx.whack();
   }
 }
 
@@ -770,7 +779,7 @@ function update(dt: number) {
         e.flash = 0.1;
         g.vx *= 0.75;
         g.vz *= 0.75;
-        sfx.thud();
+        sfx.bonk();
       }
     } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt();
   }
@@ -958,7 +967,7 @@ function showPick() {
   if (!picks.length) return void (g.picks = 0);
   mode = 'pick';
   resetInput();
-  sfx.sparkle();
+  sfx.fanfare();
   const cards = picks.map((id) => {
     const [name, desc, c] = UPS[id], lv = id === 'heart' ? 0 : g.lv[id];
     const tag = id === 'heart' ? '' : lv ? `<em>Lv ${lv} → ${lv + 1}</em>` : `<em class="new">NEW</em>`;
@@ -977,6 +986,7 @@ const stageName = (i: number) => L(...R.STAGES[i].name);
 
 function startRun() {
   resetInput();
+  sfx.setMusicFast(false);
   g = newGame();
   camTarget.set(0, 0, 0);
   resetIsland();
@@ -998,7 +1008,8 @@ function showTitle() {
       `<button data-act="next" ${stageIdx < R.STAGES.length - 1 ? '' : 'disabled'} aria-label="${L('다음 섬', 'Next isle')}">›</button></div>` +
       (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을 지키면 열립니다`, `Defend ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
       `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
-      `<button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button></div>`,
+      `<div class="row"><button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button>` +
+      `<button class="sub" data-act="music" aria-pressed="${sfx.isMusicOn()}">${sfx.isMusicOn() ? L('♪ 음악 켬', '♪ Music on') : L('♪ 음악 끔', '♪ Music off')}</button></div></div>`,
     'title',
   );
 }
@@ -1015,10 +1026,14 @@ overlay.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
   if (!btn || btn.disabled) return;
   sfx.unlockAudio();
-  sfx.click();
+  sfx.tap();
   const act = btn.dataset.act, id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
   if (act === 'start') return startRun();
   if (act === 'shop') return showShop();
+  if (act === 'music') {
+    sfx.toggleMusic();
+    return showTitle();
+  }
   if (act === 'title') return showTitle();
   if (act === 'prev' || act === 'next') {
     stageIdx = Math.max(0, Math.min(R.STAGES.length - 1, stageIdx + (act === 'next' ? 1 : -1)));
@@ -1031,7 +1046,7 @@ overlay.addEventListener('click', (ev) => {
   }
   if (act === 'buy') {
     const next = MT.buy(meta, btn.dataset.perk as MT.Perk);
-    if (next) { meta = next; saveMeta(); sfx.coin(); }
+    if (next) { meta = next; saveMeta(); sfx.coins(); }
     return showShop();
   }
   if (!id) return;

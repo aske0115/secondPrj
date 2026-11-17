@@ -178,13 +178,13 @@ export const allModels = () => [...new Set(CHAPTERS.flatMap(chapterModels))];
 export const recommendedWeapon = (d: StageDef): WeaponId => (d.trait ? TRAIT_WEAPON[d.trait] : 'hammer');
 /** 특징 안내 한 줄(화면에 보일 문구) */
 export const TRAIT_TEXT: Record<Trait, readonly [string, string]> = {
-  swarm: ['작은 적이 떼로 몰려오는 섬 · 추천: 망치(쾅!이 자주)', 'Swarming isle · Pick: Mallet (more SLAMs)'],
-  air: ['풍선·폭탄 해골이 많은 섬 · 추천: 뿅망치(빠른 연타)', 'Balloons & bombs · Pick: Squeaky Hammer (rapid taps)'],
-  pack: ['적이 덩어리로 오는 섬 · 추천: 대형 해머(가운데 쿵)', 'Packs of foes · Pick: Sledgehammer (slam the middle)'],
+  swarm: ['적이 둘레에서 떼로 솟는 섬 · 추천: 망치(쾅!이 자주·크게)', 'Swarms pop up around you · Pick: Mallet (bigger, faster SLAMs)'],
+  air: ['풍선 해골이 떠오는 섬 · 추천: 뿅망치(뿅! 터뜨리고 뿅! 치기)', 'Balloon skeletons · Pick: Squeaky Hammer (pop, then bop)'],
+  pack: ['적이 덩어리로 떨어지는 섬 · 추천: 대형 해머(쿵! 한가운데까지)', 'Clumps drop in · Pick: Sledgehammer (slams right through)'],
   rush: ['빠른 적이 달려드는 섬 · 추천: 스펀지 쌍검(준비 없이 다다닥)', 'Rushers · Pick: Twin Foam Swords (no wind-up)'],
   shield: ['방패 좀비가 많은 섬 · 추천: 프라이팬(방패 무시)', 'Shield zombies · Pick: Frying Pan (ignores shields)'],
-  heavy: ['버티는 큰 적이 많은 섬 · 추천: 야구방망이(멀리 한 방)', 'Heavy brutes · Pick: Bat (big knockback)'],
-  line: ['두 방향에서 줄지어 오는 섬 · 추천: 펀치 막대(일직선 관통)', 'Marching lines · Pick: Punch Pole (pierces a line)'],
-  tough: ['단단한 적이 많은 섬 · 추천: 큰 부채(밀어서 떨어뜨리기)', 'Tough foes · Pick: Giant Fan (blow them off)'],
+  heavy: ['약한 타엔 꿈쩍 않는 큰 적 · 추천: 야구방망이(가장 센 한 방)', 'Brutes shrug off light hits · Pick: Bat (the hardest hit)'],
+  line: ['두 방향에서 줄지어 오는 섬 · 추천: 펀치 막대(한 줄을 꿰뚫어 퍽)', 'Lines march from two sides · Pick: Punch Pole (punches through the line)'],
+  tough: ['무거워서 잘 안 밀리는 적 · 추천: 큰 부채(바람은 무게 상관없이)', 'Heavy foes barely budge · Pick: Giant Fan (wind ignores weight)'],
 };
 export const traitText = (d: StageDef) => (d.trait ? TRAIT_TEXT[d.trait] : undefined);

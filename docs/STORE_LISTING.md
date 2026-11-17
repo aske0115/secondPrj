@@ -1,6 +1,6 @@
 # 스토어 등록 문구 — 망치섬(Tumble Isle)
 
-Google Play 먼저(2026-11-17 초안, 기획 담당). App Store는 같은 문구에서 부제·키워드만 따로 뽑는다.
+Google Play 먼저(2026-11-17 초안, 기획 담당. 같은 날 무기 8종·언락·숙련·스테이지 성질 반영 — 결정 085~087). App Store는 같은 문구에서 부제·키워드만 따로 뽑는다.
 
 **지킬 원칙**(AGENTS.md 「마케팅·문구 원칙」, Play 메타데이터 정책)
 - 경쟁 게임 이름 금지 — 장르어(액션 서바이벌·로우폴리·미니어처)만.
@@ -36,6 +36,7 @@ Google Play 먼저(2026-11-17 초안, 기획 담당). App Store는 같은 문구
 | **A (추천)** | 망치로 쾅! 몰려오는 좀비를 하늘 섬 밖으로 날려 버리는 미니어처 액션 서바이벌 | 44 |
 | B | 무너지는 하늘 섬에서 살아남아라! 망치 한 방에 좀비가 섬 밖으로 날아간다. | 42 |
 | C | 짧고 시원한 한 판! 쳐서 밀고, 떨어뜨리고, 왕좀비까지 섬 밖으로 날려 버리세요. | 46 |
+| D (무기) | 망치부터 프라이팬까지, 무기를 휘둘러 좀비를 하늘 섬 밖으로 날려 버리는 액션 서바이벌 | 48 |
 
 ### 영어
 | 안 | 문구 | 글자 수 |
@@ -43,8 +44,10 @@ Google Play 먼저(2026-11-17 초안, 기획 담당). App Store는 같은 문구
 | **A (추천)** | Bonk zombies off a tiny floating island in this miniature action survivor! | 74 |
 | B | The island is crumbling. Grab your hammer and knock every zombie off the edge. | 78 |
 | C | Swing, slam and send zombies flying off a crumbling sky island! | 63 |
+| D (무기) | Swing a mallet, a frying pan or a bat and knock zombies off a floating island! | 78 |
 
 추천 이유: A는 「무엇을(좀비) / 어떻게(망치로 쳐서) / 어디서(하늘 섬 밖으로) / 장르(액션 서바이벌)」가 한 줄에 다 들어가 검색어(액션·서바이벌·좀비·섬)도 자연스럽게 담긴다. 영어 A의 「Bonk」는 동사로만 쓴 것이라 이름과 겹치지 않음.
+무기가 8종이 됐어도 A를 그대로 추천한다: 망치는 상징 무기이고(이름 「망치섬」·아이콘·첫 장면) 80자 안에 무기 이름을 늘어놓으면 핵심 동작(쳐서 날리기)이 흐려진다. 무기 이야기는 자세한 설명·스크린샷 4·5번이 맡는다. D는 무기를 앞세우고 싶을 때의 대안(망치를 맨 앞에 둠).
 
 ---
 
@@ -52,7 +55,7 @@ Google Play 먼저(2026-11-17 초안, 기획 담당). App Store는 같은 문구
 
 접힌 상태에서는 첫 2~3줄만 보이므로 핵심 동작 → 위기(무너지는 섬) → 클라이맥스(왕좀비) 순으로 앞에 둔다.
 
-### 한국어 (약 1,450자)
+### 한국어 (약 1,790자 — 줄마다 손으로 셈, 줄바꿈 포함)
 
 ```
 망치로 쾅! 몰려오는 좀비와 해골을 하늘에 뜬 작은 섬 밖으로 날려 버리세요.
@@ -69,9 +72,16 @@ Google Play 먼저(2026-11-17 초안, 기획 담당). App Store는 같은 문구
 · 이어서 여섯 마리를 떨어뜨리면 STRIKE! 떠오른 적을 또 치면 공중 콤보!
 · 풍선 해골, 폭탄 해골, 방패 좀비 — 적마다 상대하는 법이 다릅니다
 
+■ 무기 8종, 스테이지마다 어울리는 무기
+· 처음엔 망치 하나. 스테이지를 지킬수록 뿅망치, 대형 해머, 스펀지 쌍검, 프라이팬, 야구방망이, 펀치 막대, 큰 부채가 하나씩 열립니다
+· 무기마다 손맛이 다릅니다. 크게 들어 올렸다 쿵! 내려찍는 대형 해머, 준비 없이 다다닥 몰아치는 스펀지 쌍검, 멀리 딱! 날려 보내는 야구방망이
+· 망치를 들면 쾅!이 더 자주, 더 크게 터집니다
+· 스테이지마다 성질이 달라요. 풍선 해골이 떠다니는 섬, 방패 좀비가 몰려오는 섬, 두 방향에서 줄지어 오는 섬 — 열린 무기 중 어울리는 무기를 알아서 쥐여 주니 휘두르기만 하세요
+· 쓸수록 그 무기의 숙련이 올라 사거리·속도·밀어내는 힘이 붙습니다
+
 ■ 무너지는 섬, 하늘에서 내려오는 보급
 · 무너지기 전에 가장자리가 빨갛게 깜빡입니다. 그 위의 적은 같이 떨어져요
-· 낙하산 상자를 밟으면 회복, 쾅! 충전, 황금 망치, 전투 도우미
+· 낙하산 상자를 밟으면 회복, 쾅! 충전, 번개 무기, 전투 도우미
 · 강풍과 지진이 불면 섬 위의 모두가 한쪽으로 미끄러집니다
 · 판 중간 보너스: 손가락을 끌었다 놓아 돌진, 모여 있는 해골을 볼링처럼 쓰러뜨리세요
 
@@ -102,9 +112,10 @@ Google Play 먼저(2026-11-17 초안, 기획 담당). App Store는 같은 문구
 · 잠깐 쉬는 틈에 짧게 한 판씩 하고 싶은 분
 · 생각보다 손이 먼저 가는 시원한 손맛을 좋아하는 분
 · 몰려든 적을 한 번에 날려 버리는 순간을 좋아하는 분
+· 무기를 바꿔 가며 다른 손맛을 느끼고 싶은 분
 ```
 
-### 영어 (약 2,500자)
+### 영어 (약 3,380자 — 줄마다 손으로 셈, 줄바꿈 포함. 4,000자까지 약 600자 여유)
 
 ```
 Grab your hammer and bonk zombies and skeletons right off a tiny floating island!
@@ -121,9 +132,16 @@ and when the gauge is full, hit SLAM! to blast everyone around you away.
 · Drop six in a row for a STRIKE! Hit an enemy in mid-air for an air combo
 · Balloon skeletons, bomb skeletons, shield zombies — each one needs a different trick
 
+■ 8 weapons, the right one for every stage
+· You start with a mallet. Clear stages to unlock the Squeaky Hammer, Sledgehammer, Twin Foam Swords, Frying Pan, Bat, Punch Pole and Giant Fan, one by one
+· Every weapon feels different: lift the Sledgehammer high and slam it down, rattle off quick hits with the Twin Foam Swords, or crack foes far away with the Bat
+· With the mallet in hand, your SLAM! charges faster and hits wider
+· Every stage has its own twist: floating balloon skeletons, shield zombies, lines marching in from two sides — the matching weapon is equipped for you once it's unlocked, so just swing
+· The more you use a weapon, the more it grows: longer reach, quicker swings, harder hits
+
 ■ A crumbling island, supplies from the sky
 · The edge flashes red before it falls, taking every enemy on it down too
-· Step on parachute crates for healing, a full SLAM!, a golden mallet or a battle buddy
+· Step on parachute crates for healing, a full SLAM!, a lightning weapon or a battle buddy
 · Gales and earthquakes send everyone sliding toward one side
 · Bonus round: drag and release to dash, and bowl over packs of skeletons
 
@@ -155,6 +173,7 @@ and low gravity on the Moon Base that sends them floating high.
 · Quick runs on a short break
 · Players who love instant, hands-on action over heavy thinking
 · Anyone who enjoys sending a whole crowd flying in one hit
+· Players who like switching weapons for a different feel
 ```
 
 ### 대조 — 문구가 기대는 결정·코드
@@ -167,7 +186,13 @@ and low gravity on the Moon Base that sends them floating high.
 | 무너지는 섬·빨간 경고 띠 | 결정 036 |
 | 끝까지 버티면 승리, 왕좀비를 떨어뜨리면 즉시 승리, % 게이지 | 결정 057·064 |
 | STRIKE(이어서 6마리)·공중 콤보·풍선/폭탄 해골·방패 좀비 | 결정 058 |
-| 낙하산 상자 4종 | 결정 042·055 |
+| 낙하산 상자 4종(「번개 무기 / lightning weapon」) | 결정 042·055, 이름은 결정 083(옛 「황금 망치」에서 바뀜, `main.ts` `DROP_NAME`) |
+| 무기 8종 이름·언락 순서(진행으로만 열림) | 결정 085·085 보완·086, `meta.ts` `WEAPON_OPEN`, 이름은 `docs/WEAPONS.md` 2-1 |
+| 무기별 손맛(해머 들어 올렸다 쿵·쌍검 다다닥·방망이 멀리 딱) | `rules.ts` `WEAPON_STATS`(준비·타수·넉백), `docs/WEAPONS.md` 2-2 |
+| 망치를 들면 쾅!이 더 자주·크게 | `rules.ts` `HAMMER_SLAM`(결정 087) |
+| 스테이지 성질(풍선 해골·방패 좀비·두 방향 행렬)·추천 무기 자동 장착(열린 것만) | 결정 083·087, `chapters.ts` `traitOf`, `main.ts` 주무기 고르기(`autoWeapon` 기본 켬, 잠겼으면 망치) |
+| 숙련(쓸수록 사거리·속도·밀어내는 힘) | 결정 085·086, `rules.ts` `MASTERY_LINES` |
+| **출시 전 확인**: 무기 시트·무기 도형·숙련 표시·성질 안내는 디자인 담당 진행 중(2026-11-17). 숙련·무기 모양이 화면에 안 보이면 「쓸수록 숙련」「무기마다 손맛」 문구가 약해지므로 출시 빌드에서 확인. 영구 강화 이름은 지금 코드(`PERK_UI`) 「큰 망치 / Big mallet」 그대로 — 「큰 무기」로 바뀌면 이 문서도 고친다 | — |
 | 강풍·지진, 섬 장치(스프링 버섯·통·유령 등불) | 결정 059 |
 | 박치기 보너스(끌었다 놓아 돌진) | 결정 040·048 |
 | 장 10개 이름·150스테이지 | 결정 067, `src/game/chapters.ts`의 `name` |
@@ -206,14 +231,14 @@ and low gravity on the Moon Base that sends them floating high.
 ```
 망치섬 첫 출시!
 망치로 쳐서 좀비를 섬 밖으로 날려 버리세요.
-장 10개·스테이지 150개, 영구 강화와 캐릭터 캡슐, 날마다 바뀌는 오늘의 섬이 기다립니다.
+장 10개·스테이지 150개, 진행으로 여는 무기 8종, 영구 강화와 캐릭터 캡슐, 날마다 바뀌는 오늘의 섬이 기다립니다.
 ```
 
-영어 (약 170자)
+영어 (약 190자)
 ```
 Tumble Isle is here!
 Bonk zombies off the island with your hammer.
-10 chapters, 150 stages, permanent upgrades, hero capsules and a new Today's Isle every day.
+10 chapters, 150 stages, 8 unlockable weapons, permanent upgrades, hero capsules and a new Today's Isle every day.
 ```
 
 ---
@@ -227,11 +252,15 @@ Bonk zombies off the island with your hammer.
 | 1 | 망치로 쾅! 섬 밖으로 날려라 | Bonk them off the island! | 쾅!으로 적 여러 마리가 사방으로 날아가는 순간 |
 | 2 | 섬이 무너진다, 버텨라! | The island is crumbling. Hold on! | 빨간 경고 띠와 함께 가장자리 적이 떨어지는 장면 |
 | 3 | 왕좀비를 떨어뜨리면 바로 승리 | Knock the King Zombie off for the win | 금관 왕좀비와 % 게이지, 가장자리 근처 |
-| 4 | 장 10개, 스테이지 150개 | 10 chapters, 150 stages | 서로 다른 장(과자 섬·달 기지·눈 마을 등) 섞어 보이기 |
-| 5 | 강화하고, 새 캐릭터를 뽑아라 | Upgrade and unlock new heroes | 상점(강화 타일·캡슐 열림 연출) |
-| 6 | 날마다 오늘의 섬, 베스트 컷 공유 | Today's Isle daily. Share your best shot | 결과 화면 베스트 컷 섬네일 또는 시작 화면 오늘의 섬 |
+| 4 | 새 무기를 열고, 손맛을 바꿔라 | Unlock new weapons, each with its own feel | 대형 해머를 들어 올렸다 쿵! 내려찍는 순간(착지 원·흙먼지 고리), 또는 스펀지 쌍검 다다닥 잔상 |
+| 5 | 섬마다 어울리는 무기로 | The right weapon for every island | 시작 화면 스테이지 카드 「추천: ○○」 + 무기 시트(8칸, 일부는 잠김 그림자) |
+| 6 | 장 10개, 스테이지 150개 | 10 chapters, 150 stages | 서로 다른 장(과자 섬·달 기지·눈 마을 등) 섞어 보이기 |
+| 7 | 강화하고, 새 캐릭터를 뽑아라 | Upgrade and unlock new heroes | 상점(강화 타일·캡슐 열림 연출) |
+| 8 | 날마다 오늘의 섬, 베스트 컷 공유 | Today's Isle daily. Share your best shot | 결과 화면 베스트 컷 섬네일 또는 시작 화면 오늘의 섬 |
 
 모두 시간 숫자·경쟁작 이름·순위 표현 없음. 「150」「10」은 콘텐츠 수라 원칙 위반이 아니다.
+- 1~3번은 망치 그대로(망치가 상징 무기, 첫 장면). 다른 무기는 4·5번에서만 보인다.
+- 4·5번은 무기 시트·무기 도형이 화면에 나온 뒤 촬영(디자인 담당). Play 휴대폰 스크린샷은 8장까지라 8장을 다 쓴다. 장이 모자라면 5번을 뺀다.
 
 ---
 

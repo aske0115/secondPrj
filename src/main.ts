@@ -18,6 +18,7 @@ import * as ads from './ads';
 import * as R from './game/rules';
 import * as MT from './game/meta';
 import * as MS from './game/missions';
+import * as WL from './weaponLook';
 
 const $ = (id: string) => document.getElementById(id)!;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -235,11 +236,12 @@ const portraits = (() => {
   return out;
 })();
 let hero: THREE.Object3D = new THREE.Object3D(), mixer = new THREE.AnimationMixer(hero);
-let heroIdle: THREE.AnimationAction, heroWalk: THREE.AnimationAction;
+let heroIdle: THREE.AnimationAction, heroWalk: THREE.AnimationAction, heroBase = 1; // heroBase: 모델 크기(웅크림은 여기에 곱한다)
 function setHero(id: MT.CharId) {
   scene.remove(hero);
   const gl = heroModels[id];
   hero = gl.scene;
+  heroBase = hero.scale.x;
   scene.add(hero);
   mixer = new THREE.AnimationMixer(hero);
   const clip = (name: string) => mixer.clipAction(THREE.AnimationClip.findByName(gl.animations, name)!);
@@ -260,14 +262,39 @@ const C_SMALL = new THREE.Color(0xe9e4d4), C_BIG = new THREE.Color(0x7fae6a), C_
 const swing = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, depthWrite: false }));
 swing.position.y = 0.08;
 scene.add(swing);
-let swingArc = -1, ringAtHero = true;
-const hammerMat = flat(0x9aa3b0);
-const hammer = new THREE.Group();
-const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 1.1, 6).rotateX(Math.PI / 2).translate(0, 0, 0.55), flat(0x8a5a3c));
-const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.36, 0.36).translate(0, 0, 1.15), hammerMat);
-handle.castShadow = head.castShadow = true;
-hammer.add(handle, head);
-scene.add(hammer);
+let ringAtHero = true;
+const arcGeos = new Map<string, THREE.BufferGeometry>();
+/** 부채꼴(+z 가운데)은 각도별로 한 번만 만든다: 원·360°와 부채꼴이 번갈아 나와도 새로 만들지 않게 */
+function arcGeo(arc: number, inner = 0.4) {
+  const k = `${arc.toFixed(3)}|${inner}`;
+  let geo = arcGeos.get(k);
+  if (!geo) arcGeos.set(k, (geo = new THREE.RingGeometry(inner, 1, 28, 1, -Math.PI / 2 - arc / 2, arc).rotateX(-Math.PI / 2)));
+  return geo;
+}
+// 주무기 8종(결정 088): 무기마다 한 덩어리(WL.weaponGeo), 쌍검만 왼손에 하나 더
+const weaponMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+const weapon = new THREE.Mesh(new THREE.BufferGeometry(), weaponMat), weapon2 = new THREE.Mesh(new THREE.BufferGeometry(), weaponMat);
+weapon.castShadow = weapon2.castShadow = true;
+scene.add(weapon, weapon2);
+let weaponKey = '';
+// 박자 연출(결정 088): 늘 만들어 두고 보일 때만 그린다(인스턴스 0개면 그리기 없음)
+const fxMat = (color: number, opacity = 1) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
+const strip = () => new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5); // 길이 1, +z로 뻗는 띠
+const shockFx = new THREE.Mesh(arcGeo(Math.PI * 2, 0.72), fxMat(0xfff3c4)); // 원 충격파(대형 해머·펀치 막대 고리)
+const landFx = new THREE.Mesh(mergeGeometries([new THREE.RingGeometry(0.8, 1, 40), new THREE.CircleGeometry(0.12, 12)]).rotateX(-Math.PI / 2), fxMat(0xfff0c8)); // 대형 해머 착지 원
+const crackFx = new THREE.Mesh(mergeGeometries(Array.from({ length: 7 }, (_, k) => {
+  const a = (k / 7) * Math.PI * 2 + (k % 2) * 0.3, l = 0.55 + (k % 3) * 0.2;
+  return new THREE.PlaneGeometry(0.07, l).rotateX(-Math.PI / 2).translate(0, 0, l / 2 + 0.1).rotateY(a);
+})), fxMat(0x5a3b22, 0.7)); // 쿵! 금 간 자국
+for (const m of [shockFx, landFx, crackFx]) { m.visible = false; scene.add(m); }
+const lineFx = instanced(strip(), fxMat(0xffffff), 3); // 펀치 막대 직선 흰 띠
+const dashFx = instanced(new THREE.PlaneGeometry(0.12, 0.3).rotateX(-Math.PI / 2), fxMat(0xffffff, 0.8), 12); // 찌를 줄 점선
+const logWarnFx = instanced(strip(), fxMat(0xff6a3c, 0.25), 4); // 통나무 예고 띠
+const markFx = instanced(arcGeo(Math.PI * 2, 0.82), fxMat(0xff9a3c, 0.6), 16); // 호박 착지 원·덩어리 떨어지는 자리
+const slashFx = instanced(arcGeo(1.5, 0.82), fxMat(0xffffff, 0.7), 3); // 쌍검 교차 잔상
+const gustFx = instanced(new THREE.ConeGeometry(0.55, 1.2, 9, 1, true).rotateX(Math.PI).translate(0, 0.6, 0), fxMat(0xe8f8ff, 0.4), 6); // 부채 회오리
+const helmetMesh = instanced(new THREE.SphereGeometry(0.3, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.75, 1), flat(0x59606c), R.MAX_ENEMIES, true); // 단단 성질 투구
+const C_SUB = new THREE.Color(2.6, 1.3, 0.3), C_BLOCK = new THREE.Color(0.45, 0.48, 0.58), C_TOUGH = new THREE.Color(0.72, 0.72, 0.8), C_STAR = new THREE.Color(0xffe23f);
 const logMesh = instanced(
   mergeGeometries([
     new THREE.CylinderGeometry(0.36, 0.36, 3.2, 9).rotateZ(Math.PI / 2),
@@ -298,7 +325,7 @@ const barrelMesh = instanced(barrel.geo, barrel.mat, R.GADGET_COUNT, true);
 const lanternMesh = instanced(lantern.geo, lantern.mat, R.GADGET_COUNT, true);
 const pullRing = instanced(new THREE.RingGeometry(0.9, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.5, depthWrite: false }), R.GADGET_COUNT);
 // 날씨 줄무늬(바람에 날리는 흰 선)
-const streakMesh = instanced(new THREE.BoxGeometry(0.04, 0.04, 1.4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }), 40);
+const streakMesh = instanced(new THREE.BoxGeometry(0.04, 0.04, 1.4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }), 56); // 40개는 날씨, 나머지는 부채 바람
 // 내 섬 트로피(결정 060): 떨어뜨린 왕좀비는 금 동상, 미션 3개마다 금 호박. 시작 화면에서만 보인다
 const goldMat = flat(0xffc94d, { emissive: 0x5a3a00 });
 const statueMesh = instanced(zombie.geo, goldMat, 3, true);
@@ -439,7 +466,7 @@ function applyStage() {
 }
 
 // ───────── 상태 ─────────
-type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind; pct?: number; stag?: number; v?: number; by?: Src; byT?: number };
+type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind; pct?: number; stag?: number; v?: number; by?: Src; byT?: number; blk?: number; bnc?: number }; // blk: 가려서 안 맞음 표시, bnc: 풍선이 무른 타를 튕겨 냄 표시(그리기용)
 /** 떨어뜨린 원인(결정 083): 마지막으로 친 것. 2초 지나면 '그 밖' */
 type Src = 'main' | 'log' | 'pumpkin' | 'sweep' | 'other';
 /** 주무기 한 타(덧붙는 타격은 in 초 뒤 실행). 디자인: kind로 그릴 모양을 고른다 */
@@ -455,11 +482,9 @@ type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: n
 type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: number; t: number; y: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
 /** 이번 판 주무기: 「추천 무기 자동」(meta.autoWeapon)이 켜져 있으면 추천 무기(잠겼으면 망치), 꺼져 있으면 고른 무기(결정 083·085) */
-function runWeapon(): MT.WeaponId {
-  const rec = CH.recommendedWeapon(curDef);
-  if (!meta.autoWeapon) return meta.weapon;
-  return MT.weaponOpen(rec, meta.cleared) ? rec : 'hammer'; // 추천이 잠겼으면 상징 무기 망치(결정 085 2-4)
-}
+// 무기 시트·「바로 쓰기」로 직접 고른 무기: 화살표로 스테이지를 바꾸거나 다시 고르기 전까지 유지(한 번 더·처음으로·다음 섬에도), 앱을 다시 켜면 잊음(결정 088 보완)
+let manualPick: MT.WeaponId | null = null;
+const runWeapon = (): MT.WeaponId => WL.pickRunWeapon(manualPick, meta.autoWeapon, CH.recommendedWeapon(curDef), meta.weapon, meta.cleared);
 const newGame = (w = runWeapon()) => ({
   t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: MT.startPicks(meta.perks.cards),
   charge: 0, kills: 0, falls: 0, rerolls: MT.rerolls(meta.perks.cards), revived: false, continued: false,
@@ -478,6 +503,11 @@ const newGame = (w = runWeapon()) => ({
   wPhase: 'idle' as 'idle' | 'windup' | 'recovery', wT: 0, wYaw: 0, hurts: 0, hurtsInWind: 0, ringAcc: 0, laneA: rnd(0, Math.PI), // laneA: 행렬 성질의 두 방향
   swingKind: 'main' as Strike['kind'], swingShape: R.WEAPON_STATS[w].shape, swingArc: R.weaponArc(w, 1), swingRad: R.weaponRadius(w, 1) * MT.hammerMul(meta),
   fallBy: { main: 0, log: 0, pumpkin: 0, sweep: 0, other: 0 } as Record<Src, number>,
+  airToastT: -9, homerT: -9, // 「공중 콤보!」·「홈런!」 글자는 1.5초에 한 번
+  // 그리기 전용 잔상 기록(결정 088, 판 규칙과 무관): 원 충격파·금 간 자국·직선 띠·쌍검 잔상·부채 바람·덩어리 자리
+  vis: { shockT: 1, shockX: 0, shockZ: 0, shockR: 1, crackT: 1, crackX: 0, crackZ: 0, crackR: 1, twinTap: 0, windT: 1, windX: 0, windZ: 0, windYaw: 0, windR: 1, windArc: 1,
+    lines: [] as { x: number; z: number; yaw: number; len: number; w: number; t: number }[], slashes: [] as { x: number; z: number; yaw: number; r: number; hand: number; t: number }[],
+    packs: [] as { x: number; z: number; t: number }[] },
 });
 let g = newGame();
 let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' | 'pause' = 'title';
@@ -595,6 +625,7 @@ function spawnRing(n: number) {
     if (o > lim) { x *= lim / o; z *= lim / o; }
     e.x = x;
     e.z = z;
+    burst(x, z, C_DIRT, 2); // 땅에서 솟아오르는 흙
   }
 }
 /** 뭉침 성질: 주인공에게서 PACK_R칸 떨어진 한 점에 n마리가 덩어리로 떨어진다 */
@@ -603,6 +634,7 @@ function spawnPack(n: number) {
   let cx = g.px + Math.cos(a) * R.PACK_R, cz = g.pz + Math.sin(a) * R.PACK_R;
   const o = Math.hypot(cx, cz);
   if (o > lim) { cx *= lim / o; cz *= lim / o; }
+  g.vis.packs.push({ x: cx, z: cz, t: 0 }); // 덩어리가 떨어지는 자리(그리기용)
   for (let k = 0; k < n && g.enemies.length < R.MAX_ENEMIES; k++) {
     spawn();
     const e = g.enemies[g.enemies.length - 1], r = Math.sqrt(Math.random()) * R.PACK_SPREAD, b = rnd(0, Math.PI * 2);
@@ -647,7 +679,7 @@ function hit(i: number, dmg: number, kx: number, kz: number, src: Src = 'other',
   const fx = tfx();
   if (fx.pop && e.kind === 'balloon') { // 풍선 많은 섬: 첫 타엔 풍선만 터진다(피해 없음, 밀리기는 함) → 연타가 유리. 무른 타는 튕겨 나가 아무 일 없음
     if (Math.hypot(kx, kz) >= R.POP_MIN) e.kind = '';
-    else kx = kz = 0;
+    else { kx = kz = 0; e.bnc = 0.3; }
     dmg = 0;
   }
   if (e.big && e.kind !== 'boss' && Math.hypot(kx, kz) < fx.brace) { kx *= fx.braceKeep; kz *= fx.braceKeep; } // 무거운 섬: 약한 타격엔 큰 적이 버틴다 → 넉백 큰 무기가 유리
@@ -668,7 +700,7 @@ function hit(i: number, dmg: number, kx: number, kz: number, src: Src = 'other',
   if (!extra && e.y > 0.3 && e.kind !== 'boss') { // 공중에 뜬 적을 또 치면 더 세게
     km *= R.JUGGLE_KNOCK;
     g.juggles++;
-    toast(L('공중 콤보!', 'Air combo!'));
+    if (g.t - g.airToastT > 1.5) { g.airToastT = g.t; toast(L('공중 콤보!', 'Air combo!')); }
   }
   e.kx += kx * km;
   e.kz += kz * km;
@@ -723,6 +755,7 @@ function fall(e: Enemy, byCrumble = false) {
   if (g.chain >= 3 && g.chain > g.bestChain && performance.now() - lastShotAt > 300) { g.bestChain = g.chain; wantShot = true; }
   if (g.chain === R.STRIKE_CHAIN) { g.extra += R.STRIKE_COINS; g.strikes++; sfx.fanfare(); }
   if (e.kind === 'bomb') blast(e.x, e.z);
+  if (g.weapon === 'bat' && e.by === 'main' && g.t - (e.byT ?? 0) < 1 && g.t - g.homerT > 1.5) { g.homerT = g.t; toast(L('홈런!', 'Home run!')); }
   if (e.kind === 'boss' && !g.bossDown) { // 왕좀비를 떨어뜨리면 그 자리에서 클리어
     g.bossDown = true;
     g.extra += R.bossCoins(curDef.chapter);
@@ -908,7 +941,9 @@ function strike(s: Strike) {
     const c: [number, number][] = [];
     es.forEach((e, i) => {
       const rx = e.x - ox, rz = e.z - oz, along = rx * fx + rz * fz, side = Math.abs(rx * fz - rz * fx);
-      if (!e.out && along > -eRadius(e) && along <= s.rad + eRadius(e) && side <= s.width / 2 + eRadius(e) && !(tfx().clump && hidden(e))) c.push([i, along]);
+      if (e.out || along <= -eRadius(e) || along > s.rad + eRadius(e) || side > s.width / 2 + eRadius(e)) return;
+      if (tfx().clump && hidden(e)) e.blk = 0.35; // 가린 적은 회색으로 보여 안 맞는 이유가 보이게
+      else c.push([i, along]);
     });
     c.sort((a, b) => a[1] - b[1]);
     for (const [i] of c.slice(0, s.pierce)) { pick.push([i, s.dmg]); if (es[i].kind === 'boss') break; }
@@ -916,7 +951,11 @@ function strike(s: Strike) {
     for (let i = 0; i < es.length; i++) {
       const e = es[i], dx = e.x - ox, dz = e.z - oz, d = Math.hypot(dx, dz);
       if (e.out || d > s.rad + eRadius(e)) continue;
-      if (cover > 0 && !circle && hidden(e)) continue; // 원 충격파는 위에서 내려찍어 덩어리 안쪽까지
+      if (cover > 0 && !circle && hidden(e)) { // 원 충격파는 위에서 내려찍어 덩어리 안쪽까지
+        const a = Math.atan2(dx, dz) - s.yaw;
+        if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) <= s.half) e.blk = 0.35; // 부채꼴 안인데 가려서 안 맞음(회색)
+        continue;
+      }
       if (circle) { pick.push([i, d <= s.core ? s.coreDmg : s.dmg]); continue; }
       let da = Math.atan2(dx, dz) - s.yaw;
       da = Math.atan2(Math.sin(da), Math.cos(da));
@@ -936,6 +975,7 @@ function strike(s: Strike) {
   g.swingShape = s.shape;
   g.swingArc = s.shape === 'fan' ? s.half * 2 : Math.PI * 2;
   g.swingRad = s.rad;
+  showStrike(s);
   return pick.length;
 }
 /** 타격 순간: 무기 표·숙련대로 첫 타를 치고 다음 타·덧붙는 타격(Lv3·Lv5)을 예약한다 */
@@ -1119,7 +1159,8 @@ function openDrop(d: Drop) {
   else if (d.type === 'golden') g.golden = R.GOLDEN_SECONDS;
   else g.helper = { x: g.px + 1.2, z: g.pz, t: R.HELPER_SECONDS, cd: 0.4, face: 0, hop: 0 };
   burst(d.x, d.z, new THREE.Color(DROP_COLOR[d.type]), 14);
-  toast(DROP_NAME[d.type]);
+  const wn = WL.UI[g.weapon].name;
+  toast(d.type === 'golden' ? L(`번개 ${wn[0]}!`, `Lightning ${wn[1]}!`) : DROP_NAME[d.type]); // 「번개 ○○」(결정 082)
   sfx.coins();
   sfx.chime();
   sfx.buzz(15);
@@ -1430,10 +1471,10 @@ function draw(dt: number, now: number) {
   heroIdle.setEffectiveWeight(1 - ww);
   mixer.update((mode === 'play' || mode === 'bonus') && g.stop <= 0 ? dt : 0);
   hero.position.set(g.px, 0, g.pz);
-  hero.rotation.y = g.face;
   hero.visible = g.inv <= 0 || Math.floor(g.inv * 14) % 2 === 0;
 
-  let ns = 0, ns2 = 0, nb = 0, nBal = 0, nBomb = 0, nSh = 0;
+  let ns = 0, ns2 = 0, nb = 0, nBal = 0, nBomb = 0, nSh = 0, nHel = 0;
+  const fxT = tfx(), heavyLook = fxT.weight < 1; // 단단 성질: 투구 쓴 진한 색 적
   bossMesh.visible = false;
   for (const e of g.enemies) {
     const yaw = Math.atan2(g.px - e.x, g.pz - e.z);
@@ -1446,15 +1487,22 @@ function draw(dt: number, now: number) {
       bossBody.material = e.flash > 0 ? bossFlash : bossMat;
       continue;
     }
-    const top = (e.big ? 1.05 * 1.5 : 1.05) + e.y;
-    if (e.kind === 'balloon') put(balloonMesh, nBal++, e.x, top + 0.55, e.z, 0, 1, 1.15, 1);
+    // 성질 연출(결정 088): 떼는 땅에서 솟고, 뭉침은 하늘에서 떨어진다(그림만, 판정 자리는 그대로)
+    const rise = fxT.ring && e.age < 0.3 ? -(0.3 - e.age) * 3.5 : fxT.pack > 1 && e.age < 0.45 ? (0.45 - e.age) ** 2 * 30 : 0;
+    const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), es = eScale(e), sc = es * Math.min(1, e.age * 4), ey = e.y + rise + hop * 0.22;
+    const top = (e.big ? 1.05 * 1.5 : 1.05) + e.y + rise;
+    e.bnc = (e.bnc ?? 0) - dt;
+    e.blk = (e.blk ?? 0) - dt;
+    const wob = e.bnc > 0 ? Math.sin(now * 0.06) * e.bnc : 0; // 무른 타를 튕겨 낸 풍선이 흔들린다
+    if (e.kind === 'balloon') put(balloonMesh, nBal++, e.x + wob, top + 0.55, e.z, 0, 1 + Math.abs(wob), 1.15 - Math.abs(wob), 1);
     if (e.kind === 'bomb') put(bombMesh, nBomb++, e.x, top + 0.12, e.z, yaw);
-    if (e.kind === 'shield') put(shieldMesh, nSh++, e.x + Math.sin(yaw) * 0.75, e.y + 0.75, e.z + Math.cos(yaw) * 0.75, yaw);
-    const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), sc = eScale(e) * Math.min(1, e.age * 4);
+    if (e.kind === 'shield') put(shieldMesh, nSh++, e.x + Math.sin(yaw) * 0.5 * es, ey + 0.5 * es, e.z + Math.cos(yaw) * 0.5 * es, yaw, es / 1.5); // 몸 크기에 맞춰 손 앞에(작은 적의 방패가 떠 보이던 것)
+    if (heavyLook && !e.out) put(helmetMesh, nHel++, e.x, top - 0.2 * es + hop * 0.22, e.z, yaw, sc);
     const mesh = e.big ? bigMesh : e.v ? small2Mesh : smallMesh, i = e.big ? nb++ : e.v ? ns2++ : ns++;
     const roll = e.out ? Math.min(2.6, -e.y * 0.35 + 0.6) : 0; // 떨어질 때 뒤로 넘어가며 구른다
-    put(mesh, i, e.x, e.y + hop * 0.22, e.z, Math.atan2(g.px - e.x, g.pz - e.z), sc * (1.04 - hop * 0.08), sc * (0.94 + hop * 0.12), sc * (1.04 - hop * 0.08), -roll);
-    mesh.setColorAt(i, e.flash > 0 ? C_FLASH : C_PLAIN);
+    put(mesh, i, e.x, ey, e.z, Math.atan2(g.px - e.x, g.pz - e.z), sc * (1.04 - hop * 0.08), sc * (0.94 + hop * 0.12), sc * (1.04 - hop * 0.08), -roll);
+    // 회색 = 가려서·튕겨서 안 먹힘, 주황 번쩍 = 보조 무기에 맞음, 흰 번쩍 = 주무기
+    mesh.setColorAt(i, e.blk > 0 || e.bnc > 0 ? C_BLOCK : e.flash > 0 ? ((e.by === 'log' || e.by === 'pumpkin') && g.t - (e.byT ?? 0) < 0.2 ? C_SUB : C_FLASH) : heavyLook ? C_TOUGH : C_PLAIN);
   }
   sync(smallMesh, ns);
   sync(small2Mesh, ns2);
@@ -1462,6 +1510,7 @@ function draw(dt: number, now: number) {
   sync(balloonMesh, nBal);
   sync(bombMesh, nBomb);
   sync(shieldMesh, nSh);
+  sync(helmetMesh, nHel);
   dropViews.forEach((v, i) => {
     const d = g.drops[i];
     v.box.visible = v.mark.visible = !!d;
@@ -1492,15 +1541,7 @@ function draw(dt: number, now: number) {
     helperMesh.position.set(h.x, Math.abs(Math.sin(h.hop)) * 0.18, h.z);
     helperMesh.rotation.y = h.face;
   }
-  (swing.material as THREE.MeshBasicMaterial).color.setHex(g.golden > 0 ? 0xffd23f : 0xfff3c4);
-  hammerMat.color.setHex(g.golden > 0 ? 0xffd23f : 0x9aa3b0);
-  const sw = Math.min(1, g.swingT * 1.6), swinging = sw < 1;
-  const half = Math.min(g.swingArc, Math.PI) / 2 + 0.3; // 회오리(360°)도 망치 모양은 반 바퀴만
-  const ha = swinging ? g.swingYaw + half - 2 * half * (1 - (1 - sw) ** 2) : g.face + 2.4; // 처음 빠르게, 끝에 느리게
-  hammer.visible = mode !== 'bonus';
-  hammer.position.set(g.px + Math.sin(ha) * 0.25, swinging ? 0.55 : 0.75, g.pz + Math.cos(ha) * 0.25);
-  hammer.rotation.set(swinging ? 0.25 : -0.9, ha, 0, 'YXZ');
-  hammer.scale.setScalar((g.golden > 0 ? 1.35 : 1) * (0.9 + 0.08 * g.lv.hammer) * MT.hammerMul(meta));
+  drawWeapon(dt, now);
   const gk = stage().gadget, inPlay = mode !== 'title' && mode !== 'over';
   let nSp = 0, nBa = 0, nLa = 0, nRing = 0;
   if (inPlay)
@@ -1534,25 +1575,28 @@ function draw(dt: number, now: number) {
       const ph = ((now * 0.0011 + k * 0.137) % 1) * 24 - 12, side = ((k * 7.31) % 1) * 20 - 10;
       put(streakMesh, nStreak++, g.px + g.wx * ph - g.wz * side, 0.6 + (k % 5) * 0.4, g.pz + g.wz * ph + g.wx * side, Math.atan2(g.wx, g.wz));
     }
+  const v = g.vis;
+  if ((v.windT = Math.min(1, v.windT + dt * 3)) < 1) // 부채: 펼친 쪽으로 바람 줄이 흘러간다
+    for (let k = 0; k < 14; k++) {
+      const a = v.windYaw + (k / 13 - 0.5) * v.windArc, d = v.windR * (0.25 + 0.85 * v.windT) + (k % 3) * 0.3;
+      put(streakMesh, nStreak++, v.windX + Math.sin(a) * d, 0.3 + (k % 4) * 0.25, v.windZ + Math.cos(a) * d, a, 1, 1, 0.6 + v.windT);
+    }
   sync(streakMesh, nStreak);
   g.logs.forEach((l, i) => put(logMesh, i, l.x, 0.36, l.z, Math.atan2(l.dx, l.dz), 1, 1, 1, l.roll));
   sync(logMesh, g.logs.length);
+  let nWarn = 0, nMark = 0; // 통나무 0.6초 예고 띠, 호박 착지 원, 덩어리 떨어지는 자리
+  for (const l of g.logs) if (l.warn > 0) put(logWarnFx, nWarn++, l.x, 0.05, l.z, Math.atan2(l.dx, l.dz), 3.2, 1, l.left);
+  (logWarnFx.material as THREE.MeshBasicMaterial).opacity = 0.14 + 0.18 * Math.abs(Math.sin(now * 0.018));
+  sync(logWarnFx, nWarn);
+  if (mode !== 'title' && mode !== 'over') for (const pk of g.pumpkins) put(markFx, nMark++, pk.tx, 0.05, pk.tz, 0, R.pumpkinRadius(g.lv.pumpkin) * (0.6 + 0.4 * pk.t));
+  for (let k = g.vis.packs.length - 1; k >= 0; k--) {
+    const pa = g.vis.packs[k];
+    if ((pa.t += dt) > 0.5) { g.vis.packs.splice(k, 1); continue; }
+    put(markFx, nMark++, pa.x, 0.05, pa.z, 0, (R.PACK_SPREAD + 0.6) * (1.3 - pa.t * 0.6));
+  }
+  sync(markFx, Math.min(16, nMark));
   g.pumpkins.forEach((pk, i) => put(pumpkinMesh, i, pk.x, pk.y, pk.z, pk.t * 9, 1.1));
   sync(pumpkinMesh, g.pumpkins.length);
-  g.swingT = Math.min(1, g.swingT + dt * 6);
-  swing.visible = g.swingT < 1;
-  if (swing.visible) {
-    const arc = g.swingArc;
-    if (arc !== swingArc) { // 부채꼴은 +z(주인공이 보는 쪽) 가운데로 만든다. 눕히면 xy평면의 -90°가 +z가 된다
-      swing.geometry.dispose();
-      swing.geometry = new THREE.RingGeometry(0.4, 1, 24, 1, -Math.PI / 2 - arc / 2, arc).rotateX(-Math.PI / 2);
-      swingArc = arc;
-    }
-    swing.position.set(g.px, 0.08, g.pz);
-    swing.rotation.y = g.swingYaw;
-    swing.scale.setScalar(g.swingRad * (0.7 + g.swingT * 0.3));
-    (swing.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - g.swingT);
-  }
   g.bits.forEach((b, i) => {
     put(bitMesh, i, b.x, b.y, b.z, b.life * 20, Math.min(1, b.life * 4));
     bitMesh.setColorAt(i, b.color);
@@ -1587,6 +1631,151 @@ function draw(dt: number, now: number) {
   camera.position.x += rnd(-1, 1) * g.shake * 0.5;
   camera.position.y += rnd(-1, 1) * g.shake * 0.5;
   camera.lookAt(camTarget);
+}
+
+/** 지금 보여 줄 주무기: 판 안은 이번 판 무기, 시작 화면은 다음 판에 들 무기 */
+const shownWeapon = (): MT.WeaponId => (mode === 'title' ? runWeapon() : g.weapon);
+/** 타격 순간 그릴 것을 기록한다(strike에서 부름, 판 규칙과 무관) */
+function showStrike(s: Strike) {
+  const v = g.vis, w = g.weapon;
+  if (s.shape === 'circle') {
+    v.shockT = 0; v.shockX = s.cx; v.shockZ = s.cz; v.shockR = s.rad;
+    if (w === 'sledge' && (s.kind === 'main' || s.kind === 'double')) { // 쿵: 멈춤 0.08초·흔들림·금 간 자국 1초·흙먼지 고리
+      v.crackT = 0; v.crackX = s.cx; v.crackZ = s.cz; v.crackR = s.rad;
+      g.stop = Math.max(g.stop, 0.08);
+      g.shake = Math.max(g.shake, 0.25);
+      for (let k = 0; k < 10; k++) burst(s.cx + Math.sin(k * 0.628) * s.rad * 0.8, s.cz + Math.cos(k * 0.628) * s.rad * 0.8, C_DIRT, 1);
+    }
+  } else if (s.shape === 'line') {
+    v.lines.push({ x: g.px, z: g.pz, yaw: s.yaw, len: s.rad, w: s.width, t: 0 });
+    if (v.lines.length > 3) v.lines.shift();
+  } else if (w === 'twin' && s.kind !== 'spin') { // 좌·우·좌 교차 잔상
+    v.twinTap++;
+    v.slashes.push({ x: g.px, z: g.pz, yaw: s.yaw, r: s.rad, hand: v.twinTap % 2, t: 0 });
+    if (v.slashes.length > 3) v.slashes.shift();
+  } else if (w === 'fan' && s.kind === 'main') { v.windT = 0; v.windX = g.px; v.windZ = g.pz; v.windYaw = s.yaw; v.windR = s.rad; v.windArc = s.half * 2; }
+  if (w === 'squeaky' && s.kind === 'tap') burst(g.px + Math.sin(s.yaw) * s.rad * 0.7, g.pz + Math.cos(s.yaw) * s.rad * 0.7, C_STAR, 5); // 둘째 타 노란 별
+}
+const HANDS = [[weapon, -1], [weapon2, 1]] as const; // 쌍검: 오른손·왼손
+let titleModsKey = '', titleModsVal = R.NO_MODS;
+/** 시작 화면 무기의 숙련 값: 무기·숙련 단계가 바뀔 때만 다시 계산(매 프레임 만들지 않게) */
+function titleMods(w: MT.WeaponId) {
+  const lv = R.masteryLevel(meta.mastery[w]), k = `${w}|${lv}`;
+  if (k !== titleModsKey) { titleModsKey = k; titleModsVal = R.masteryMods(w, lv); }
+  return titleModsVal;
+}
+/** 주무기와 박자 연출(결정 088): 무기별 모양, 준비(들어 올림·젖힘·당김·접기) → 타격 → 후딜(내려온 자세), 바닥 표시 */
+function drawWeapon(dt: number, now: number) {
+  const wid = shownWeapon(), inRun = mode !== 'title' && mode !== 'over', v = g.vis, big = MT.hammerMul(meta), gold = inRun && g.golden > 0;
+  const wlv = inRun ? g.lv.hammer : 1, mods = inRun ? g.wMods : titleMods(wid), tier = WL.tierOf(wlv);
+  const key = `${wid}|${tier}|${mods.star}`;
+  if (key !== weaponKey) {
+    weaponKey = key;
+    weapon.geometry = WL.weaponGeo(wid, tier, mods.star);
+    weapon2.geometry = WL.weaponGeo(wid, tier, mods.star, true);
+  }
+  weaponMat.emissive.setHex(gold ? 0x5a4000 : 0); // 번개 무기 보급
+  const phase = inRun ? g.wPhase : 'idle';
+  const p = phase === 'windup' ? Math.min(1, 1 - g.wT / Math.max(0.01, R.weaponWind(wid, wlv, mods))) : 0, k = p * (2 - p);
+  g.swingT = Math.min(1, g.swingT + dt * 6);
+  const sw = Math.min(1, g.swingT * 1.6), swinging = inRun && sw < 1, ease = 1 - (1 - sw) ** 2; // 처음 빠르게, 끝에 느리게
+  const half = Math.min(g.swingArc, Math.PI) / 2 + 0.3, half0 = R.weaponArc(wid, wlv, mods) / 2 + 0.3; // 회오리(360°)도 무기는 반 바퀴만
+  let yaw = g.face + 2.4, pitch = -0.9, wy = 0.75, fwd = 0.25, crouch = 0, twist = 0, fold = 1, squash = 0;
+  if (swinging && g.swingShape === 'circle' && wid === 'sledge') { yaw = g.swingYaw; pitch = -2.5 + 3 * ease; wy = 0.95 - 0.4 * ease; crouch = 1 - sw; } // 쿵 내려찍기
+  else if (swinging && g.swingShape === 'line') { yaw = g.swingYaw; pitch = 0.1; wy = 0.6; fwd = -0.3 + 0.9 * ease; } // 퍽 찌르기
+  else if (swinging && wid !== 'sledge' && wid !== 'pole') {
+    yaw = g.swingYaw + half - 2 * half * ease; pitch = 0.25; wy = 0.55;
+    if (wid === 'squeaky' && g.swingKind === 'tap') squash = 1 - sw; // 둘째 타에 머리가 찌그러짐
+  } else if (phase === 'windup') {
+    if (wid === 'sledge') { yaw = g.wYaw; pitch = -0.9 - 1.6 * k; wy = 0.75 + 0.2 * k; crouch = k; } // 머리 위로 크게 천천히
+    else if (wid === 'bat') { yaw = g.wYaw + half0 + 1.1 * k; pitch = 0.05; wy = 0.65; twist = 0.7 * k; crouch = k; } // 몸을 비틀며 뒤로 젖힘
+    else if (wid === 'pole') { yaw = g.wYaw; pitch = 0.1; wy = 0.6; fwd = 0.25 - 0.55 * k; } // 뒤로 당김
+    else if (wid === 'fan') { yaw = g.wYaw + half0 * k; pitch = -0.9 + 0.6 * k; fold = 1 - 0.8 * k; } // 접었다가
+    else if (wid !== 'twin') { yaw = g.wYaw + half0 * k; pitch = -0.9 - 0.45 * k; } // 짧게 들어 올림
+  } else if (phase === 'recovery') { // 후딜: 휘두른 자세로 멈춤
+    if (wid === 'sledge') { yaw = g.swingYaw; pitch = 0.5; wy = 0.55; crouch = 0.6; } // 땅에 박힌 채
+    else if (wid === 'pole') { yaw = g.swingYaw; pitch = 0.1; wy = 0.6; fwd = 0.6; } // 내민 채
+    else if (wid !== 'twin') { yaw = g.swingYaw - half; pitch = 0.25; wy = 0.55; }
+  }
+  const sc = (gold ? 1.35 : 1) * (0.9 + 0.08 * wlv) * big; // Lv5 ×1.3
+  weapon.visible = mode !== 'bonus';
+  weapon2.visible = weapon.visible && wid === 'twin';
+  if (wid === 'twin') { // 두 손에 하나씩: 친 손만 휘두르고 다른 손은 앞으로 들고 있다
+    const right = v.twinTap % 2 === 1;
+    for (const [m, side] of HANDS) {
+      const hit = swinging && g.swingKind !== 'spin' ? right === (side < 0) : swinging;
+      const a = hit ? g.swingYaw - side * (half - 2 * half * ease) : g.face + side * 0.55, hx = g.face + (side * Math.PI) / 2;
+      m.position.set(g.px + Math.sin(hx) * 0.28, hit ? 0.55 : 0.7, g.pz + Math.cos(hx) * 0.28);
+      m.rotation.set(hit ? 0.25 : -1.0, a, 0, 'YXZ');
+      m.scale.setScalar(sc);
+    }
+  } else {
+    weapon.position.set(g.px + Math.sin(yaw) * fwd, wy - 0.12 * crouch, g.pz + Math.cos(yaw) * fwd);
+    weapon.rotation.set(pitch, yaw, 0, 'YXZ');
+    weapon.scale.set(sc * fold * (1 + 0.35 * squash), sc * (1 - 0.3 * squash), sc);
+  }
+  // 준비가 긴 무기(대형 해머·방망이)는 준비 동안 웅크린다
+  hero.scale.set(heroBase * (1 + 0.06 * crouch), heroBase * (1 - 0.1 * crouch), heroBase * (1 + 0.06 * crouch));
+  hero.rotation.y = g.face + twist;
+  // 타격 모양: 부채꼴(주인공 자리)·원(앞자리)·직선
+  const swingMat = swing.material as THREE.MeshBasicMaterial;
+  swing.visible = swinging && g.swingShape === 'fan' && (wid !== 'twin' || g.swingKind === 'spin');
+  if (swing.visible) {
+    swing.geometry = arcGeo(g.swingArc, wid === 'bat' ? 0.8 : 0.4); // 방망이는 가는 흰 줄 궤적
+    swingMat.color.setHex(gold ? 0xffd23f : wid === 'bat' ? 0xffffff : wid === 'fan' ? 0xd8f4ff : 0xfff3c4);
+    swing.position.set(g.px, 0.08, g.pz);
+    swing.rotation.y = g.swingYaw;
+    swing.scale.setScalar(g.swingRad * (0.7 + g.swingT * 0.3));
+    swingMat.opacity = 0.75 * (1 - g.swingT);
+  }
+  v.shockT = Math.min(1, v.shockT + dt * 4);
+  shockFx.visible = inRun && v.shockT < 1;
+  if (shockFx.visible) {
+    shockFx.position.set(v.shockX, 0.08, v.shockZ);
+    shockFx.scale.setScalar(v.shockR * (0.55 + 0.45 * v.shockT));
+    (shockFx.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - v.shockT);
+  }
+  v.crackT = Math.min(1, v.crackT + dt);
+  crackFx.visible = inRun && v.crackT < 1;
+  if (crackFx.visible) {
+    crackFx.position.set(v.crackX, 0.04, v.crackZ);
+    crackFx.scale.setScalar(v.crackR * 0.75);
+    (crackFx.material as THREE.MeshBasicMaterial).opacity = 0.7 * Math.min(1, (1 - v.crackT) * 3);
+  }
+  // 대형 해머 착지 원: 들어 올리는 동안 점점 진해진다(맞을 자리 = 주인공 + 겨눈 방향 × 앞 거리)
+  landFx.visible = inRun && wid === 'sledge' && phase === 'windup';
+  if (landFx.visible) {
+    const at = (R.WEAPON_STATS.sledge.at ?? 0) * big, r = R.weaponRadius('sledge', wlv, mods) * big + (gold ? 1.2 : 0);
+    landFx.position.set(g.px + Math.sin(g.wYaw) * at, 0.06, g.pz + Math.cos(g.wYaw) * at);
+    landFx.scale.setScalar(r);
+    (landFx.material as THREE.MeshBasicMaterial).opacity = 0.12 + 0.6 * p;
+  }
+  // 펀치 막대: 준비 중 찌를 줄에 얇은 점선, 찌르면 직선 흰 띠
+  let nDash = 0, nLine = 0, nSlash = 0, nGust = 0;
+  if (inRun && wid === 'pole' && phase === 'windup') {
+    const len = R.weaponRadius('pole', wlv, mods) * big + (gold ? 1.2 : 0);
+    for (let d = 0.6; d < len && nDash < 12; d += 0.45) put(dashFx, nDash++, g.px + Math.sin(g.wYaw) * d, 0.07, g.pz + Math.cos(g.wYaw) * d, g.wYaw);
+    (dashFx.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.6 * p;
+  }
+  let lineFade = 1;
+  for (const l of v.lines) {
+    if ((l.t += dt * 4) >= 1) continue;
+    put(lineFx, nLine++, l.x, 0.075, l.z, l.yaw, l.w * (1 - 0.4 * l.t), 1, l.len);
+    lineFade = Math.min(lineFade, l.t);
+  }
+  (lineFx.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - lineFade);
+  let slashFade = 1;
+  for (const sl of v.slashes) {
+    if ((sl.t += dt * 4) >= 1) continue;
+    put(slashFx, nSlash++, sl.x, 0.5, sl.z, sl.yaw + (sl.hand ? 0.25 : -0.25), sl.r, sl.r, sl.r, sl.hand ? 0.35 : -0.35); // 좌우로 기울여 X자 교차
+    slashFade = Math.min(slashFade, sl.t);
+  }
+  (slashFx.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - slashFade);
+  if (inRun) for (const u of g.gusts) put(gustFx, nGust++, u.x, 0, u.z, now * 0.012, 1, 0.8 + 0.2 * Math.sin(now * 0.02), 1);
+  sync(dashFx, nDash);
+  sync(lineFx, nLine);
+  sync(slashFx, nSlash);
+  sync(gustFx, Math.min(6, nGust));
 }
 
 // ───────── 화면 글자 ─────────
@@ -1639,9 +1828,9 @@ function showPick() {
   resetInput();
   pickAt = performance.now();
   const cards = picks.map((id) => {
-    const [name, desc, c] = UPS[id], lv = id === 'heart' ? 0 : g.lv[id];
+    const wu = WL.UI[g.weapon], [name, desc, c] = id === 'hammer' ? [L(...wu.name), UPS.hammer[1], wu.color] : UPS[id], lv = id === 'heart' ? 0 : g.lv[id]; // 무기 카드는 이번 판 무기 이름·색
     const tag = id === 'heart' ? '' : lv ? `<em>Lv ${lv} → ${lv + 1}</em>` : `<em class="new">NEW</em>`;
-    return `<button class="card" data-id="${id}" style="--c:${c}"><div class="ico">${svg(ICON[id])}</div><b>${name}</b>${tag}<span>${desc}</span></button>`;
+    return `<button class="card" data-id="${id}" style="--c:${c}"><div class="ico">${svg(id === 'hammer' ? wu.icon : ICON[id])}</div><b>${name}</b>${tag}<span>${desc}</span></button>`;
   });
   const again = g.rerolls > 0 ? `<button class="sub" data-act="reroll">${L(`다시 고르기 (${g.rerolls})`, `Reroll (${g.rerolls})`)}</button>` : '';
   const head = g.t === 0 ? L('들고 갈 스킬', 'Starting skill') : L('레벨 업!', 'Level up!');
@@ -1651,7 +1840,7 @@ function showPick() {
 // 상점 설명은 "다음 단계에서 무엇이 되는지"를 보여 준다(결정 072)
 const PERK_UI: Record<MT.Perk, [string, (next: number) => string, string, string]> = {
   vigor: [L('튼튼한 몸', 'Sturdy'), () => L('최대 체력 +15', 'Max HP +15'), '#ff5a6e', ICON.heart],
-  shove: [L('큰 망치', 'Big mallet'), () => L('망치 크기·사거리 +3%, 넉백 +5%', 'Mallet size & reach +3%, knockback +5%'), '#b06ee8', ICON.hammer],
+  shove: [L('큰 무기', 'Big weapon'), () => L('모든 무기 크기·사거리 +3%, 넉백 +5%', 'All weapons: size & reach +3%, knockback +5%'), '#b06ee8', ICON.hammer],
   charge: [L('쾅! 충전', 'Slam charge'), () => L('쾅! 게이지가 10% 빨리 참', 'Slam gauge fills 10% faster'), '#ff8a4c', ICON.sweep],
   cards: [L('카드 달인', 'Card master'), (n) => L(`다시 고르기 ${MT.rerolls(n)}번`, `${MT.rerolls(n)} rerolls`) + (MT.startPicks(n) ? L(` · 스킬 ${MT.startPicks(n)}개 들고 시작`, ` · start with ${MT.startPicks(n)} skill(s)`) : ''), '#35b9ab',
     '<rect x="3" y="7" width="11" height="14" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v12"/>'],
@@ -1731,7 +1920,15 @@ async function shareShot() {
   a.download = file.name;
   a.click();
 }
-function showTitle() {
+/** 무기 아이콘(무기 색 바탕 + 흰 선). lock: 검은 그림자 */
+const wIcon = (w: MT.WeaponId, lock = false) => `<span class="wico${lock ? ' lock' : ''}" style="--c:${WL.UI[w].color}">${svg(WL.UI[w].icon)}</span>`;
+/** 잠긴 무기 안내: 장 끝이면 「2장 끝에서 열림」, 아니면 스테이지 이름 */
+function openText(w: MT.WeaponId) {
+  const n = MT.WEAPON_OPEN[w], ch = n / CH.STAGES_PER_CHAPTER;
+  return Number.isInteger(ch) ? L(`${ch}장 끝에서 열림`, `Unlocks after Ch.${ch}`) : L(`${stageName(n - 1)} 지키면 열림`, `Clear ${stageName(n - 1)} to unlock`);
+}
+const otherWeaponOpen = () => MT.WEAPONS.some((w) => w !== 'hammer' && MT.weaponOpen(w, meta.cleared));
+function showTitle(still = false) {
   mode = 'title';
   if (curDef.no !== stageIdx) void enterStage(stageIdx); // 고른 스테이지의 장 모델을 불러와 끼운다
   else { applyStage(); resetIsland(); }
@@ -1739,6 +1936,14 @@ function showTitle() {
   // 시작 화면(결정 079): 미션은 한 줄로 접고(가장 쉬운 것 = 보상이 가장 적은 것을 앞에), 주인공이 가려지지 않게 메뉴를 아래로 모은다
   const ms = meta.missions.map((id) => MS.missionById(id)!).filter(Boolean), easy = [...ms].sort((a, b) => a.coins - b.coins)[0];
   const daily = loadDaily();
+  // 스테이지 성질·추천 무기(결정 088): 성질이 있으면 「버티면 섬을 지킨다」 줄 자리에 두 줄로(시작 화면 높이 그대로, 결정 079)
+  const tt = CH.traitText(curDef), rec = CH.recommendedWeapon(curDef), recOpen = MT.weaponOpen(rec, meta.cleared), cur = runWeapon();
+  const [traitA, traitB] = tt ? L(...tt).split(' · ') : ['', ''];
+  const goalRow = tt
+    ? `<div class="goal trait">${wIcon(rec, !recOpen)}<span><b>${traitA}</b><small>${traitB}${recOpen ? '' : ` · ${openText(rec)}`}</small></span></div>`
+    : `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>`;
+  const wBtn = otherWeaponOpen()
+    ? `<button class="wbtn" data-act="weapons" aria-label="${L('무기 고르기', 'Choose weapon')}">${wIcon(cur)}<small>${L(...WL.UI[cur].name)}</small>${tt && cur === rec ? `<em>${L('추천', 'Pick')}</em>` : ''}</button>` : '';
   show(
     `<div class="top">${coinPill()}<h1 class="big-title">${L('망치섬', 'Tumble<br>Isle')}</h1><p class="tag">${L('망치로 쳐서 섬 밖으로 날려 버리세요', 'Bonk the horde off your tiny island')}</p></div>` +
       `<div class="menu">` +
@@ -1748,13 +1953,37 @@ function showTitle() {
       `<button data-act="next" ${stageIdx < CH.STAGE_COUNT - 1 ? '' : 'disabled'} aria-label="${L('다음 스테이지', 'Next stage')}">›</button>` +
       `<button data-act="nextCh" ${curDef.chapter < CH.CHAPTERS.length - 1 ? '' : 'disabled'} aria-label="${L('다음 장', 'Next chapter')}">»</button></div>` +
       (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을(를) 지키면 열립니다`, `Clear ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
-      `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>` +
+      goalRow +
       (easy ? `<details class="fold"><summary>${L(`미션 1/${ms.length}`, `Mission 1/${ms.length}`)} · ${L(easy.ko, easy.en)}</summary>${missionList(meta.missions)}</details>` : '') +
-      `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
+      `<div class="startrow">${wBtn}<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button></div>` +
       `<div class="row"><button class="sub daily" data-act="daily">${L('오늘의 섬', "Today's isle")}<small>${stageName(R.dailyStage(today()))}${daily.best ? L(` · 최고 ${daily.best}`, ` · best ${daily.best}`) : ''}</small></button>` +
       `<button class="sub" data-act="shop">${L('상점', 'Shop')}</button>` +
       `<button class="sub" data-act="settings">${L('설정', 'Settings')}</button></div></div>`,
     'title',
+  );
+  if (still) overlay.setAttribute('data-still', ''); // 무기 시트에서 돌아올 때 메뉴가 다시 튀어 오르지 않게(결정 074)
+}
+/** 무기 시트(결정 085 6-2·088): 아래 시트에 2×4 칸, 한 번 누르면 고르고 닫힘 */
+function showWeapons() {
+  mode = 'title';
+  const rec = CH.recommendedWeapon(curDef), cur = runWeapon(), lv1 = (w: MT.WeaponId) => R.masteryMods(w, R.masteryLevel(meta.mastery[w]));
+  // 박자 막대 길이 = 시간, 가장 긴 무기(대형 해머) 기준. 숫자는 쓰지 않는다
+  const mx = (f: (w: MT.WeaponId) => number) => Math.max(...MT.WEAPONS.map(f));
+  const wind = (w: MT.WeaponId) => R.weaponWind(w, 1, lv1(w)), cyc = (w: MT.WeaponId) => R.weaponCycle(w, 1, lv1(w)), recv = (w: MT.WeaponId) => R.weaponRec(w, 1, lv1(w));
+  const top = [mx(wind), mx(cyc), mx(recv)];
+  const tiles = MT.WEAPONS.map((w) => {
+    const open = MT.weaponOpen(w, meta.cleared), lvl = R.masteryLevel(meta.mastery[w]), ui = WL.UI[w];
+    const bars = [wind(w), cyc(w), recv(w)].map((x, i) => `<i style="--w:${Math.max(5, (x / top[i]) * 100).toFixed(0)}%"></i>`).join('');
+    const mast = lvl >= R.MASTERY_MAX ? `<span class="next">★ ${L('달인', 'Master')}</span>`
+      : `<span class="next" style="--m:${lvl * 10}%"><u></u>${L('다음', 'Next')}: ${L(...WL.masteryStep(w, lvl + 1))}</span>`;
+    return `<button class="wtile${w === cur ? ' on' : ''}" data-act="weapon" data-w="${w}" ${open ? '' : 'disabled'}>${wIcon(w, !open)}<b>${L(...ui.name)}</b>` +
+      (curDef.trait && w === rec ? `<em>${L('추천', 'Pick')}</em>` : '') + `<small>${open ? L(...ui.tag) : openText(w)}</small><div class="beats">${bars}</div>${open ? mast : ''}</button>`;
+  });
+  show(
+    `<div class="sheet wsheet"><h2>${L('무기', 'Weapons')}</h2>` +
+      `<div class="legend"><i></i>${L('준비', 'Wind-up')}<i></i>${L('공속', 'Cycle')}<i></i>${L('후딜', 'Recovery')}</div>` +
+      `<div class="wgrid">${tiles.join('')}</div>${toggleRow('autoWeapon', L('추천 무기 자동', 'Auto-pick recommended'), meta.autoWeapon)}</div>`,
+    'pick wsheet',
   );
 }
 const CHAR_UI: Record<MT.CharId, [string, string]> = {
@@ -1925,6 +2154,7 @@ function showShop() {
 }
 overlay.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
+  if (!btn && ev.target === overlay && overlay.classList.contains('wsheet')) return showTitle(true); // 시트 밖을 누르면 닫힘
   if (!btn || btn.disabled) return;
   if (mode === 'pick' && ev.isTrusted && performance.now() - pickAt < 300) return; // 시트가 뜬 직후 누름 막기(봇의 .click()은 통과)
   sfx.unlockAudio();
@@ -1940,6 +2170,28 @@ overlay.addEventListener('click', (ev) => {
     return;
   }
   if (act === 'shop') return showShop();
+  if (act === 'weapons') return showWeapons();
+  if (act === 'weapon') { // 한 번 누르면 고르고 닫힘. 자동 장착이 켜져 있어도 이 스테이지에선 고른 무기
+    const w = btn.dataset.w as MT.WeaponId;
+    meta = { ...meta, weapon: w };
+    saveMeta();
+    manualPick = w;
+    return showTitle(true);
+  }
+  if (act === 'autoWeapon') {
+    meta = meta.autoWeapon ? { ...meta, weapon: runWeapon(), autoWeapon: false } : { ...meta, autoWeapon: true }; // 끌 때는 지금 들 무기를 그대로
+    if (meta.autoWeapon) manualPick = null;
+    saveMeta();
+    return showWeapons();
+  }
+  if (act === 'useWeapon') { // 결과 화면 「새 무기!」 바로 쓰기: 다음 판에 들고 간다
+    const w = btn.dataset.w as MT.WeaponId;
+    meta = { ...meta, weapon: w };
+    saveMeta();
+    manualPick = w;
+    btn.outerHTML = `<span class="badge">${L('장착!', 'Equipped!')}</span>`;
+    return;
+  }
   if (act === 'settings') return showSettings();
   if (act === 'music' || act === 'sound' || act === 'haptic') {
     (act === 'music' ? sfx.toggleMusic : act === 'sound' ? sfx.toggleSfx : sfx.toggleHaptic)();
@@ -1955,6 +2207,7 @@ overlay.addEventListener('click', (ev) => {
   }
   if (act === 'quit') return end(false);
   if (act === 'title') return showTitle();
+  if (act === 'prev' || act === 'next' || act === 'prevCh' || act === 'nextCh') manualPick = null; // 스테이지를 바꾸면 다시 추천 무기로
   if (act === 'prev' || act === 'next') {
     stageIdx = Math.max(0, Math.min(CH.STAGE_COUNT - 1, stageIdx + (act === 'next' ? 1 : -1)));
     return showTitle();
@@ -2005,12 +2258,13 @@ const bestLine = () => {
   return b.kills ? `<p class="best">${L('최고 기록', 'Best')} · ${clock(b.time)} · ${L('처치', 'KOs')} ${b.kills}</p>` : '';
 };
 /** 이번 판 숙련 점수(rules.ts masteryGain) */
-function masteryEarned() {
+function masteryEarned(chapter: number) {
   const lvOf = (w: MT.WeaponId) => R.masteryLevel(meta.mastery[w]);
-  return R.masteryGain(g.falls, curDef.chapter, lvOf(g.weapon), Math.max(...MT.WEAPONS.map(lvOf)));
+  return R.masteryGain(g.falls, chapter, lvOf(g.weapon), Math.max(...MT.WEAPONS.map(lvOf)));
 }
 function end(win: boolean) {
   mode = 'over';
+  const chapter = curDef.chapter; // 오늘의 섬은 아래에서 원래 스테이지로 돌아가 curDef가 바뀌므로 판의 장을 먼저 잡아 둔다
   win ? sfx.finale() : sfx.fail();
   const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls }, best = loadBest();
   const isBest = !dailyRun && (score.time > best.time || (score.time === best.time && score.kills > best.kills));
@@ -2028,21 +2282,29 @@ function end(win: boolean) {
   checkMissions();
   const doneMs = g.done.map((id) => MS.missionById(id)!);
   const missionCoins = doneMs.reduce((a, m) => a + m.coins, 0);
-  const coins = Math.round((MT.coinsFor(g.kills, g.falls, win, curDef.chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins) * MT.coinMul(meta));
+  const coins = Math.round((MT.coinsFor(g.kills, g.falls, win, chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins) * MT.coinMul(meta));
   lastCoins = coins;
   ads.initAds(); // 첫 판이 끝난 뒤에야 광고 준비(추적 허용 창)를 시작한다
   const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < CH.STAGE_COUNT;
+  const clearedBefore = meta.cleared, mastBefore = R.masteryLevel(meta.mastery[g.weapon]);
   meta = {
     ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared,
     missionsDone: meta.missionsDone + g.done.length, bossDowns: meta.bossDowns + (g.bossDown ? 1 : 0),
     missions: MS.fillMissions(meta.missions.filter((id) => !g.done.includes(id))), // 달성한 미션은 새 것으로
-    mastery: { ...meta.mastery, [g.weapon]: meta.mastery[g.weapon] + masteryEarned() }, // 숙련(결정 085): 이기든 지든 떨어뜨린 수
+    mastery: { ...meta.mastery, [g.weapon]: meta.mastery[g.weapon] + masteryEarned(chapter) }, // 숙련(결정 085): 이기든 지든 떨어뜨린 수
   };
   saveMeta();
   const hasNext = win && !dailyNote && stageIdx + 1 < CH.STAGE_COUNT;
   // 결과(결정 079): 떨어뜨린 수를 크게, 나머지는 작은 한 줄. 미션은 이번 판 달성한 것만 펼치고 없으면 접는다
   const badges = (unlocked && hasNext ? `<span class="badge">${L(`다음: ${stageName(stageIdx + 1)}`, `Next: ${stageName(stageIdx + 1)}`)}</span>` : '') +
     (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') + (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + dailyNote;
+  // 새 무기·숙련 오름(결정 088): 배지 줄 아래 한 칸씩, 주 버튼은 그대로 하나
+  const newW = MT.WEAPONS.find((w) => !MT.weaponOpen(w, clearedBefore) && MT.weaponOpen(w, meta.cleared));
+  const mastAfter = R.masteryLevel(meta.mastery[g.weapon]), wn = WL.UI[g.weapon].name;
+  const newBlock = newW ? `<div class="newweapon"><div class="rays"></div>${wIcon(newW)}<span><b>${L('새 무기!', 'New weapon!')}</b>${L(...WL.UI[newW].name)}</span>` +
+    `<button class="sub" data-act="useWeapon" data-w="${newW}">${L('바로 쓰기', 'Use now')}</button></div>` : '';
+  const mastLine = mastAfter > mastBefore ? `<p class="mastline">${wIcon(g.weapon)}<span>${mastAfter >= R.MASTERY_MAX ? L(`${wn[0]} 달인!`, `${wn[1]} master!`)
+    : L(`${wn[0]} 숙련 ${mastAfter} → ${WL.masteryStep(g.weapon, mastAfter)[0]}`, `${wn[1]} mastery ${mastAfter} → ${WL.masteryStep(g.weapon, mastAfter)[1]}`)}</span></p>` : '';
   const missions = doneMs.length ? missionList(g.done, g.done)
     : `<details class="fold"><summary>${L(`다음 미션 ${meta.missions.length}개`, `${meta.missions.length} next missions`)}</summary>${missionList(meta.missions)}</details>`;
   show(
@@ -2050,7 +2312,7 @@ function end(win: boolean) {
       `<div class="panel result"><small>${L('떨어뜨림', 'Knocked off')}</small><strong class="falls">${g.falls}</strong>` +
       `<p class="line">${clock(sec)} · ${L('처치', 'KOs')} ${g.kills} · Lv ${g.level + 1}</p>` +
       `<div class="earn"><i></i>+${coins}</div>${doubleBtn()}` +
-      (badges ? `<div class="badges">${badges}</div>` : '') + missions + `</div>` +
+      (badges ? `<div class="badges">${badges}</div>` : '') + newBlock + mastLine + missions + `</div>` +
       (bestShot ? `<button class="bestcut" data-act="share" aria-label="${L('베스트 컷 공유', 'Share best shot')}"><img src="${bestShot}" alt=""><span><b>${L('베스트 컷', 'Best shot')}</b>${L(`낙하 ×${g.bestChain}`, `Drop ×${g.bestChain}`)}</span>` +
         `${svg('<path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>', 'share')}</button>` : '') +
       `<div class="actions">` +
@@ -2176,7 +2438,7 @@ if (DEV)
       ads: ads.adDev, // 광고 흐름 시험: __demo.ads.failNext·closeNext = true, __demo.ads.setReady(false)
       /** 광고 자리 시험: 판을 시작해 60초 지난 것으로 하고 쓰러지게(이어하기 창) 또는 이기게(결과 화면) */
       down: async () => { await stageReady; startRun(); g.t = 61; g.revived = true; hurt(1e9); return overlay.innerText; },
-      win: async () => { await stageReady; startRun(); g.t = 61; end(true); return overlay.innerText; },
+      win: async (falls = 0) => { await stageReady; startRun(); g.t = 61; g.falls = falls; end(true); return overlay.innerText; }, // falls: 숙련 오름 줄 확인용
       /** 촬영 모드: 연출 장면을 정해진 크기로 렌더해 docs/art/<kind>.png로 저장(개발 서버 vite.config.ts) */
       shot: async (kind: 'icon' | 'splash') => {
         const size = kind === 'icon' ? 1024 : 2732;
@@ -2345,6 +2607,41 @@ if (DEV)
       /** 무기 숙련 단계를 바로 정한다(0~10) */
       setMastery: (id: MT.WeaponId, n: number) => { meta = { ...meta, mastery: { ...meta.mastery, [id]: R.MASTERY_K * n * n } }; },
       setWeapon: (id: MT.WeaponId) => { meta = { ...meta, weapon: id, autoWeapon: false }; g.weapon = id; },
+      /** 무기 8종을 주인공 앞에 한 줄로 세운다(휴대폰 크기에서 실루엣·색으로 구분되는지 보는 용도, 결정 088). lv: 카드 레벨(재질) */
+      lineup: async (lv = 1) => {
+        await stageReady;
+        startRun();
+        g.enemies.length = 0;
+        overlay.hidden = true;
+        mode = 'pause';
+        MT.WEAPONS.forEach((w, i) => {
+          for (const left of w === 'twin' ? [false, true] : [false]) {
+            const m = new THREE.Mesh(WL.weaponGeo(w, WL.tierOf(lv), false, left), weaponMat);
+            m.position.set(-4.0 + i * 1.15 + (left ? 0.3 : 0), 0.15, 2.2);
+            m.rotation.set(-1.25, Math.PI + (left ? 0.3 : 0), 0, 'YXZ');
+            m.scale.setScalar(0.9 + 0.08 * lv);
+            m.castShadow = true;
+            scene.add(m);
+          }
+        });
+      },
+      /** 박자 장면을 멈춰 세운다: 준비(windup, p = 진행 0~1)·타격(swing, p = 잔상 진행)·후딜(recovery) */
+      pose: async (id: MT.WeaponId, phase: 'windup' | 'swing' | 'recovery', p = 0.7, lv = 1) => {
+        await stageReady;
+        meta = { ...meta, weapon: id, autoWeapon: false };
+        manualPick = null;
+        startRun();
+        g.lv.hammer = lv;
+        g.enemies.length = 0;
+        for (let k = 0; k < 5; k++) { spawn(); const e = g.enemies[k], a = 0.6 + (k - 2) * 0.35, d = 2 + (k % 2) * 0.8; e.x = Math.sin(a) * d; e.z = Math.cos(a) * d; e.age = 1; }
+        overlay.hidden = true;
+        mode = 'pause';
+        g.face = g.wYaw = 0.6;
+        if (phase === 'windup') { g.wPhase = 'windup'; g.wT = R.weaponWind(id, lv, g.wMods) * (1 - p); }
+        else { swingNow(g.wYaw); g.wPhase = 'recovery'; g.wT = 0.2; g.swingT = phase === 'swing' ? p / 1.6 : 1; g.vis.shockT = g.vis.crackT = phase === 'swing' ? p * 0.5 : 0.5; }
+        g.stop = 0;
+        draw(0, performance.now());
+      },
       /** 스테이지 특징을 바꿔 비교: '' 끔, undefined 스테이지 그대로(다음 enterStage부터) */
       setTrait: (t?: R.Trait | '') => { traitOverride = t; },
       /** 장 규칙을 바꿔 비교: '' 끔, undefined 장 그대로 */

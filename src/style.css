@@ -315,3 +315,57 @@ button.bestcut b { color: var(--gold-deep); }
   .store .chars { grid-template-columns: repeat(3, 1fr); }
 }
 .store .side { display: grid; gap: 10px; align-content: start; }
+
+/* ───── 무기(결정 088) ───── */
+.wico { display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--c); box-shadow: inset 0 -3px 0 #0002; }
+.wico svg { width: 20px; height: 20px; stroke: #fff; stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.wico.lock { background: #232a36; } /* 잠긴 무기는 검은 그림자 */
+.wico.lock svg { stroke: #ffffff4d; }
+/* 시작 화면: 성질 두 줄(「버티면」 줄 자리), 「시작」 줄 왼쪽 무기 버튼 */
+.goal.trait { gap: 10px; padding: 7px 14px 7px 8px; max-width: min(100%, 340px); text-align: left; }
+.goal.trait > span:not(.wico) { display: grid; min-width: 0; }
+.goal.trait b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.goal.trait small { font-size: 12px; font-weight: 800; opacity: .65; }
+.startrow { display: flex; gap: 10px; width: min(100%, 300px); }
+.startrow .go { flex: 1; width: auto; }
+.wbtn { position: relative; flex: none; display: grid; justify-items: center; align-content: center; gap: 2px; width: 64px; padding: 4px 2px; border: 0; border-radius: 18px;
+  background: #ffffffe6; box-shadow: 0 6px 0 #d8ccb4, 0 12px 24px #0003; }
+.wbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #d8ccb4; }
+.wbtn small { max-width: 60px; font-size: 10.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wbtn em, .wtile em { position: absolute; top: -7px; right: -7px; padding: 1px 6px; border-radius: 99px; background: var(--heart); color: #fff; font-size: 10.5px; font-style: normal; font-weight: 900; }
+/* 무기 시트: 2×4 칸(375×812에서 스크롤 없이), 가로 넓은 화면은 4×2 */
+.wsheet { gap: 8px; }
+.legend { display: flex; align-items: center; gap: 4px 6px; color: #fff; font-size: 11.5px; font-weight: 800; opacity: .85; }
+.legend i { width: 14px; height: 5px; border-radius: 3px; margin-left: 6px; background: #ff9a3c; }
+.legend i:nth-of-type(2) { background: #3d7ff2; } .legend i:nth-of-type(3) { background: #a8a29a; }
+.wgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.wtile { position: relative; display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 2px 8px; min-width: 0; padding: 8px 9px; border: 0; border-radius: 14px;
+  background: var(--paper); box-shadow: 0 3px 0 var(--edge); text-align: left; color: var(--ink); }
+.wtile .wico { grid-row: span 2; }
+.wtile b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wtile small { font-size: 11px; font-weight: 700; opacity: .65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wtile.on { outline: 3px solid var(--teal); }
+.wtile:disabled { background: #e6dfd2; }
+.wtile:disabled b { opacity: .55; }
+.beats { grid-column: 1 / -1; display: grid; gap: 2px; margin-top: 3px; }
+.beats i { display: block; width: var(--w); height: 4px; border-radius: 2px; background: #ff9a3c; }
+.beats i:nth-child(2) { background: #3d7ff2; } .beats i:nth-child(3) { background: #a8a29a; }
+.wtile .next { grid-column: 1 / -1; display: grid; gap: 3px; font-size: 10.5px; font-weight: 800; color: var(--teal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wtile .next u { display: block; height: 4px; background: linear-gradient(90deg, var(--teal) var(--m), #0000001a var(--m));
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), #0000 calc(10% - 2px) 10%); mask: repeating-linear-gradient(90deg, #000 0 calc(10% - 2px), #0000 calc(10% - 2px) 10%); } /* 숙련 10칸 */
+.wsheet .set { width: 100%; padding: 10px 14px; }
+@media (min-width: 700px) { .sheet.wsheet { max-width: 760px; } .wgrid { grid-template-columns: repeat(4, 1fr); } }
+/* 결과: 새 무기·숙련 한 줄 */
+.newweapon { position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 8px; padding: 8px 10px; border-radius: 14px;
+  background: #fff3c4; text-align: left; animation: burst .5s cubic-bezier(.2, 1.6, .4, 1) .3s both; }
+.newweapon .rays { position: absolute; z-index: 0; left: -20px; top: 50%; width: 120px; height: 120px; margin-top: -60px; border-radius: 50%;
+  background: repeating-conic-gradient(#ffc94d55 0 10deg, transparent 10deg 20deg); animation: spin 8s linear infinite; }
+.newweapon .wico { position: relative; width: 42px; height: 42px; border-radius: 12px; }
+.newweapon .wico svg { width: 28px; height: 28px; }
+.newweapon > span:not(.wico) { position: relative; flex: 1; display: grid; font-size: 16px; font-weight: 900; }
+.newweapon b { color: var(--gold-deep); font-size: 12.5px; }
+.newweapon .sub, .newweapon .badge { position: relative; width: auto; margin: 0; padding: 8px 12px; font-size: 14px; white-space: nowrap; }
+.mastline { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 8px 0 0; font-size: 12.5px; font-weight: 800; }
+.mastline .wico { width: 22px; height: 22px; border-radius: 6px; }
+.mastline > span:not(.wico) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mastline .wico svg { width: 15px; height: 15px; }

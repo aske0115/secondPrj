@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { BONUS_AT, BONUS_SECONDS, STAGES, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -67,4 +67,11 @@ test('짧게 스친 손가락은 돌진이 아니고, 길게 튕길수록 빠르
   expect(dashSpeed(5)).toBe(0);
   expect(dashSpeed(100)).toBeGreaterThan(dashSpeed(40));
   expect(dashSpeed(5000)).toBe(24);
+});
+
+test('낙하산: 체력이 가득이면 회복은 안 나오고, 아니면 모든 종류가 나올 수 있다', () => {
+  const seen = (hpFull: boolean) => new Set(Array.from({ length: 40 }, (_, i) => pickDrop(hpFull, () => (i % 10) / 10)));
+  expect(seen(true).has('heart')).toBe(false);
+  expect(seen(false).size).toBe(DROPS.length);
+  expect(FIRST_DROP + DROP_FALL).toBeLessThan(BONUS_AT);
 });

@@ -133,10 +133,10 @@ const onIsland = (min: number, max: number) => {
 function insert([x, z]: readonly [number, number], y = 0) {
   return [x, y, z] as const;
 }
-const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, heroGltf] = await Promise.all([
+const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, heroGltf, keeper] = await Promise.all([
   bake('graveyard/pine', 3.2), bake('graveyard/pine-crooked', 3), bake('graveyard/rocks', 0.6), bake('graveyard/rocks-tall', 1.1),
   bake('graveyard/trunk', 0.5), bake('graveyard/pumpkin', 0.5), bake('graveyard/character-skeleton', 1.05),
-  bake('graveyard/character-zombie', 1.05), model('dungeon/character-human'),
+  bake('graveyard/character-zombie', 1.05), model('dungeon/character-human'), bake('graveyard/character-keeper', 1.15),
 ]);
 // 나무는 가장자리에만 둬서 싸움터를 가리지 않는다
 prop(pine, 6, 0.82, 0.96, 0.8, 1.2);
@@ -184,6 +184,30 @@ const logMesh = instanced(
   flat(0x8a5a3c), 4, true,
 );
 const pumpkinMesh = instanced(pumpkin.geo, pumpkin.mat, 12, true);
+const DROP_COLOR: Record<R.DropId, number> = { heart: 0xff5a6e, charge: 0xffb84d, golden: 0xffd23f, helper: 0x7d8cf0 };
+const dropViews = Array.from({ length: 3 }, () => {
+  const box = new THREE.Group();
+  const crate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.7), flat(0xb07a45));
+  crate.position.y = 0.3;
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.14, 0.74), flat(0xffffff));
+  band.position.y = 0.3;
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), flat(0xffffff, { side: THREE.DoubleSide }));
+  canopy.position.y = 2.1;
+  const lines = new THREE.Mesh(new THREE.ConeGeometry(1, 1.5, 6, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }));
+  lines.position.y = 1.35;
+  lines.rotation.x = Math.PI;
+  box.add(crate, band, canopy, lines);
+  for (const m of [crate, band, canopy]) m.castShadow = true;
+  const mark = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+  mark.position.y = 0.04;
+  box.visible = mark.visible = false;
+  scene.add(box, mark);
+  return { box, band, canopy, lines, mark };
+});
+const helperMesh = new THREE.Mesh(keeper.geo, keeper.mat);
+helperMesh.castShadow = true;
+helperMesh.visible = false;
+scene.add(helperMesh);
 const bitMesh = instanced(new THREE.BoxGeometry(0.16, 0.16, 0.16), flat(0xffffff), 256);
 const ring = new THREE.Mesh(
   new THREE.RingGeometry(0.86, 1, 48).rotateX(-Math.PI / 2),
@@ -231,6 +255,8 @@ function applyStage() {
 
 // ───────── 상태 ─────────
 type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number };
+type Drop = { x: number; z: number; y: number; type: R.DropId; life: number };
+type Helper = { x: number; z: number; t: number; cd: number; face: number; hop: number };
 type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number };
 type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: number; t: number; y: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
@@ -240,6 +266,7 @@ const newGame = () => ({
   lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
+  drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: R.ISLAND_R as number, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
 let g = newGame();
@@ -494,16 +521,16 @@ function weapons(dt: number) {
   const es = g.enemies;
   // 망치: 가까운 적 쪽으로 부채꼴
   g.hammerCd -= dt;
-  const rad = R.hammerRadius(g.lv.hammer), target = g.hammerCd <= 0 ? nearest(rad + 0.6) : null;
+  const gold = g.golden > 0, rad = R.hammerRadius(g.lv.hammer) + (gold ? 1.2 : 0), target = g.hammerCd <= 0 ? nearest(rad + 0.6) : null;
   if (target) {
-    g.hammerCd = R.hammerCooldown(g.lv.hammer);
+    g.hammerCd = R.hammerCooldown(g.lv.hammer) * (gold ? 0.35 : 1);
     const yaw = Math.atan2(target.x - g.px, target.z - g.pz), half = R.hammerArc(g.lv.hammer) / 2;
     for (let i = es.length - 1; i >= 0; i--) {
       const e = es[i], dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
       let da = Math.atan2(dx, dz) - yaw;
       da = Math.atan2(Math.sin(da), Math.cos(da));
       if (e.out || d > rad + eRadius(e) || Math.abs(da) > half) continue;
-      hit(i, 14, (dx / d) * 9, (dz / d) * 9);
+      hit(i, gold ? 24 : 14, (dx / d) * (gold ? 12 : 9), (dz / d) * (gold ? 12 : 9));
     }
     g.swingT = 0;
     g.swingYaw = yaw;
@@ -570,6 +597,69 @@ function weapons(dt: number) {
     ringAtHero = false;
     g.shake = Math.max(g.shake, 0.25);
     sfx.thud();
+  }
+}
+
+const DROP_NAME: Record<R.DropId, string> = {
+  heart: L('회복!', 'Heal!'), charge: L('쓸어! 충전!', 'Sweep charged!'), golden: L('황금 망치!', 'Golden mallet!'), helper: L('묘지기가 도와줍니다!', 'The keeper joins you!'),
+};
+function openDrop(d: Drop) {
+  if (d.type === 'heart') g.hp = Math.min(g.maxHp, g.hp + 1);
+  else if (d.type === 'charge') g.charge = R.sweepCost(g.lv.sweep);
+  else if (d.type === 'golden') g.golden = R.GOLDEN_SECONDS;
+  else g.helper = { x: g.px + 1.2, z: g.pz, t: R.HELPER_SECONDS, cd: 0.4, face: 0, hop: 0 };
+  burst(d.x, d.z, new THREE.Color(DROP_COLOR[d.type]), 14);
+  toast(DROP_NAME[d.type]);
+  sfx.coin();
+  sfx.sparkle();
+  sfx.buzz(15);
+}
+function supplies(dt: number) {
+  g.dropCd -= dt;
+  if (g.dropCd <= 0 && g.drops.length < dropViews.length) {
+    g.dropCd = R.DROP_INTERVAL;
+    const a = rnd(0, Math.PI * 2), r = rnd(0.15, 0.65) * g.isl;
+    g.drops.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: 12, type: R.pickDrop(g.hp >= g.maxHp), life: R.DROP_LIFE });
+  }
+  for (let k = g.drops.length - 1; k >= 0; k--) {
+    const d = g.drops[k];
+    if (d.y > 0) { d.y = Math.max(0, d.y - (12 / R.DROP_FALL) * dt); continue; }
+    d.life -= dt;
+    const gone = d.life <= 0 || Math.hypot(d.x, d.z) > g.isl;
+    if (!gone && Math.hypot(d.x - g.px, d.z - g.pz) < 1.1) openDrop(d);
+    if (gone || Math.hypot(d.x - g.px, d.z - g.pz) < 1.1) g.drops.splice(k, 1);
+  }
+  g.golden -= dt;
+  // 도우미: 가까운 적에게 달려가 둘레를 밀어낸다
+  const h = g.helper;
+  if (!h) return;
+  if ((h.t -= dt) <= 0) {
+    burst(h.x, h.z, new THREE.Color(0xffffff), 10);
+    g.helper = null;
+    return;
+  }
+  let tgt: Enemy | null = null, bd = 99;
+  for (const e of g.enemies) {
+    const dd = Math.hypot(e.x - h.x, e.z - h.z);
+    if (!e.out && dd < bd) { bd = dd; tgt = e; }
+  }
+  const gx = tgt ? tgt.x : g.px + 1.2, gz = tgt ? tgt.z : g.pz, dx = gx - h.x, dz = gz - h.z, dist = Math.hypot(dx, dz) || 1;
+  if (dist > 1.1) {
+    h.x += (dx / dist) * 6.5 * dt;
+    h.z += (dz / dist) * 6.5 * dt;
+    h.face = Math.atan2(dx, dz);
+    h.hop += dt * 12;
+  }
+  const lim = g.isl - 0.7, hd = Math.hypot(h.x, h.z);
+  if (hd > lim) { h.x *= lim / hd; h.z *= lim / hd; }
+  h.cd -= dt;
+  if (tgt && bd < 1.5 && h.cd <= 0) {
+    h.cd = 0.55;
+    for (let i = g.enemies.length - 1; i >= 0; i--) {
+      const e = g.enemies[i], ex = e.x - h.x, ez = e.z - h.z, ed = Math.hypot(ex, ez) || 1;
+      if (!e.out && ed < 1.9 + eRadius(e)) hit(i, 12, (ex / ed) * 11, (ez / ed) * 11);
+    }
+    sfx.snap();
   }
 }
 
@@ -695,7 +785,7 @@ function update(dt: number) {
     }
   }
 
-  if (!bonus) weapons(dt);
+  if (!bonus) { weapons(dt); supplies(dt); }
 
   for (let i = g.bits.length - 1; i >= 0; i--) {
     const b = g.bits[i];
@@ -732,6 +822,29 @@ function draw(dt: number, now: number) {
   }
   sync(smallMesh, ns);
   sync(bigMesh, nb);
+  dropViews.forEach((v, i) => {
+    const d = g.drops[i];
+    v.box.visible = v.mark.visible = !!d;
+    if (!d) return;
+    const blink = d.y <= 0 && d.life < 3 && Math.floor(now / 120) % 2 === 0;
+    v.box.visible = !blink;
+    v.box.position.set(d.x + (d.y > 0 ? Math.sin(now * 0.004 + i) * 0.3 : 0), d.y + (d.y <= 0 ? Math.abs(Math.sin(now * 0.006)) * 0.12 : 0), d.z);
+    v.box.rotation.z = d.y > 0 ? Math.sin(now * 0.003 + i) * 0.15 : 0;
+    v.canopy.visible = v.lines.visible = d.y > 0;
+    (v.canopy.material as THREE.MeshLambertMaterial).color.setHex(DROP_COLOR[d.type]);
+    (v.band.material as THREE.MeshLambertMaterial).color.setHex(DROP_COLOR[d.type]);
+    v.mark.position.set(d.x, 0.04, d.z);
+    const mm = v.mark.material as THREE.MeshBasicMaterial;
+    mm.color.setHex(DROP_COLOR[d.type]);
+    mm.opacity = 0.45 + 0.35 * Math.sin(now * 0.008);
+  });
+  const h = g.helper;
+  helperMesh.visible = !!h && (h.t > 2 || Math.floor(now / 110) % 2 === 0);
+  if (h) {
+    helperMesh.position.set(h.x, Math.abs(Math.sin(h.hop)) * 0.18, h.z);
+    helperMesh.rotation.y = h.face;
+  }
+  (swing.material as THREE.MeshBasicMaterial).color.setHex(g.golden > 0 ? 0xffd23f : 0xfff3c4);
   g.logs.forEach((l, i) => put(logMesh, i, l.x, 0.36, l.z, Math.atan2(l.dx, l.dz), 1, 1, 1, l.roll));
   sync(logMesh, g.logs.length);
   g.pumpkins.forEach((pk, i) => put(pumpkinMesh, i, pk.x, pk.y, pk.z, pk.t * 9, 1.1));

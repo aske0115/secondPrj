@@ -78,3 +78,18 @@ export const CRUMBLE_WARN = 3;
 export const islandRadius = (t: number, cs: readonly Crumble[] = STAGES[0].crumbles) => cs.reduce((r, c) => (t >= c.at ? c.r : r), ISLAND_R as number);
 /** 곧 무너질 단계의 번호(경고 중일 때만), 없으면 -1 */
 export const crumbleWarning = (t: number, cs: readonly Crumble[] = STAGES[0].crumbles) => cs.findIndex((c) => t >= c.at - CRUMBLE_WARN && t < c.at);
+
+// 낙하산 보급: 판 중간중간 하늘에서 상자가 내려온다. 밟으면 열린다(결정 042)
+export const DROPS = ['heart', 'charge', 'golden', 'helper'] as const;
+export type DropId = (typeof DROPS)[number];
+export const FIRST_DROP = 12;
+export const DROP_INTERVAL = 17;
+export const DROP_FALL = 3; // 내려오는 데 걸리는 초
+export const DROP_LIFE = 12; // 땅에 닿은 뒤 이만큼 지나면 사라진다
+export const GOLDEN_SECONDS = 8;
+export const HELPER_SECONDS = 12;
+/** 체력이 가득이면 회복은 빼고 고른다 */
+export function pickDrop(hpFull: boolean, rand = Math.random): DropId {
+  const pool = DROPS.filter((d) => !(hpFull && d === 'heart'));
+  return pool[Math.floor(rand() * pool.length)];
+}

@@ -6,15 +6,19 @@ export const MAX_HP = 4;
 export const MAX_LEVEL = 5;
 
 // 시간이 갈수록 더 자주, 더 많이, 더 큰 적이 올라온다
-export const spawnInterval = (t: number) => Math.max(0.1, 0.8 - t * 0.006);
-export const spawnBatch = (t: number) => 1 + Math.floor(t / 25);
-export const bigChance = (t: number) => Math.min(0.3, t / 240);
-export const enemyHp = (t: number, big: boolean) => (big ? 40 + t * 0.5 : 10 + t * 0.12);
+// 초반은 부드럽게(사람은 봇보다 늦게 피한다), 뒤로 갈수록 빽빽하게(결정 043)
+export const spawnInterval = (t: number) => Math.max(0.12, 1.0 - t * 0.0075);
+export const spawnBatch = (t: number) => 1 + Math.floor(t / 30);
+export const bigChance = (t: number) => Math.min(0.3, Math.max(0, (t - 20) / 260));
+export const enemyHp = (t: number, big: boolean) => (big ? 32 + t * 0.5 : 8 + t * 0.12);
+export const enemySpeed = (t: number, big: boolean) => (big ? 1.3 : 1.8 + t * 0.007);
 
-export const xpNeed = (level: number) => 4 + level * 3;
+// 뒤 레벨일수록 가파르게: 무너짐으로 한꺼번에 떨어질 때 모든 스킬이 만렙이 되던 폭주를 막는다
+export const xpNeed = (level: number) => Math.round(4 + level * 3 + level * level * 0.4);
 
 // 스킬은 모두 "밀어내기"다: 쏘아 맞히는 무기 대신 장난감 섬의 물건으로 친다(쓸어킬과 겹치지 않게, 결정 039)
 export const UPGRADES = ['hammer', 'log', 'pumpkin', 'sweep', 'knock', 'speed'] as const;
+export const ATTACKS: readonly UpgradeId[] = ['hammer', 'log', 'pumpkin', 'sweep'];
 export type UpgradeId = (typeof UPGRADES)[number];
 export type Levels = Record<UpgradeId, number>;
 export const startLevels = (): Levels => ({ hammer: 1, log: 0, pumpkin: 0, sweep: 0, knock: 0, speed: 0 });
@@ -43,15 +47,21 @@ export const BONUS_COIN = 3; // 보너스 중 떨어뜨린 한 마리당
 /** 손가락을 튕긴 길이(px)로 돌진 속도를 정한다. 너무 짧으면 무시 */
 export const dashSpeed = (px: number) => (px < 18 ? 0 : Math.min(24, 6 + px * 0.12));
 
-/** 레벨업 3택. 다 올린 강화는 빼고, 체력이 깎였을 때만 회복을 섞는다. 고를 것이 없으면 빈 배열 */
+/** 레벨업 3택. 공격 스킬이 패시브보다 3배 잘 나오고, 공격 스킬이 남아 있으면 적어도 하나는 넣는다.
+ *  다 올린 강화는 빼고, 체력이 깎였을 때만 회복을 섞는다. 고를 것이 없으면 빈 배열 */
 export function pickUpgrades(lv: Levels, hpFull: boolean, rand = Math.random): (UpgradeId | 'heart')[] {
-  const pool: (UpgradeId | 'heart')[] = UPGRADES.filter((id) => lv[id] < MAX_LEVEL);
-  if (!hpFull) pool.push('heart');
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+  const pool: { id: UpgradeId | 'heart'; w: number }[] = UPGRADES.filter((id) => lv[id] < MAX_LEVEL).map((id) => ({ id, w: ATTACKS.includes(id) ? 3 : 1 }));
+  if (!hpFull) pool.push({ id: 'heart', w: 1.5 });
+  const out: (UpgradeId | 'heart')[] = [];
+  while (out.length < 3 && pool.length) {
+    let r = rand() * pool.reduce((a, p) => a + p.w, 0), k = 0;
+    while (k < pool.length - 1 && (r -= pool[k].w) > 0) k++;
+    out.push(pool.splice(k, 1)[0].id);
   }
-  return pool.slice(0, 3);
+  const anyAttack = (ids: readonly (UpgradeId | 'heart')[]) => ids.some((id) => ATTACKS.includes(id as UpgradeId));
+  const spare = pool.find((p) => ATTACKS.includes(p.id as UpgradeId));
+  if (!anyAttack(out) && spare) out[out.length - 1] = spare.id;
+  return out;
 }
 
 // 밀어 떨어뜨리기가 그냥 처치보다 이득이어야 벼랑 쪽으로 몰 이유가 생긴다
@@ -68,7 +78,7 @@ export type Stage = {
 };
 export const STAGES: readonly Stage[] = [
   { name: ['풀밭 섬', 'Meadow Isle'], grass: 0x86c46a, cliff: 0xb89468, sky: 0xbfe6f5, sun: 0xfff0d2,
-    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 1, big: 1, hp: 1, speed: 1 },
+    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.8, big: 0.8, hp: 0.8, speed: 0.9 }, // 첫 섬은 배우는 섬
   { name: ['단풍 섬', 'Maple Isle'], grass: 0xd9a24e, cliff: 0x9a6b4a, sky: 0xf6dcc0, sun: 0xffd9a8,
     crumbles: [{ at: 30, r: 11.5 }, { at: 60, r: 10 }, { at: 90, r: 8.8 }], spawn: 1.3, big: 1.4, hp: 1.3, speed: 1.1 },
   { name: ['달빛 묘지 섬', 'Moonlit Isle'], grass: 0x5f8a7a, cliff: 0x6b6378, sky: 0x2d3555, sun: 0xb9c6ff,

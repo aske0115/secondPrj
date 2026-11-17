@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -74,4 +74,20 @@ test('낙하산: 체력이 가득이면 회복은 안 나오고, 아니면 모�
   expect(seen(true).has('heart')).toBe(false);
   expect(seen(false).size).toBe(DROPS.length);
   expect(FIRST_DROP + DROP_FALL).toBeLessThan(BONUS_AT);
+});
+
+test('레벨업은 공격 스킬 위주: 매번 하나 이상, 전체로는 패시브보다 훨씬 자주', () => {
+  let seed = 1;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let attack = 0, passive = 0;
+  for (let i = 0; i < 2000; i++) {
+    const picks = pickUpgrades(startLevels(), true, rand);
+    expect(picks.some((id) => ATTACKS.includes(id as never))).toBe(true);
+    for (const id of picks) ATTACKS.includes(id as never) ? attack++ : passive++;
+  }
+  expect(attack).toBeGreaterThan(passive * 2.5);
+});
+
+test('필요 경험치는 레벨마다 더 크게 는다', () => {
+  for (let l = 2; l < 40; l++) expect(xpNeed(l) - xpNeed(l - 1)).toBeGreaterThanOrEqual(xpNeed(l - 1) - xpNeed(l - 2));
 });

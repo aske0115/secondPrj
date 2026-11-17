@@ -177,6 +177,13 @@ const swing = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMate
 swing.position.y = 0.08;
 scene.add(swing);
 let swingArc = -1, ringAtHero = true;
+const hammerMat = flat(0x9aa3b0);
+const hammer = new THREE.Group();
+const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 1.1, 6).rotateX(Math.PI / 2).translate(0, 0, 0.55), flat(0x8a5a3c));
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.36, 0.36).translate(0, 0, 1.15), hammerMat);
+handle.castShadow = head.castShadow = true;
+hammer.add(handle, head);
+scene.add(hammer);
 const logMesh = instanced(
   mergeGeometries([
     new THREE.CylinderGeometry(0.36, 0.36, 3.2, 9).rotateZ(Math.PI / 2),
@@ -393,7 +400,7 @@ function hit(i: number, dmg: number, kx: number, kz: number) {
 }
 
 let lastFallSfx = 0;
-function fall(e: Enemy) {
+function fall(e: Enemy, byCrumble = false) {
   e.out = true;
   e.vy = 4; // 살짝 튀었다가 떨어진다
   g.falls++;
@@ -401,7 +408,7 @@ function fall(e: Enemy) {
   g.chain = g.chainT > 0 ? g.chain + 1 : 1;
   g.chainT = 1.2;
   reward(R.FALL_CHARGE);
-  gainXp(R.fallXp(e.big));
+  gainXp(byCrumble ? R.killXp(e.big) : R.fallXp(e.big));
   const now = performance.now();
   if (now - lastFallSfx > 70) {
     lastFallSfx = now;
@@ -419,7 +426,7 @@ function crumble(r: number) {
     const a = (k / 14) * Math.PI * 2;
     burst(Math.cos(a) * (r + 0.8), Math.sin(a) * (r + 0.8), C_DIRT, 3);
   }
-  for (const e of g.enemies) if (!e.out && Math.hypot(e.x, e.z) > r) fall(e); // 무너진 땅 위의 적은 같이 떨어진다
+  for (const e of g.enemies) if (!e.out && Math.hypot(e.x, e.z) > r) fall(e, true); // 무너진 땅 위의 적은 같이 떨어진다
 }
 
 function gainXp(n: number) {
@@ -738,7 +745,7 @@ function update(dt: number) {
       continue;
     }
     const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz) || 1;
-    const sp = bonus ? 0 : (e.big ? 1.4 : 2.2 + g.t * 0.006) * stage().speed;
+    const sp = bonus ? 0 : R.enemySpeed(g.t, e.big) * stage().speed;
     e.x += ((dx / d) * sp + e.kx) * dt;
     e.z += ((dz / d) * sp + e.kz) * dt;
     e.kx *= decay;
@@ -845,6 +852,14 @@ function draw(dt: number, now: number) {
     helperMesh.rotation.y = h.face;
   }
   (swing.material as THREE.MeshBasicMaterial).color.setHex(g.golden > 0 ? 0xffd23f : 0xfff3c4);
+  hammerMat.color.setHex(g.golden > 0 ? 0xffd23f : 0x9aa3b0);
+  const sw = Math.min(1, g.swingT * 1.6), swinging = sw < 1;
+  const half = R.hammerArc(g.lv.hammer) / 2 + 0.3;
+  const ha = swinging ? g.swingYaw + half - 2 * half * (1 - (1 - sw) ** 2) : g.face + 2.4; // 처음 빠르게, 끝에 느리게
+  hammer.visible = mode !== 'bonus';
+  hammer.position.set(g.px + Math.sin(ha) * 0.25, swinging ? 0.55 : 0.75, g.pz + Math.cos(ha) * 0.25);
+  hammer.rotation.set(swinging ? 0.25 : -0.9, ha, 0, 'YXZ');
+  hammer.scale.setScalar((g.golden > 0 ? 1.35 : 1) * (0.9 + 0.08 * g.lv.hammer));
   g.logs.forEach((l, i) => put(logMesh, i, l.x, 0.36, l.z, Math.atan2(l.dx, l.dz), 1, 1, 1, l.roll));
   sync(logMesh, g.logs.length);
   g.pumpkins.forEach((pk, i) => put(pumpkinMesh, i, pk.x, pk.y, pk.z, pk.t * 9, 1.1));
@@ -853,9 +868,9 @@ function draw(dt: number, now: number) {
   swing.visible = g.swingT < 1;
   if (swing.visible) {
     const arc = R.hammerArc(g.lv.hammer);
-    if (arc !== swingArc) { // 부채꼴은 +z 쪽 가운데로 만든다
+    if (arc !== swingArc) { // 부채꼴은 +z(주인공이 보는 쪽) 가운데로 만든다. 눕히면 xy평면의 -90°가 +z가 된다
       swing.geometry.dispose();
-      swing.geometry = new THREE.RingGeometry(0.4, 1, 24, 1, Math.PI / 2 - arc / 2, arc).rotateX(-Math.PI / 2);
+      swing.geometry = new THREE.RingGeometry(0.4, 1, 24, 1, -Math.PI / 2 - arc / 2, arc).rotateX(-Math.PI / 2);
       swingArc = arc;
     }
     swing.position.set(g.px, 0.08, g.pz);

@@ -6,15 +6,16 @@
   <title>secondPrj</title>
   <link rel="stylesheet" href="/src/style.css" />
 </head>
-<body>
+<body data-mode="title">
   <div id="hud">
-    <span id="hearts"></span>
-    <span id="time"></span>
-    <div id="xp"><i></i></div>
+    <div class="pill" id="hearts"></div>
+    <div class="pill" id="time"></div>
+    <div id="xp"><b id="lvl"></b><div class="bar"><i></i></div></div>
+    <div class="chip" id="falls"></div>
     <span id="dev"></span>
   </div>
-  <div id="stick"></div>
-  <button id="sweep"><i></i><span></span></button>
+  <div id="stick"><i></i></div>
+  <button id="sweep"><span></span></button>
   <div id="overlay" hidden></div>
   <script type="module" src="/src/main.ts"></script>
 </body>

@@ -189,7 +189,7 @@ const eRadius = (e: Enemy) => 0.45 * eScale(e);
 // ───────── 입력: 화면 어디든 누른 자리가 조이스틱 원점 ─────────
 let joyId = -1, jox = 0, joy = 0, jx = 0, jz = 0;
 const keys = new Set<string>();
-const stick = $('stick');
+const stick = $('stick'), knob = stick.firstElementChild as HTMLElement;
 renderer.domElement.addEventListener('pointerdown', (e) => {
   sfx.unlockAudio();
   if (joyId >= 0) return;
@@ -197,6 +197,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   jox = e.clientX;
   joy = e.clientY;
   stick.style.cssText = `display:block;left:${jox}px;top:${joy}px`;
+  knob.style.cssText = '';
 });
 addEventListener('pointermove', (e) => {
   if (e.pointerId !== joyId) return;
@@ -214,6 +215,8 @@ addEventListener('pointermove', (e) => {
   const m = Math.min(1, d / 40);
   jx = (dx / d) * m;
   jz = (dy / d) * m;
+  knob.style.setProperty('--kx', `${jx * 28}px`);
+  knob.style.setProperty('--ky', `${jz * 28}px`);
 });
 const release = (e: PointerEvent) => {
   if (e.pointerId !== joyId) return;
@@ -528,15 +531,26 @@ function draw(dt: number, now: number) {
 
 // ───────── 화면 글자 ─────────
 const overlay = $('overlay');
-const UP_TEXT: Record<R.UpgradeId | 'heart', [string, string]> = {
-  shot: [L('돌팔매', 'Sling'), L('더 빨리, 더 많이 던집니다', 'Throws faster and more')],
-  orbit: [L('회전 칼날', 'Orbit blades'), L('주위를 도는 칼날이 하나 늘어납니다', 'One more blade circles you')],
-  sweep: [L('쓸어내기', 'Sweep'), L('더 넓게 쓸고 더 빨리 찹니다', 'Wider sweep, charges faster')],
-  speed: [L('가벼운 신발', 'Light boots'), L('더 빨리 움직입니다', 'Move faster')],
-  magnet: [L('자석', 'Magnet'), L('보석을 더 멀리서 끌어옵니다', 'Pull gems from farther away')],
-  heart: [L('회복', 'Heal'), L('체력을 하나 채웁니다', 'Restore one heart')],
+const ICON: Record<R.UpgradeId | 'heart', string> = {
+  shot: '<circle cx="15" cy="12" r="5.5"/><path d="M3 8h6M2 12h6M3 16h6"/>',
+  orbit: '<circle cx="12" cy="12" r="3"/><path d="M12 3a9 9 0 0 1 9 9M12 21a9 9 0 0 1-9-9"/>',
+  sweep: '<path d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0M9 12a3 3 0 0 1 6 0"/>',
+  speed: '<path d="M5 6l6 6-6 6M12 6l6 6-6 6"/>',
+  magnet: '<path d="M6 4v8a6 6 0 0 0 12 0V4M6 8h4M14 8h4"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
 };
-function show(html: string) {
+const UPS: Record<R.UpgradeId | 'heart', [string, string, string]> = {
+  shot: [L('돌팔매', 'Sling'), L('더 빨리, 더 많이 던집니다', 'Throws faster and more'), '#f0a24a'],
+  orbit: [L('회전 칼날', 'Orbit blades'), L('주위를 도는 칼날이 하나 늘어납니다', 'One more blade circles you'), '#7d8cf0'],
+  sweep: [L('쓸어내기', 'Sweep'), L('더 넓게 쓸고 더 빨리 찹니다', 'Wider sweep, charges faster'), '#ff8a4c'],
+  speed: [L('가벼운 신발', 'Light boots'), L('더 빨리 움직입니다', 'Move faster'), '#3fc1a5'],
+  magnet: [L('자석', 'Magnet'), L('보석을 더 멀리서 끌어옵니다', 'Pull gems from farther away'), '#e2577a'],
+  heart: [L('회복', 'Heal'), L('체력을 하나 채웁니다', 'Restore one heart'), '#ff5a6e'],
+};
+const svg = (body: string, cls = '') => `<svg viewBox="0 0 24 24" class="${cls}">${body}</svg>`;
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+function show(html: string, cls = '') {
+  overlay.className = cls;
   overlay.innerHTML = html;
   overlay.hidden = false;
 }
@@ -545,15 +559,12 @@ function showPick() {
   if (!picks.length) return void (g.picks = 0);
   mode = 'pick';
   sfx.sparkle();
-  show(
-    `<h2>${L('레벨 업!', 'Level up!')}</h2>` +
-      picks
-        .map((id) => {
-          const pips = id === 'heart' ? '' : `<i>${'●'.repeat(g.lv[id])}${'○'.repeat(R.MAX_LEVEL - g.lv[id])}</i>`;
-          return `<button class="card" data-id="${id}"><b>${UP_TEXT[id][0]}</b>${pips}<span>${UP_TEXT[id][1]}</span></button>`;
-        })
-        .join(''),
-  );
+  const cards = picks.map((id) => {
+    const [name, desc, c] = UPS[id], lv = id === 'heart' ? 0 : g.lv[id];
+    const tag = id === 'heart' ? '' : lv ? `<em>Lv ${lv} → ${lv + 1}</em>` : `<em class="new">NEW</em>`;
+    return `<button class="card" data-id="${id}" style="--c:${c}"><div class="ico">${svg(ICON[id])}</div><b>${name}</b>${tag}<span>${desc}</span></button>`;
+  });
+  show(`<h2 class="big-title" style="font-size:34px">${L('레벨 업!', 'Level up!')}</h2><p class="tag">${L('하나를 고르세요', 'Pick one')}</p><div class="cards">${cards.join('')}</div>`);
 }
 overlay.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
@@ -571,25 +582,73 @@ overlay.addEventListener('click', (ev) => {
   g.inv = Math.max(g.inv, 0.6);
   if (id && --g.picks > 0) showPick();
 });
+
+// 최고 기록(기기에만 저장). 저장소를 못 쓰면 이번 실행에서만 기억한다
+type Best = { time: number; kills: number; falls: number };
+let best: Best = { time: 0, kills: 0, falls: 0 };
+try {
+  best = { ...best, ...JSON.parse(localStorage.getItem('best') ?? '{}') };
+} catch { /* 저장소 없음 */ }
+const bestLine = () => (best.kills ? `<p class="best">${L('최고 기록', 'Best')} · ${clock(best.time)} · ${L('처치', 'KOs')} ${best.kills}</p>` : '');
 function end(win: boolean) {
   mode = 'over';
   win ? sfx.finale() : sfx.fail();
-  const sec = Math.floor(g.t);
+  const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls };
+  const isBest = score.time > best.time || (score.time === best.time && score.kills > best.kills);
+  if (isBest) {
+    best = score;
+    try { localStorage.setItem('best', JSON.stringify(best)); } catch { /* 저장 실패 시 이번 실행에서만 */ }
+  }
+  const cell = (label: string, v: string | number, hi = false) => `<div class="${hi ? 'hi' : ''}"><small>${label}</small><strong>${v}</strong></div>`;
   show(
-    `<h1>${win ? L('섬을 지켰습니다!', 'Island defended!') : L('섬을 빼앗겼습니다', 'The island fell')}</h1>` +
-      `<p>${L('버틴 시간', 'Survived')} <b>${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}</b><br>` +
-      `${L('처치', 'Defeated')} <b>${g.kills}</b> · ${L('떨어뜨림', 'Knocked off')} <b>${g.falls}</b> · ${L('레벨', 'Level')} <b>${g.level + 1}</b></p>` +
-      `<button class="go">${L('한 번 더', 'Once more')}</button>`,
+    `<h1 class="big-title" style="font-size:36px">${win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
+      `<div class="panel"><div class="stats">` +
+      cell(L('버틴 시간', 'Survived'), clock(sec)) + cell(L('레벨', 'Level'), g.level + 1) +
+      cell(L('처치', 'KOs'), g.kills) + cell(L('떨어뜨림', 'Knocked off'), g.falls, true) +
+      `</div>${isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : ''}</div>` +
+      `<button class="go">${L('한 번 더', 'Once more')}</button>` + (isBest ? '' : bestLine()),
   );
 }
 show(
-  `<h1>${L('섬 지키기', 'Hold the Isle')}</h1>` +
-    `<p>${L('끌어서 이동 · 공격은 자동<br>게이지가 차면 <b>쓸어!</b>로 섬 밖으로 밀어내기', 'Drag to move · attacks are automatic<br>When the gauge fills, <b>Sweep!</b> them off the isle')}</p>` +
-    `<button class="go">${L('시작', 'Start')}</button>`,
+  `<div class="top"><h1 class="big-title">${L('섬 지키기', 'Hold<br>the Isle')}</h1><p class="tag">${L('몰려오는 적을 섬 밖으로 쓸어버리세요', 'Sweep the horde off your tiny island')}</p></div>` +
+    `<div style="display:grid;gap:12px;justify-items:center;width:100%"><div class="how"><span>${L('끌어서 이동', 'Drag to move')}</span><span>${L('공격은 자동', 'Auto attack')}</span><span>${L('차면 쓸어!', 'Sweep when full')}</span></div>` +
+    `<button class="go">${L('시작', 'Start')}</button>${bestLine()}</div>`,
+  'title',
 );
 $('sweep').querySelector('span')!.textContent = L('쓸어!', 'Sweep!');
 
-const hud = { hearts: $('hearts'), time: $('time'), xp: $('xp').firstElementChild as HTMLElement, fill: $('sweep').firstElementChild as HTMLElement, dev: $('dev') };
+// 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
+const hud = { hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
+const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '' };
+const HEART = '<path d="M12 21s-8-5-8-11.5A4.5 4.5 0 0 1 12 6.6a4.5 4.5 0 0 1 8 2.9C20 16 12 21 12 21z"/>';
+function drawHud() {
+  if (shown.mode !== mode) document.body.dataset.mode = shown.mode = mode;
+  if (shown.hp !== g.hp) {
+    hud.hearts.innerHTML = Array.from({ length: R.MAX_HP }, (_, i) => svg(HEART, i < g.hp ? '' : i < shown.hp ? 'empty lost' : 'empty')).join('');
+    shown.hp = g.hp;
+  }
+  const left = Math.max(0, Math.ceil(R.RUN_SECONDS - g.t));
+  if (shown.left !== left) {
+    hud.time.textContent = clock(left);
+    hud.time.classList.toggle('hurry', left <= 10);
+    shown.left = left;
+  }
+  if (shown.level !== g.level) {
+    hud.lvl.textContent = String(g.level + 1);
+    hud.lvl.classList.remove('up');
+    if (shown.level >= 0) void hud.lvl.offsetWidth, hud.lvl.classList.add('up'); // 애니메이션 다시 틀기
+    shown.level = g.level;
+  }
+  const xp = Math.round((g.xp / R.xpNeed(g.level)) * 100);
+  if (shown.xp !== xp) hud.xp.style.width = `${(shown.xp = xp)}%`;
+  if (shown.falls !== g.falls) hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
+  const p = Math.round((g.charge / R.sweepCost(g.lv.sweep)) * 100);
+  if (shown.p !== p) {
+    hud.sweep.style.setProperty('--p', String((shown.p = p)));
+    hud.sweep.classList.toggle('ready', p >= 100);
+  }
+}
+
 const DEV = import.meta.env.MODE !== 'release'; // 실기기 성능을 눈으로 보려고 출시 빌드가 아니면 프레임 수를 띄운다
 let last = performance.now(), frames = 0, fpsAt = last, fps = 0;
 function frame(now: number) {
@@ -603,13 +662,7 @@ function frame(now: number) {
   draw(dt, now);
   renderer.info.reset();
   composer.render();
-
-  const left = Math.max(0, Math.ceil(R.RUN_SECONDS - g.t)), cost = R.sweepCost(g.lv.sweep);
-  hud.hearts.textContent = '♥'.repeat(Math.max(0, g.hp)) + '♡'.repeat(R.MAX_HP - Math.max(0, g.hp));
-  hud.time.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-  hud.xp.style.width = `${(g.xp / R.xpNeed(g.level)) * 100}%`;
-  hud.fill.style.height = `${(g.charge / cost) * 100}%`;
-  $('sweep').classList.toggle('ready', g.charge >= cost);
+  drawHud();
   frames++;
   if (DEV && now - fpsAt >= 500) {
     fps = Math.round((frames * 1000) / (now - fpsAt));

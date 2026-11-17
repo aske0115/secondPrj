@@ -10,6 +10,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { L } from './i18n';
 import * as sfx from './audio';
 import * as R from './game/rules';
+import * as MT from './game/meta';
 
 const $ = (id: string) => document.getElementById(id)!;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -32,7 +33,8 @@ const CAM_DIR = new THREE.Vector3(0, 0.8, 0.6).normalize();
 let camDist = 50;
 const camTarget = new THREE.Vector3();
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x8fb0c8, 1.25));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x8fb0c8, 1.25);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff0d2, 2.3);
 sun.position.set(10, 22, 8);
 sun.castShadow = true;
@@ -180,18 +182,42 @@ const ring = new THREE.Mesh(
 ring.position.y = 0.06;
 ring.visible = false;
 scene.add(ring);
-const warnRings = R.CRUMBLES.map((c, k) => {
-  const outer = k ? R.CRUMBLES[k - 1].r : R.ISLAND_R;
-  const m = new THREE.Mesh(
-    new THREE.RingGeometry(c.r, outer, 64).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color: 0xff5a3c, transparent: true, depthWrite: false }),
-  );
-  m.position.y = 0.03;
-  m.visible = false;
-  scene.add(m);
-  return m;
-});
+let warnRings: THREE.Mesh[] = [];
+function buildWarnRings(cs: readonly R.Crumble[]) {
+  for (const m of warnRings) { scene.remove(m); m.geometry.dispose(); }
+  warnRings = cs.map((c, k) => {
+    const m = new THREE.Mesh(
+      new THREE.RingGeometry(c.r, k ? cs[k - 1].r : R.ISLAND_R, 64).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xff5a3c, transparent: true, depthWrite: false }),
+    );
+    m.position.y = 0.03;
+    m.visible = false;
+    scene.add(m);
+    return m;
+  });
+}
 let islandVis: number = R.ISLAND_R; // 보이는 반지름은 실제 값을 부드럽게 따라간다
+
+// ───────── 판 사이에 남는 것 ─────────
+const store = {
+  get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* 저장 실패 시 이번 실행에서만 */ } },
+};
+let meta = MT.loadMeta(store.get('meta'), R.STAGES.length);
+const saveMeta = () => store.set('meta', JSON.stringify(meta));
+let stageIdx = Math.min(meta.cleared, R.STAGES.length - 1);
+const stage = () => R.STAGES[stageIdx];
+function applyStage() {
+  const st = stage(), night = stageIdx === 2;
+  (grass.material as THREE.MeshLambertMaterial).color.set(st.grass);
+  (cliff.material as THREE.MeshLambertMaterial).color.set(st.cliff);
+  (scene.background as THREE.Color).set(st.sky);
+  scene.fog!.color.set(st.sky);
+  sun.color.set(st.sun);
+  hemi.intensity = night ? 0.8 : 1.25;
+  document.body.style.background = `#${st.sky.toString(16).padStart(6, '0')}`;
+  buildWarnRings(st.crumbles);
+}
 
 // ───────── 상태 ─────────
 type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number };
@@ -199,7 +225,8 @@ type Shot = { x: number; z: number; dx: number; dz: number; life: number };
 type Gem = { x: number; z: number; xp: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
 const newGame = () => ({
-  t: 0, px: 0, pz: 0, face: 0, hp: R.MAX_HP, inv: 0, level: 0, xp: 0, picks: 0, charge: 0, kills: 0, falls: 0,
+  t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: 0,
+  charge: Math.floor(MT.startChargeFrac(meta) * R.sweepCost(0)), kills: 0, falls: 0,
   lv: R.startLevels(), enemies: [] as Enemy[], shots: [] as Shot[], gems: [] as Gem[], bits: [] as Bit[],
   shotCd: 0.4, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, orbitA: 0, moving: false,
   isl: R.ISLAND_R as number, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
@@ -264,8 +291,8 @@ function spawn() {
     a = rnd(0, Math.PI * 2);
     if (Math.hypot(Math.cos(a) * g.isl - g.px, Math.sin(a) * g.isl - g.pz) > 5) break;
   }
-  const big = Math.random() < R.bigChance(g.t), d = g.isl - 0.8;
-  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big), big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0 });
+  const st = stage(), big = Math.random() < Math.min(0.6, R.bigChance(g.t) * st.big), d = g.isl - 0.8;
+  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp, big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0 });
 }
 
 function burst(x: number, z: number, color: THREE.Color, n: number) {
@@ -293,7 +320,7 @@ function hit(i: number, dmg: number, kx: number, kz: number) {
   const e = g.enemies[i];
   e.hp -= dmg;
   e.flash = 0.1;
-  const km = R.knockMul(g.lv.knock);
+  const km = R.knockMul(g.lv.knock) * MT.shoveMul(meta);
   e.kx += kx * km;
   e.kz += kz * km;
   if (e.hp > 0) return;
@@ -334,7 +361,7 @@ function crumble(r: number) {
 }
 
 function gainXp(n: number) {
-  g.xp += n;
+  g.xp += n * MT.xpMul(meta);
   while (g.xp >= R.xpNeed(g.level)) {
     g.xp -= R.xpNeed(g.level);
     g.level++;
@@ -381,7 +408,7 @@ function update(dt: number) {
   if (g.t >= R.RUN_SECONDS) return end(true);
   g.inv -= dt;
   g.chainT -= dt;
-  const isl = R.islandRadius(g.t);
+  const isl = R.islandRadius(g.t, stage().crumbles);
   if (isl < g.isl) crumble(isl);
 
   // 주인공
@@ -406,8 +433,8 @@ function update(dt: number) {
   // 적이 올라온다
   g.spawnCd -= dt;
   if (g.spawnCd <= 0) {
-    g.spawnCd = R.spawnInterval(g.t);
-    for (let i = R.spawnBatch(g.t); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn();
+    g.spawnCd = R.spawnInterval(g.t) / stage().spawn;
+    for (let i = Math.round(R.spawnBatch(g.t) * stage().spawn); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn();
   }
 
   // 적 이동·낙하·접촉
@@ -426,7 +453,7 @@ function update(dt: number) {
       continue;
     }
     const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz) || 1;
-    const sp = e.big ? 1.4 : 2.2 + g.t * 0.006;
+    const sp = (e.big ? 1.4 : 2.2 + g.t * 0.006) * stage().speed;
     e.x += ((dx / d) * sp + e.kx) * dt;
     e.z += ((dz / d) * sp + e.kz) * dt;
     e.kx *= decay;
@@ -582,7 +609,7 @@ function draw(dt: number, now: number) {
     p.y += p.vy * dt;
     place(p);
   }
-  const warn = mode === 'play' ? R.crumbleWarning(g.t) : -1;
+  const warn = mode === 'play' ? R.crumbleWarning(g.t, stage().crumbles) : -1;
   warnRings.forEach((m, i) => {
     m.visible = i === warn;
     if (m.visible) (m.material as THREE.MeshBasicMaterial).opacity = 0.25 + 0.3 * Math.abs(Math.sin(now * 0.008));
@@ -630,7 +657,7 @@ function show(html: string, cls = '') {
   overlay.hidden = false;
 }
 function showPick() {
-  const picks = R.pickUpgrades(g.lv, g.hp >= R.MAX_HP);
+  const picks = R.pickUpgrades(g.lv, g.hp >= g.maxHp);
   if (!picks.length) return void (g.picks = 0);
   mode = 'pick';
   sfx.sparkle();
@@ -641,56 +668,116 @@ function showPick() {
   });
   show(`<h2 class="big-title" style="font-size:34px">${L('레벨 업!', 'Level up!')}</h2><p class="tag">${L('하나를 고르세요', 'Pick one')}</p><div class="cards">${cards.join('')}</div>`);
 }
+const PERK_UI: Record<MT.Perk, [string, string, string, string]> = {
+  vigor: [L('튼튼한 몸', 'Sturdy'), L('시작 체력 +1', 'Start with +1 heart'), '#ff5a6e', ICON.heart],
+  shove: [L('묵직한 손', 'Heavy hands'), L('모든 넉백 +12%', 'All knockback +12%'), '#b06ee8', ICON.knock],
+  charge: [L('미리 충전', 'Head start'), L('쓸어! 게이지 15%를 채우고 시작', 'Start with 15% Sweep charge'), '#ff8a4c', ICON.sweep],
+  wisdom: [L('지혜', 'Wisdom'), L('경험치 +10%', 'XP +10%'), '#35b9ab', '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>'],
+};
+const coinPill = () => `<div class="coins"><i></i>${meta.coins.toLocaleString()}</div>`;
+const stageName = (i: number) => L(...R.STAGES[i].name);
+
+function startRun() {
+  g = newGame();
+  camTarget.set(0, 0, 0);
+  resetIsland();
+  shown.hp = -1;
+  overlay.hidden = true;
+  mode = 'play';
+  g.inv = 0.6;
+}
+function showTitle() {
+  mode = 'title';
+  applyStage();
+  resetIsland();
+  const locked = stageIdx > meta.cleared;
+  show(
+    `<div class="top">${coinPill()}<h1 class="big-title">${L('섬 지키기', 'Hold<br>the Isle')}</h1><p class="tag">${L('몰려오는 적을 섬 밖으로 쓸어버리세요', 'Sweep the horde off your tiny island')}</p></div>` +
+      `<div style="display:grid;gap:12px;justify-items:center;width:100%">` +
+      `<div class="stage"><button data-act="prev" ${stageIdx ? '' : 'disabled'} aria-label="${L('이전 섬', 'Previous isle')}">‹</button>` +
+      `<div><small>${L('섬', 'Isle')} ${stageIdx + 1} / ${R.STAGES.length}</small><b>${locked ? '🔒 ' : ''}${stageName(stageIdx)}</b></div>` +
+      `<button data-act="next" ${stageIdx < R.STAGES.length - 1 ? '' : 'disabled'} aria-label="${L('다음 섬', 'Next isle')}">›</button></div>` +
+      (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을 지키면 열립니다`, `Defend ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
+      `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
+      `<button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button></div>`,
+    'title',
+  );
+}
+function showShop() {
+  mode = 'title';
+  const cards = MT.PERKS.map((id) => {
+    const [name, desc, c, ico] = PERK_UI[id], lv = meta.perks[id], max = MT.PERK_MAX[id], cost = MT.perkCost(id, lv);
+    const btn = lv >= max ? `<button class="buy" disabled>MAX</button>` : `<button class="buy" data-act="buy" data-perk="${id}" ${meta.coins < cost ? 'disabled' : ''}><i></i>${cost}</button>`;
+    return `<div class="card perk" style="--c:${c}"><div class="ico">${svg(ico)}</div><b>${name}</b><em>${'●'.repeat(lv)}${'○'.repeat(max - lv)}</em><span>${desc}</span>${btn}</div>`;
+  });
+  show(`<h2 class="big-title" style="font-size:32px">${L('강화 상점', 'Upgrades')}</h2>${coinPill()}<div class="cards">${cards.join('')}</div><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`, 'shop');
+}
 overlay.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   sfx.unlockAudio();
   sfx.click();
-  const id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
-  if (!id) { // 시작·다시 하기
-    g = newGame();
-    camTarget.set(0, 0, 0);
-    resetIsland();
-  } else if (id === 'heart') g.hp++;
+  const act = btn.dataset.act, id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
+  if (act === 'start') return startRun();
+  if (act === 'shop') return showShop();
+  if (act === 'title') return showTitle();
+  if (act === 'prev' || act === 'next') {
+    stageIdx = Math.max(0, Math.min(R.STAGES.length - 1, stageIdx + (act === 'next' ? 1 : -1)));
+    return showTitle();
+  }
+  if (act === 'nextIsle') {
+    stageIdx++;
+    applyStage();
+    return startRun();
+  }
+  if (act === 'buy') {
+    const next = MT.buy(meta, btn.dataset.perk as MT.Perk);
+    if (next) { meta = next; saveMeta(); sfx.coin(); }
+    return showShop();
+  }
+  if (!id) return;
+  if (id === 'heart') g.hp = Math.min(g.maxHp, g.hp + 1);
   else g.lv[id]++;
   overlay.hidden = true;
   mode = 'play';
   g.inv = Math.max(g.inv, 0.6);
-  if (id && --g.picks > 0) showPick();
+  if (--g.picks > 0) showPick();
 });
 
-// 최고 기록(기기에만 저장). 저장소를 못 쓰면 이번 실행에서만 기억한다
+// 섬마다 최고 기록(기기에만 저장)
 type Best = { time: number; kills: number; falls: number };
-let best: Best = { time: 0, kills: 0, falls: 0 };
-try {
-  best = { ...best, ...JSON.parse(localStorage.getItem('best') ?? '{}') };
-} catch { /* 저장소 없음 */ }
-const bestLine = () => (best.kills ? `<p class="best">${L('최고 기록', 'Best')} · ${clock(best.time)} · ${L('처치', 'KOs')} ${best.kills}</p>` : '');
+const loadBest = (): Best => {
+  try { return { time: 0, kills: 0, falls: 0, ...JSON.parse(store.get(`best-${stageIdx}`) ?? '{}') }; } catch { return { time: 0, kills: 0, falls: 0 }; }
+};
+const bestLine = () => {
+  const b = loadBest();
+  return b.kills ? `<p class="best">${L('최고 기록', 'Best')} · ${clock(b.time)} · ${L('처치', 'KOs')} ${b.kills}</p>` : '';
+};
 function end(win: boolean) {
   mode = 'over';
   win ? sfx.finale() : sfx.fail();
-  const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls };
+  const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls }, best = loadBest();
   const isBest = score.time > best.time || (score.time === best.time && score.kills > best.kills);
-  if (isBest) {
-    best = score;
-    try { localStorage.setItem('best', JSON.stringify(best)); } catch { /* 저장 실패 시 이번 실행에서만 */ }
-  }
+  if (isBest) store.set(`best-${stageIdx}`, JSON.stringify(score));
+  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx);
+  const unlocked = win && stageIdx === meta.cleared && stageIdx < R.STAGES.length;
+  meta = { ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared };
+  saveMeta();
+  const hasNext = win && stageIdx + 1 < R.STAGES.length;
   const cell = (label: string, v: string | number, hi = false) => `<div class="${hi ? 'hi' : ''}"><small>${label}</small><strong>${v}</strong></div>`;
   show(
     `<h1 class="big-title" style="font-size:36px">${win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
       `<div class="panel"><div class="stats">` +
       cell(L('버틴 시간', 'Survived'), clock(sec)) + cell(L('레벨', 'Level'), g.level + 1) +
       cell(L('처치', 'KOs'), g.kills) + cell(L('떨어뜨림', 'Knocked off'), g.falls, true) +
-      `</div>${isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : ''}</div>` +
-      `<button class="go">${L('한 번 더', 'Once more')}</button>` + (isBest ? '' : bestLine()),
+      `</div><div class="earn"><i></i>+${coins}</div>` +
+      (unlocked && hasNext ? `<span class="badge">${L(`새 섬: ${stageName(stageIdx + 1)}`, `New isle: ${stageName(stageIdx + 1)}`)}</span>` : '') +
+      (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') + `</div>` +
+      (hasNext ? `<button class="go" data-act="nextIsle">${L('다음 섬으로', 'Next isle')}</button><button class="sub" data-act="start">${L('한 번 더', 'Once more')}</button>`
+        : `<button class="go" data-act="start">${L('한 번 더', 'Once more')}</button>`) +
+      `<div class="row"><button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div>`,
   );
 }
-show(
-  `<div class="top"><h1 class="big-title">${L('섬 지키기', 'Hold<br>the Isle')}</h1><p class="tag">${L('몰려오는 적을 섬 밖으로 쓸어버리세요', 'Sweep the horde off your tiny island')}</p></div>` +
-    `<div style="display:grid;gap:12px;justify-items:center;width:100%"><div class="how"><span>${L('끌어서 이동', 'Drag to move')}</span><span>${L('공격은 자동', 'Auto attack')}</span><span>${L('차면 쓸어!', 'Sweep when full')}</span></div>` +
-    `<button class="go">${L('시작', 'Start')}</button>${bestLine()}</div>`,
-  'title',
-);
 $('sweep').querySelector('span')!.textContent = L('쓸어!', 'Sweep!');
 
 // 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
@@ -700,7 +787,7 @@ const HEART = '<path d="M12 21s-8-5-8-11.5A4.5 4.5 0 0 1 12 6.6a4.5 4.5 0 0 1 8 
 function drawHud() {
   if (shown.mode !== mode) document.body.dataset.mode = shown.mode = mode;
   if (shown.hp !== g.hp) {
-    hud.hearts.innerHTML = Array.from({ length: R.MAX_HP }, (_, i) => svg(HEART, i < g.hp ? '' : i < shown.hp ? 'empty lost' : 'empty')).join('');
+    hud.hearts.innerHTML = Array.from({ length: g.maxHp }, (_, i) => svg(HEART, i < g.hp ? '' : i < shown.hp ? 'empty lost' : 'empty')).join('');
     shown.hp = g.hp;
   }
   const left = Math.max(0, Math.ceil(R.RUN_SECONDS - g.t));
@@ -726,7 +813,7 @@ function drawHud() {
       hud.toast.className = 'pop';
     }
   }
-  const warn = mode === 'play' ? R.crumbleWarning(g.t) : -1;
+  const warn = mode === 'play' ? R.crumbleWarning(g.t, stage().crumbles) : -1;
   if (shown.warn !== warn) {
     shown.warn = warn;
     hud.warn.hidden = warn < 0;
@@ -761,6 +848,7 @@ function frame(now: number) {
     hud.dev.textContent = `${fps}fps · ${g.enemies.length} · ${renderer.info.render.calls}dc`;
   }
 }
+showTitle();
 requestAnimationFrame(frame);
 
 // 개발 훅: 콘솔에서 상태 확인·부하 시험(__demo.stress(300))

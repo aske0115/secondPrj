@@ -44,12 +44,21 @@ export const FALL_CHARGE = 2;
 export const killXp = (big: boolean) => (big ? 3 : 1);
 export const fallXp = (big: boolean) => killXp(big) * 2;
 
-// 섬 가장자리가 정해진 때 무너진다. 그 전에 경고를 띄운다
-export const CRUMBLES = [
-  { at: 40, r: 11.5 },
-  { at: 80, r: 10 },
-] as const;
+// 섬(스테이지). 앞 섬을 버티면 다음 섬이 열린다. 섬마다 색·무너지는 때·적 세기가 다르다
+export type Crumble = { readonly at: number; readonly r: number };
+export type Stage = {
+  name: readonly [string, string]; grass: number; cliff: number; sky: number; sun: number;
+  crumbles: readonly Crumble[]; spawn: number; big: number; hp: number; speed: number;
+};
+export const STAGES: readonly Stage[] = [
+  { name: ['풀밭 섬', 'Meadow Isle'], grass: 0x86c46a, cliff: 0xb89468, sky: 0xbfe6f5, sun: 0xfff0d2,
+    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 1, big: 1, hp: 1, speed: 1 },
+  { name: ['단풍 섬', 'Maple Isle'], grass: 0xd9a24e, cliff: 0x9a6b4a, sky: 0xf6dcc0, sun: 0xffd9a8,
+    crumbles: [{ at: 30, r: 11.5 }, { at: 60, r: 10 }, { at: 90, r: 8.8 }], spawn: 1.3, big: 1.4, hp: 1.3, speed: 1.1 },
+  { name: ['달빛 묘지 섬', 'Moonlit Isle'], grass: 0x5f8a7a, cliff: 0x6b6378, sky: 0x2d3555, sun: 0xb9c6ff,
+    crumbles: [{ at: 25, r: 11.8 }, { at: 50, r: 10.6 }, { at: 75, r: 9.4 }, { at: 100, r: 8.4 }], spawn: 1.6, big: 1.8, hp: 1.7, speed: 1.2 },
+];
 export const CRUMBLE_WARN = 3;
-export const islandRadius = (t: number) => CRUMBLES.reduce((r, c) => (t >= c.at ? c.r : r), ISLAND_R as number);
+export const islandRadius = (t: number, cs: readonly Crumble[] = STAGES[0].crumbles) => cs.reduce((r, c) => (t >= c.at ? c.r : r), ISLAND_R as number);
 /** 곧 무너질 단계의 번호(경고 중일 때만), 없으면 -1 */
-export const crumbleWarning = (t: number) => CRUMBLES.findIndex((c) => t >= c.at - CRUMBLE_WARN && t < c.at);
+export const crumbleWarning = (t: number, cs: readonly Crumble[] = STAGES[0].crumbles) => cs.findIndex((c) => t >= c.at - CRUMBLE_WARN && t < c.at);

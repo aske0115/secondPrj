@@ -105,6 +105,30 @@ body[data-mode="title"] #hud, body[data-mode="title"] #sweep, body[data-mode="ov
 .stats .hi strong { color: var(--gold-deep); }
 .badge { display: inline-block; margin-top: 12px; padding: 4px 12px; border-radius: 999px; background: var(--heart); color: #fff; font-size: 13px; font-weight: 900; }
 
+/* 코인·섬 고르기·상점 */
+.coins, .earn { display: inline-flex; align-items: center; gap: 6px; justify-self: center; font-weight: 900; }
+.coins { padding: 6px 14px; border-radius: 999px; background: var(--paper); box-shadow: var(--shadow); font-size: 17px; }
+.earn { display: flex; justify-content: center; margin: 12px 0 2px; font-size: 22px; color: var(--gold-deep); }
+.panel .badge { margin: 8px 3px 0; }
+.coins i, .earn i, .buy i { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b0, var(--gold) 45%, var(--gold-deep)); box-shadow: inset 0 -2px 0 #0002; }
+.go:disabled { filter: grayscale(1); opacity: .6; box-shadow: none; }
+.sub { width: min(100%, 300px); border: 0; border-radius: 16px; padding: 12px; font-size: 16px; font-weight: 800; background: #ffffffe6; box-shadow: var(--shadow); }
+.row { display: flex; gap: 10px; width: min(100%, 300px); }
+.row .sub { flex: 1; }
+.stage { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; width: min(100%, 300px); }
+.stage > div { background: #ffffffe6; border-radius: 16px; padding: 8px; box-shadow: var(--shadow); }
+.stage small { display: block; font-size: 12px; font-weight: 700; opacity: .6; }
+.stage b { font-size: 19px; }
+.stage button { height: 48px; border: 0; border-radius: 14px; background: #ffffffe6; box-shadow: var(--shadow); font-size: 28px; font-weight: 900; line-height: 1; }
+.stage button:disabled { opacity: .35; }
+#overlay.shop { justify-content: center; }
+.card.perk { grid-template-columns: 52px 1fr auto; }
+.card.perk em { color: var(--c); letter-spacing: 1px; }
+.card.perk span { grid-column: 2 / 3; }
+.buy { grid-column: 3; grid-row: 2; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 12px; padding: 7px 10px;
+  font-weight: 900; background: linear-gradient(#ffdc7a, var(--gold)); box-shadow: 0 3px 0 #c98612; }
+.buy:disabled { filter: grayscale(1); opacity: .55; box-shadow: none; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; }
 }

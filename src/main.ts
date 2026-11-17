@@ -1583,12 +1583,15 @@ function offerContinue(note = '') {
   );
 }
 async function watchAd(btn: HTMLButtonElement) {
-  btn.disabled = true;
+  overlay.querySelectorAll('button').forEach((b) => (b.disabled = true)); // 광고 중엔 「그만하기」도 잠근다(QA: 광고 중 그만하기 → 판이 되살아나 코인 두 번)
   sfx.setMuted(true);
-  const ok = await ads.showAd();
-  sfx.setMuted(false);
-  btn.disabled = false;
-  return ok;
+  try {
+    return await ads.showAd();
+  } catch {
+    return false;
+  } finally {
+    sfx.setMuted(false); // SDK가 예외로 끝나도 소리는 되살린다
+  }
 }
 let lastCoins = 0;
 const doubleBtn = () =>
@@ -1596,7 +1599,9 @@ const doubleBtn = () =>
     ? `<button class="ad" data-act="adDouble">▶ ${L(`광고 보고 코인 2배 (+${lastCoins})`, `Watch ad: double coins (+${lastCoins})`)}</button>` : '';
 async function onAd(act: string, btn: HTMLButtonElement) {
   if (act === 'adContinue') {
-    if (!(await watchAd(btn))) return offerContinue(L('광고를 끝까지 보면 이어 할 수 있어요', 'Finish the ad to continue'));
+    const ok = await watchAd(btn);
+    if (mode !== 'pause' || g.hp > 0) return; // 그사이 다른 화면으로 넘어갔으면 아무것도 하지 않는다
+    if (!ok) return ads.adReady() ? offerContinue(L('광고를 끝까지 보면 이어 할 수 있어요', 'Finish the ad to continue')) : end(false);
     g.continued = true;
     g.hp = Math.round(g.maxHp * 0.5);
     g.inv = 2.5;
@@ -1604,14 +1609,14 @@ async function onAd(act: string, btn: HTMLButtonElement) {
     resume();
     toast(L('다시 일어남!', 'Back on your feet!'));
   } else if (act === 'adDouble') {
-    if (!(await watchAd(btn))) return;
+    if (!(await watchAd(btn))) { btn.disabled = !ads.adReady(); overlay.querySelectorAll<HTMLButtonElement>('button:not(.ad)').forEach((b) => (b.disabled = false)); return; }
     meta = { ...meta, coins: meta.coins + lastCoins };
     saveMeta();
     ads.useAdDaily('doubles');
     sfx.coins();
     btn.outerHTML = `<span class="badge">${L(`+${lastCoins} 코인 더 받음!`, `+${lastCoins} bonus coins!`)}</span>`;
   } else if (act === 'adCapsule') {
-    if (!(await watchAd(btn))) return;
+    if (!(await watchAd(btn))) return showShop(); // 잠갔던 버튼을 다시 그려서 푼다
     const r = MT.rollCapsule({ ...meta, coins: meta.coins + MT.CAPSULE_COST })!;
     meta = r.meta;
     saveMeta();

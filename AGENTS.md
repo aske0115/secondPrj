@@ -28,3 +28,21 @@
 - 홍보는 **무료 방법만** 씁니다. 커뮤니티(카페·게시판·레딧) 홍보 글은 하지 않습니다.
 - 결과 공유 카드·홍보 촬영 모드(HUD 숨김)·스토어 리뷰 요청은 **v1에 넣습니다.**
 - 기획이 바뀌면 마케팅·스토어 문서도 **같은 커밋에서** 고칩니다(쓸어킬에서 옛 기획 문구가 영상에 들어간 교훈).
+
+## 역할별 담당 (에이전트 팀)
+역할 정의는 개인 저장소 `aske0115/agent-team`(설치: `python3 install.py` → `~/.claude/agents/`). 메인 세션이 PD로서 나눠 맡긴다. 각 역할은 **아래 자기 담당 파일만** 고친다.
+
+> **화풍 주의(디자인 담당)**: 역할 정의에 "코드로 그린 네온 스타일"이라고 적혀 있어도 그건 쓸어킬 기준입니다. 망치섬은 **Kenney CC0 로우폴리 디오라마**(밝은 하늘·잔디·틸트시프트, 결정 033)이고 네온·빛 번짐을 섞지 않습니다. 새 모델은 CC0만, 받은 곳·라이선스는 `docs/ASSETS.md`에.
+
+| 역할 | 담당 파일 | 확인 방법 |
+|---|---|---|
+| 기획 `planner` | `docs/DECISIONS.md`, `docs/TODO.md`, `docs/HANDOFF.md`, `docs/worklogs/`, `src/game/chapters.ts`의 장 구성(이름·모델·소품·장치), `src/game/missions.ts`의 미션 문구 | 이전 결정과 충돌 없는지 |
+| 난이도 `balance` | `src/game/rules.ts`, `src/game/meta.ts`(강화 값·효과·보상), `src/game/chapters.ts`의 `stageDef` 수치, `src/game/missions.ts` 보상 | `npm test` + 개발 서버(`npm run dev`)에서 `__demo.setPerks({...})` 뒤 `__demo.bot(판수, 0.85, 스테이지, 왕좀비노림)`, 처음~끝 `__demo.campaign(300)` 전후 비교 |
+| 디자인 `design` | `src/style.css`, `index.html`, `src/main.ts`의 화면 마크업(`show*` 함수들), `public/models/`·`docs/ASSETS.md`, `docs/art/`, 아이콘·시작 화면(`ios/App/App/Assets.xcassets`, `android/app/src/main/res/`의 mipmap·splash) | `npm run dev` 후 휴대폰 375×812·태블릿·펼친 폴더블 가로, 촬영은 `__demo.shot('icon'\|'splash')`, 한 판 그리기는 `__demo.renderOnce()` |
+| 광고 `ads` | `src/ads.ts`, `src/main.ts`의 광고 자리(`offerContinue`·`doubleBtn`·`onAd`·상점 무료 캡슐), `.env.release` | `npm test`, 개발 서버는 1초짜리 가짜 광고. 실제 단위는 `npm run build:release` 결과에만 있고 `npm run build` 결과엔 0개인지 `grep 5960388113203280/ dist/assets/*.js` |
+| 배포 `release` | `ios/`, `android/`(아이콘·스플래시 제외), `capacitor.config.ts`, `package.json` 스크립트, 출시 문서 | `npm run native:release` → 빌드 → `npm run native`로 되돌린 뒤 실제 광고 단위 0개 확인. iOS·안드로이드 둘 다 동기화 |
+| 검수 `qa` | 고치지 않음(보고만) | `npm test`, `npx tsc --noEmit`, 성능은 `__demo.bench()`·`__demo.stats()`, 화면은 iOS 시뮬레이터 직접 조작 |
+
+- `src/main.ts`(약 2,000줄)는 여러 역할이 같이 건드린다. PD가 순서를 정해 한 번에 한 역할만 고친다.
+- 되돌리기 어려운 일(스토어 제출·검토 전송·AdMob/스토어 콘솔 저장·배포)은 어느 역할도 직접 하지 않고 사용자 확인을 받는다.
+- 개발 서버의 `__demo` 훅은 `src/main.ts` 끝에 모여 있다(출시 빌드에도 들어 있지만 화면에서 부를 길은 없음).

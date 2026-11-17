@@ -160,3 +160,20 @@ export const WEATHER_AT = 55;
 export const WEATHER_SECONDS = 6;
 export const WEATHER_PUSH = 12; // 넉백으로 더해 가장자리 적은 떨어진다(자기들끼리 밀린 것과 구분되는 기준 2를 넘김)
 export type Weather = 'wind' | 'quake';
+
+// ───── 오늘의 섬(결정 062): 날마다 모두 같은 섬·같은 무작위(적·상자·날씨) ─────
+export const DAILY_COINS = 50; // 그날 처음 버티면
+/** 한국 시간 기준 날짜 번호(같은 날이면 같은 값) */
+export const dayNumber = (ms: number) => Math.floor((ms + 9 * 3600e3) / 86400e3);
+export const dailyStage = (day: number) => day % STAGES.length;
+/** 같은 씨앗이면 늘 같은 수열(mulberry32) */
+export function seeded(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}

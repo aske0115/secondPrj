@@ -178,3 +178,12 @@ body[data-mode="shot"] #hud, body[data-mode="shot"] #sweep, body[data-mode="shot
 .char small { font-size: 10px; opacity: .7; line-height: 1.2; }
 .char.on { outline: 3px solid var(--teal); }
 .char:disabled { opacity: .5; }
+
+/* 베스트 컷·오늘의 섬(결정 062) */
+.bestcut { display: flex; align-items: center; gap: 12px; margin: 0; width: min(100%, 320px); padding: 10px; border-radius: 18px; background: var(--paper); box-shadow: var(--shadow); color: var(--ink); text-align: left; }
+.bestcut img { width: 84px; height: 112px; object-fit: cover; border-radius: 10px; }
+.bestcut figcaption { display: grid; gap: 4px; font-size: 14px; font-weight: 800; flex: 1; }
+.bestcut figcaption b { color: var(--gold-deep); }
+.bestcut .sub { width: auto; padding: 8px 12px; font-size: 14px; }
+.sub.daily { background: linear-gradient(#e8f6ff, #cfe9ff); }
+#overlay { overflow-y: auto; }

@@ -347,7 +347,7 @@ const newGame = () => ({
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
   swings: 0, misses: 0, sweepLock: 0, helperUsed: false,
   gadgets: [] as Gadget[], weather: '' as R.Weather | '', wt: 0, wx: 0, wz: 0, weatherDone: false,
-  opened: 0, slams: 0, done: [] as string[], // 미션(결정 060)
+  opened: 0, slams: 0, done: [] as string[], bestChain: 0, // 미션(결정 060)·베스트 컷
   bossSpawned: false, bossDown: false, endIn: 0, extra: 0, strikes: 0, juggles: 0, // 왕좀비·STRIKE·저글(결정 057·058)
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
@@ -526,6 +526,7 @@ function fall(e: Enemy, byCrumble = false) {
   if (mode === 'bonus') g.bonusFalls++;
   g.chain = g.chainT > 0 ? g.chain + 1 : 1;
   g.chainT = 1.2;
+  if (g.chain >= 3 && g.chain > g.bestChain && performance.now() - lastShotAt > 300) { g.bestChain = g.chain; wantShot = true; }
   if (g.chain === R.STRIKE_CHAIN) { g.extra += R.STRIKE_COINS; g.strikes++; sfx.fanfare(); }
   if (e.kind === 'bomb') blast(e.x, e.z);
   if (e.kind === 'boss' && !g.bossDown) { // 왕좀비를 떨어뜨리면 그 자리에서 클리어
@@ -1302,7 +1303,35 @@ function placeGadgets() {
     g.gadgets.push({ x, z, hx: x, hz: z, cd: 0, squash: 0, vx: 0, vz: 0, left: 0, gone: 0, on: 0 });
   }
 }
+// 오늘의 섬(결정 062): 그날의 씨앗으로 Math.random을 잠시 바꿔 적·상자·날씨를 모두 같게. 끝나면 되돌린다
+const realRandom = Math.random;
+let dailyRun = false, stageBeforeDaily = 0;
+const today = () => R.dayNumber(Date.now());
+const loadDaily = (): { day: number; best: number; cleared: boolean } => {
+  try {
+    const d = JSON.parse(store.get('daily') ?? '{}');
+    return d.day === today() ? { day: d.day, best: +d.best || 0, cleared: !!d.cleared } : { day: today(), best: 0, cleared: false };
+  } catch { return { day: today(), best: 0, cleared: false }; }
+};
+function startDaily() {
+  stageBeforeDaily = stageIdx;
+  stageIdx = R.dailyStage(today());
+  applyStage();
+  Math.random = R.seeded(today() * 7919);
+  dailyRun = true;
+  startRun();
+}
+// 베스트 컷(결정 062): 한 판에서 가장 크게 이어 떨어뜨린 순간을 그린 직후 찍어 둔다(글자 없이 게임 화면만)
+let bestShot = '', wantShot = false, lastShotAt = 0;
+/** 그린 직후에만 부른다(화면 버퍼가 지워지기 전) */
+function captureShot() {
+  if (!wantShot) return;
+  wantShot = false;
+  lastShotAt = performance.now();
+  bestShot = renderer.domElement.toDataURL('image/jpeg', 0.75);
+}
 function startRun() {
+  bestShot = '';
   resetInput();
   sfx.setMusicFast(false);
   g = newGame();
@@ -1323,6 +1352,18 @@ function missionList(ids: readonly string[], done: readonly string[] = []) {
   });
   return `<ul class="missions">${rows.join('')}</ul>`;
 }
+async function shareShot() {
+  if (!bestShot) return;
+  const file = new File([await (await fetch(bestShot)).blob()], 'tumble-isle.jpg', { type: 'image/jpeg' });
+  const text = L(`망치섬에서 한 번에 ${g.bestChain}마리 떨어뜨렸다!`, `Knocked off ${g.bestChain} in one go on Tumble Isle!`);
+  try {
+    if (navigator.canShare?.({ files: [file] })) return void (await navigator.share({ files: [file], text }));
+  } catch { return; } // 사용자가 공유 창을 닫음
+  const a = document.createElement('a'); // 공유를 못 하는 곳에서는 그림을 내려받는다
+  a.href = bestShot;
+  a.download = file.name;
+  a.click();
+}
 function showTitle() {
   mode = 'title';
   applyStage();
@@ -1338,6 +1379,7 @@ function showTitle() {
       `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>` +
       missionList(meta.missions) +
       `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
+      `<button class="sub daily" data-act="daily">${L('오늘의 섬', "Today's isle")} · ${stageName(R.dailyStage(today()))}${loadDaily().best ? L(` · 최고 ${loadDaily().best}마리`, ` · best ${loadDaily().best}`) : ''}</button>` +
       `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button>` +
       `<button class="sub" data-act="music" aria-pressed="${sfx.isMusicOn()}">${sfx.isMusicOn() ? L('♪ 음악 켬', '♪ Music on') : L('♪ 음악 끔', '♪ Music off')}</button></div></div>`,
     'title',
@@ -1377,6 +1419,8 @@ overlay.addEventListener('click', (ev) => {
   sfx.tap();
   const act = btn.dataset.act, id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
   if (act === 'start') return startRun();
+  if (act === 'daily') return startDaily();
+  if (act === 'share') return void shareShot();
   if (act === 'bonusGo') {
     overlay.hidden = true;
     mode = 'bonus';
@@ -1441,21 +1485,31 @@ function end(win: boolean) {
   mode = 'over';
   win ? sfx.finale() : sfx.fail();
   const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls }, best = loadBest();
-  const isBest = score.time > best.time || (score.time === best.time && score.kills > best.kills);
+  const isBest = !dailyRun && (score.time > best.time || (score.time === best.time && score.kills > best.kills));
   if (isBest) store.set(`best-${stageIdx}`, JSON.stringify(score));
+  let dailyNote = '';
+  if (dailyRun) {
+    Math.random = realRandom;
+    dailyRun = false;
+    const d = loadDaily(), firstClear = win && !d.cleared;
+    store.set('daily', JSON.stringify({ day: d.day, best: Math.max(d.best, g.falls), cleared: d.cleared || win }));
+    if (firstClear) g.extra += R.DAILY_COINS;
+    dailyNote = `<span class="badge">${L('오늘의 섬', "Today's isle")}${firstClear ? ` +${R.DAILY_COINS}` : ''}${g.falls > d.best ? L(' · 오늘 최고!', ' · Today best!') : ''}</span>`;
+    stageIdx = stageBeforeDaily; // 오늘의 섬은 섬 해금·기록과 따로 간다
+  }
   checkMissions();
   const doneMs = g.done.map((id) => MS.missionById(id)!);
   const missionCoins = doneMs.reduce((a, m) => a + m.coins, 0);
   const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins;
   const missionsNow = meta.missions;
-  const unlocked = win && stageIdx === meta.cleared && stageIdx < R.STAGES.length;
+  const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < R.STAGES.length;
   meta = {
     ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared,
     missionsDone: meta.missionsDone + g.done.length, bossDowns: meta.bossDowns + (g.bossDown ? 1 : 0),
     missions: MS.fillMissions(meta.missions.filter((id) => !g.done.includes(id))), // 달성한 미션은 새 것으로
   };
   saveMeta();
-  const hasNext = win && stageIdx + 1 < R.STAGES.length;
+  const hasNext = win && !dailyNote && stageIdx + 1 < R.STAGES.length;
   const cell = (label: string, v: string | number, hi = false) => `<div class="${hi ? 'hi' : ''}"><small>${label}</small><strong>${v}</strong></div>`;
   show(
     `<h1 class="big-title" style="font-size:36px">${g.bossDown ? L('왕좀비 격파!', 'King zombie down!') : win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
@@ -1465,7 +1519,8 @@ function end(win: boolean) {
       `</div><div class="earn"><i></i>+${coins}</div>` +
       (unlocked && hasNext ? `<span class="badge">${L(`새 섬: ${stageName(stageIdx + 1)}`, `New isle: ${stageName(stageIdx + 1)}`)}</span>` : '') +
       (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') +
-      (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + missionList(missionsNow, g.done) + `</div>` +
+      (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + dailyNote + missionList(missionsNow, g.done) + `</div>` +
+      (bestShot ? `<figure class="bestcut"><img src="${bestShot}" alt=""><figcaption><b>${L('베스트 컷', 'Best shot')}</b>${L(`낙하 ×${g.bestChain}`, `Drop ×${g.bestChain}`)}<button class="sub" data-act="share">${L('공유', 'Share')}</button></figcaption></figure>` : '') +
       (hasNext ? `<button class="go" data-act="nextIsle">${L('다음 섬으로', 'Next isle')}</button><button class="sub" data-act="start">${L('한 번 더', 'Once more')}</button>`
         : `<button class="go" data-act="start">${L('한 번 더', 'Once more')}</button>`) +
       `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div>`,
@@ -1546,6 +1601,7 @@ function frame(now: number) {
   draw(dt, now);
   renderer.info.reset();
   composer.render();
+  captureShot();
   drawHud();
   frames++;
   if (DEV && now - fpsAt >= 500) {
@@ -1674,6 +1730,8 @@ if (DEV)
         return { wins: `${out.filter((x) => x.win).length}/${runs}`, avgT: avg((x) => x.t), avgLv: avg((x) => x.lv), fallShare: avg((x) => x.falls / Math.max(1, x.kills)), missShare: avg((x) => x.misses / Math.max(1, x.swings)), bossDowns: out.filter((x) => x.boss).length, strikes: avg((x) => x.strikes) };
       },
       sweep,
+      /** 그리기 한 번 + 베스트 컷 찍기(화면 갱신이 멈춘 미리보기에서 시험용) */
+      renderOnce: () => { draw(1 / 60, performance.now()); composer.render(); captureShot(); return bestShot.length; },
       // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다
       bench: (n = 30) => {
         const gl = renderer.getContext(), t0 = performance.now();

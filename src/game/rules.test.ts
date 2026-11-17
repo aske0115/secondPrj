@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { WEATHER_AT, WEATHER_SECONDS, WEATHER_PUSH, BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { dayNumber, dailyStage, seeded, WEATHER_AT, WEATHER_SECONDS, WEATHER_PUSH, BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -120,4 +120,16 @@ test('날씨는 보너스 판과 겹치지 않고 판 안에서 끝난다', () =
   expect(WEATHER_AT + WEATHER_SECONDS).toBeLessThan(BONUS_AT);
   expect(WEATHER_PUSH / 4.5).toBeGreaterThan(2); // 넉백이 계속 쌓이면 가장자리 적이 떨어질 만큼(감쇠 4.5/초)
   for (const st of STAGES) expect(['spring', 'barrel', 'lantern']).toContain(st.gadget);
+});
+
+test('오늘의 섬: 같은 날은 같은 섬·같은 수열, 다른 날은 다름', () => {
+  const d = dayNumber(Date.UTC(2026, 10, 17, 3)); // 한국 시간 11월 17일 낮
+  expect(dayNumber(Date.UTC(2026, 10, 17, 14))).toBe(d); // 같은 날 밤 11시
+  expect(dayNumber(Date.UTC(2026, 10, 17, 15))).toBe(d + 1); // 한국 자정 = UTC 15시
+  const a = seeded(d), b = seeded(d), c = seeded(d + 1);
+  const xs = [a(), a(), a()];
+  expect([b(), b(), b()]).toEqual(xs);
+  expect(c()).not.toBe(xs[0]);
+  for (const x of xs) expect(x >= 0 && x < 1).toBe(true);
+  expect(dailyStage(d)).toBeGreaterThanOrEqual(0);
 });

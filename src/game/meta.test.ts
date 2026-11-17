@@ -27,7 +27,13 @@ test('깨진 저장값은 처음 상태로, 범위 밖 값은 잘라서 불러�
   expect(loadMeta('{망가짐', 3)).toEqual(freshMeta());
   expect(loadMeta(null, 3)).toEqual(freshMeta());
   const m = loadMeta(JSON.stringify({ coins: -5, cleared: 99, perks: { vigor: 9, shove: 2.7, charge: 'x' } }), 3);
-  expect(m).toEqual({ ...freshMeta(), coins: 0, cleared: 3, perks: { vigor: PERK_MAX.vigor, shove: 2, charge: 0, wisdom: 0 } });
+  expect(m).toEqual({ ...freshMeta(), coins: 0, cleared: 3, perks: { ...freshMeta().perks, vigor: PERK_MAX.vigor, shove: 2 } });
+});
+
+test('빠진 강화(지혜)에 쓴 코인은 돌려준다', () => {
+  const m = loadMeta(JSON.stringify({ coins: 10, perks: { wisdom: 2 } }), 3);
+  expect(m.coins).toBe(10 + 40 + Math.round(40 * 2 ** 2.8));
+  expect('wisdom' in m.perks).toBe(false);
 });
 
 test('캡슐: 새 캐릭터는 얻고, 이미 있으면 일부 돌려받고, 돈이 모자라면 못 돌린다', () => {

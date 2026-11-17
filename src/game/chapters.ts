@@ -140,8 +140,9 @@ export function stageDef(no: number, rand: () => number): StageDef {
   const time: TimeOfDay = ch.night ? 'night' : rand() < 0.2 ? 'dusk' : 'day';
   return {
     no, chapter, inChapter: s, seed: no * 9973 + 17, r, crumbles, time, finale: s === STAGES_PER_CHAPTER - 1,
-    spawn: 0.55 + p * 0.85 + inCh * 0.1, big: 0.45 + p * 1.1, hp: 0.6 + p * 1.6 + inCh * 0.15,
-    speed: 0.85 + p * 0.3, dmg: 0.45 + p * 0.7,
+    // 뒤 장을 가파르게(결정 072): 강화가 체감되게 세진 만큼 1장은 그대로 두고 뒤로 갈수록 더 단단하게
+    spawn: 0.55 + p * 1.4 + inCh * 0.15, big: 0.45 + p * 1.4, hp: 0.6 + p * 3.2 + inCh * 0.3,
+    speed: 0.85 + p * 0.3, dmg: 0.45 + p * 1.0,
   };
 }
 

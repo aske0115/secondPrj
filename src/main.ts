@@ -438,8 +438,8 @@ type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: n
 type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: number; t: number; y: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
 const newGame = () => ({
-  t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: 0,
-  charge: Math.floor(MT.startChargeFrac(meta) * R.sweepCost(0)), kills: 0, falls: 0,
+  t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: MT.startPicks(meta.perks.cards),
+  charge: 0, kills: 0, falls: 0, rerolls: MT.rerolls(meta.perks.cards), revived: false,
   lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
@@ -565,7 +565,7 @@ function reward(charge: number) {
   g.kills++;
   const he = MT.healEvery(meta);
   if (he && g.kills % he === 0) g.hp = Math.min(g.maxHp, g.hp + 1); // 흡혈귀
-  if (g.sweepLock <= 0) g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge);
+  if (g.sweepLock <= 0) g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge * MT.chargeMul(meta));
   const now = performance.now();
   if (now - lastPop > 45) { // 한꺼번에 죽을 때 소리가 뭉개지지 않게, 이어 죽이면 음이 올라간다
     combo = now - lastPop < 500 ? combo + 1 : 0;
@@ -676,7 +676,7 @@ function crumble(r: number) {
 }
 
 function gainXp(n: number) {
-  g.xp += n * MT.xpMul(meta);
+  g.xp += n;
   while (g.xp >= R.xpNeed(g.level)) {
     g.xp -= R.xpNeed(g.level);
     g.level++;
@@ -695,7 +695,15 @@ function hurt(dmg: number) {
     const dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
     if (d < 3.5) { e.kx += (dx / d) * 9; e.kz += (dz / d) * 9; }
   }
-  if (g.hp <= 0) end(false);
+  if (g.hp > 0) return;
+  const back = g.revived ? 0 : MT.revivePct(meta.perks.revive);
+  if (!back) return end(false);
+  g.revived = true; // 두 번째 기회(결정 072): 판당 1번 일어나며 주변을 밀어낸다
+  g.hp = Math.round(g.maxHp * back);
+  g.inv = 2;
+  blast(g.px, g.pz);
+  sfx.fanfare();
+  toast(L('다시 일어남!', 'Back on your feet!'));
 }
 
 function sweep() {
@@ -789,7 +797,7 @@ function weapons(dt: number) {
   const es = g.enemies;
   // 망치: 가까운 적 쪽으로 부채꼴
   g.hammerCd -= dt;
-  const gold = g.golden > 0, rad = R.hammerRadius(g.lv.hammer) + (gold ? 1.2 : 0);
+  const gold = g.golden > 0, rad = R.hammerRadius(g.lv.hammer) * MT.hammerMul(meta) + (gold ? 1.2 : 0);
   // 실제로 맞는 거리(망치 길이 + 적 몸)에 들어왔을 때만 휘두른다. 예전엔 조금 먼 적에도 헛스윙하고 쿨다운을 통째로 기다렸다
   const near = g.hammerCd <= 0 ? nearest(rad + 0.7) : null;
   const target = near && Math.hypot(near.x - g.px, near.z - g.pz) <= rad + eRadius(near) ? near : null;
@@ -1266,7 +1274,7 @@ function draw(dt: number, now: number) {
   hammer.visible = mode !== 'bonus';
   hammer.position.set(g.px + Math.sin(ha) * 0.25, swinging ? 0.55 : 0.75, g.pz + Math.cos(ha) * 0.25);
   hammer.rotation.set(swinging ? 0.25 : -0.9, ha, 0, 'YXZ');
-  hammer.scale.setScalar((g.golden > 0 ? 1.35 : 1) * (0.9 + 0.08 * g.lv.hammer));
+  hammer.scale.setScalar((g.golden > 0 ? 1.35 : 1) * (0.9 + 0.08 * g.lv.hammer) * MT.hammerMul(meta));
   const gk = stage().gadget, inPlay = mode !== 'title' && mode !== 'over';
   let nSp = 0, nBa = 0, nLa = 0, nRing = 0;
   if (inPlay)
@@ -1316,7 +1324,7 @@ function draw(dt: number, now: number) {
     }
     swing.position.set(g.px, 0.08, g.pz);
     swing.rotation.y = g.swingYaw;
-    swing.scale.setScalar(R.hammerRadius(g.lv.hammer) * (0.7 + g.swingT * 0.3));
+    swing.scale.setScalar(R.hammerRadius(g.lv.hammer) * MT.hammerMul(meta) * (0.7 + g.swingT * 0.3));
     (swing.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - g.swingT);
   }
   g.bits.forEach((b, i) => {
@@ -1400,13 +1408,19 @@ function showPick() {
     const tag = id === 'heart' ? '' : lv ? `<em>Lv ${lv} → ${lv + 1}</em>` : `<em class="new">NEW</em>`;
     return `<button class="card" data-id="${id}" style="--c:${c}"><div class="ico">${svg(ICON[id])}</div><b>${name}</b>${tag}<span>${desc}</span></button>`;
   });
-  show(`<h2 class="big-title" style="font-size:34px">${L('레벨 업!', 'Level up!')}</h2><p class="tag">${L('하나를 고르세요', 'Pick one')}</p><div class="cards">${cards.join('')}</div>`);
+  const start = g.t === 0, again = g.rerolls > 0 ? `<button class="sub" data-act="reroll">${L(`다시 고르기 (${g.rerolls})`, `Reroll (${g.rerolls})`)}</button>` : '';
+  show(`<h2 class="big-title" style="font-size:34px">${start ? L('들고 갈 스킬', 'Starting skill') : L('레벨 업!', 'Level up!')}</h2><p class="tag">${L('하나를 고르세요', 'Pick one')}</p><div class="cards">${cards.join('')}</div>${again}`);
 }
-const PERK_UI: Record<MT.Perk, [string, string, string, string]> = {
-  vigor: [L('튼튼한 몸', 'Sturdy'), L('최대 체력 +12', 'Max HP +12'), '#ff5a6e', ICON.heart],
-  shove: [L('묵직한 손', 'Heavy hands'), L('모든 넉백 +6%', 'All knockback +6%'), '#b06ee8', ICON.knock],
-  charge: [L('미리 충전', 'Head start'), L('쾅! 게이지 8%를 채우고 시작', 'Start with 8% Slam charge'), '#ff8a4c', ICON.sweep],
-  wisdom: [L('지혜', 'Wisdom'), L('경험치 +5%', 'XP +5%'), '#35b9ab', '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>'],
+// 상점 설명은 "다음 단계에서 무엇이 되는지"를 보여 준다(결정 072)
+const PERK_UI: Record<MT.Perk, [string, (next: number) => string, string, string]> = {
+  vigor: [L('튼튼한 몸', 'Sturdy'), () => L('최대 체력 +15', 'Max HP +15'), '#ff5a6e', ICON.heart],
+  shove: [L('큰 망치', 'Big mallet'), () => L('망치 크기·사거리 +3%, 넉백 +5%', 'Mallet size & reach +3%, knockback +5%'), '#b06ee8', ICON.hammer],
+  charge: [L('쾅! 충전', 'Slam charge'), () => L('쾅! 게이지가 10% 빨리 참', 'Slam gauge fills 10% faster'), '#ff8a4c', ICON.sweep],
+  cards: [L('카드 달인', 'Card master'), (n) => L(`다시 고르기 ${MT.rerolls(n)}번`, `${MT.rerolls(n)} rerolls`) + (MT.startPicks(n) ? L(` · 스킬 ${MT.startPicks(n)}개 들고 시작`, ` · start with ${MT.startPicks(n)} skill(s)`) : ''), '#35b9ab',
+    '<rect x="3" y="7" width="11" height="14" rx="2"/><path d="M8 3h11a2 2 0 0 1 2 2v12"/>'],
+  revive: [L('두 번째 기회', 'Second chance'), (n) => L(`판당 1번, 쓰러지면 체력 ${Math.round(MT.revivePct(n) * 100)}%로 일어남`, `Once a run, get up with ${Math.round(MT.revivePct(n) * 100)}% HP`), '#ef5da8',
+    '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/>'],
+  purse: [L('코인 주머니', 'Coin pouch'), () => L('판 보상 코인 +10%', 'Run coins +10%'), '#e6a817', '<path d="M7 8h10l3 12H4z"/><path d="M9 8l1-4h4l1 4M12 12v5"/>'],
 };
 const coinPill = () => `<div class="coins"><i></i>${meta.coins.toLocaleString()}</div>`;
 
@@ -1457,6 +1471,7 @@ function startRun() {
   mode = 'play';
   g.inv = 0.6;
   toast(L(`${clock(R.RUN_SECONDS)} 버티기!`, `Survive ${clock(R.RUN_SECONDS)}!`));
+  if (g.picks) showPick(); // 카드 달인: 스킬을 골라 들고 시작
 }
 /** 미션 목록: 달성한 것은 체크 표시와 함께 */
 function missionList(ids: readonly string[], done: readonly string[] = []) {
@@ -1572,7 +1587,7 @@ function showSettings() {
 function showShop() {
   mode = 'title';
   const cards = MT.PERKS.map((id) => {
-    const [name, desc, c, ico] = PERK_UI[id], lv = meta.perks[id], max = MT.PERK_MAX[id], cost = MT.perkCost(id, lv);
+    const [name, descOf, c, ico] = PERK_UI[id], lv = meta.perks[id], max = MT.PERK_MAX[id], cost = MT.perkCost(id, lv), desc = descOf(Math.min(max, lv + 1));
     const btn = lv >= max ? `<button class="buy" disabled>MAX</button>` : `<button class="buy" data-act="buy" data-perk="${id}" ${meta.coins < cost ? 'disabled' : ''}><i></i>${cost}</button>`;
     return `<div class="card perk" style="--c:${c}"><div class="ico">${svg(ico)}</div><b>${name}</b><em style="--p:${(lv / max) * 100}%">Lv ${lv}/${max}</em><span>${desc}</span>${btn}</div>`;
   });
@@ -1610,6 +1625,10 @@ overlay.addEventListener('click', (ev) => {
   }
   if (act === 'lang') return setLang(lang === 'ko' ? 'en' : 'ko');
   if (act === 'resume') return resume();
+  if (act === 'reroll') {
+    g.rerolls--;
+    return showPick();
+  }
   if (act === 'quit') return end(false);
   if (act === 'title') return showTitle();
   if (act === 'prev' || act === 'next') {
@@ -1680,7 +1699,7 @@ function end(win: boolean) {
   checkMissions();
   const doneMs = g.done.map((id) => MS.missionById(id)!);
   const missionCoins = doneMs.reduce((a, m) => a + m.coins, 0);
-  const coins = MT.coinsFor(g.kills, g.falls, win, curDef.chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins;
+  const coins = Math.round((MT.coinsFor(g.kills, g.falls, win, curDef.chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins) * MT.coinMul(meta));
   const missionsNow = meta.missions;
   const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < CH.STAGE_COUNT;
   meta = {

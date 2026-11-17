@@ -141,8 +141,11 @@ body[data-mode="bonus"] #sweep { opacity: .35; }
 .stage b { font-size: 19px; }
 .stage button { height: 48px; border: 0; border-radius: 14px; background: #ffffffe6; box-shadow: var(--shadow); font-size: 28px; font-weight: 900; line-height: 1; }
 .stage button:disabled { opacity: .35; }
-#overlay.shop { justify-content: center; }
-.card.perk { grid-template-columns: 52px 1fr auto; }
+#overlay.shop { justify-content: safe center; gap: 9px; } /* 화면보다 길면 위가 잘리지 않고 스크롤되게 */
+#overlay.shop .card.perk { padding: 9px 12px; }
+#overlay.shop .card.perk .ico { width: 44px; height: 44px; }
+#overlay.shop .card.perk span { font-size: 13px; }
+.card.perk { grid-template-columns: 44px 1fr auto; }
 .card.perk em { font-style: normal; font-size: 12px; font-weight: 900; color: var(--c); padding: 2px 8px; border-radius: 99px; justify-self: end;
   background: linear-gradient(90deg, color-mix(in srgb, var(--c) 28%, transparent) var(--p), #0000000d var(--p)); }
 .card.perk span { grid-column: 2 / 3; }

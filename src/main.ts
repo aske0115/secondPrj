@@ -379,6 +379,7 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* 저장 실패 시 이번 실행에서만 */ } },
 };
 let meta = MT.loadMeta(store.get('meta'), CH.STAGE_COUNT);
+if (meta.coins || meta.cleared || meta.missionsDone) ads.initAds(); // 한 판이라도 해 본 사람은 켤 때 바로 광고를 준비
 meta.missions = MS.fillMissions(meta.missions);
 setHero(meta.hero);
 const saveMeta = () => store.set('meta', JSON.stringify(meta));
@@ -760,7 +761,16 @@ function startBonus() {
   g.logs.length = g.pumpkins.length = 0;
   for (let i = 0; i < 3; i++) spawnPins();
   sfx.fanfare();
-  // 처음 보는 규칙이라 시간을 멈추고 할 일을 먼저 보여 준다(사용자: "뭘 어쩌라는 건지 모르다가 끝났다")
+  // 처음 보는 규칙이라 시간을 멈추고 할 일을 먼저 보여 준다(사용자: "뭘 어쩌라는 건지 모르다가 끝났다").
+  // 세 번 본 뒤로는 설명 카드 없이 바로 시작(결정 074, 매 판 같은 카드를 누르는 게 번거로웠다)
+  const seen = +(store.get('bonusSeen') ?? 0);
+  store.set('bonusSeen', String(seen + 1));
+  if (seen >= 3) {
+    mode = 'bonus';
+    sfx.setMusicFast(true);
+    toast(L('보너스 판! 끌었다 놓으면 돌진', 'Bonus! Drag & release to dash'));
+    return;
+  }
   mode = 'bonusIntro';
   show(
     `<h2 class="big-title" style="font-size:34px">${L('보너스 판!', 'Bonus round!')}</h2>` +
@@ -1394,6 +1404,8 @@ function toast(text: string) {
   el.className = 'pop';
 }
 function show(html: string, cls = '') {
+  // 같은 화면을 다시 그릴 때(상점에서 사기, 설정 켜고 끄기, 스테이지 넘기기)는 등장 애니메이션을 생략: 연달아 누를 때 버튼이 움직여 빗나갔다(결정 074)
+  overlay.toggleAttribute('data-still', !overlay.hidden && overlay.className === cls);
   overlay.className = cls;
   overlay.innerHTML = html;
   overlay.hidden = false;
@@ -1650,7 +1662,8 @@ function showShop() {
   show(
     `<h2 class="big-title" style="font-size:30px">${L('상점', 'Shop')}</h2>${coinPill()}` +
       `<div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST} ${L('캡슐 돌리기', 'Spin capsule')}</button>` +
-      (ads.adReady() && ads.adDaily().capsule < 1 ? `<button class="ad small" data-act="adCapsule">▶ ${L('광고 보고 무료 캡슐 (하루 1번)', 'Free capsule with an ad (1/day)')}</button>` : '') + `</div>` +
+      // 자리를 늘 차지해 사고 나서 아래 버튼이 밀려 올라가지 않게(결정 074)
+      `<button class="ad small" data-act="adCapsule" ${ads.adReady() && ads.adDaily().capsule < 1 ? '' : 'disabled'}>▶ ${ads.adDaily().capsule ? L('무료 캡슐: 내일 또 받아요', 'Free capsule: back tomorrow') : L('광고 보고 무료 캡슐 (하루 1번)', 'Free capsule with an ad (1/day)')}</button></div>` +
       `<div class="chars">${chars.join('')}</div><div class="cards">${cards.join('')}</div><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`,
     'shop',
   );
@@ -1756,6 +1769,7 @@ function end(win: boolean) {
   const coins = Math.round((MT.coinsFor(g.kills, g.falls, win, curDef.chapter) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins) * MT.coinMul(meta));
   const missionsNow = meta.missions;
   lastCoins = coins;
+  ads.initAds(); // 첫 판이 끝난 뒤에야 광고 준비(추적 허용 창)를 시작한다
   const unlocked = win && !dailyNote && stageIdx === meta.cleared && stageIdx < CH.STAGE_COUNT;
   meta = {
     ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared,

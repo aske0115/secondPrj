@@ -26,7 +26,11 @@ function preload() {
     .finally(() => { loading = false; });
 }
 
-if (native)
+let started = false;
+/** 광고 준비 시작(결정 074): 새로 깐 사람에게 게임을 보기도 전에 추적 허용 창을 띄우지 않도록 첫 판이 끝난 뒤에 부른다 */
+export function initAds() {
+  if (!native || started) return;
+  started = true;
   void (async () => {
     try {
       await AdMob.initialize({ initializeForTesting: unit.isTesting });
@@ -39,6 +43,7 @@ if (native)
       /* 광고 없이 진행 */
     }
   })();
+}
 
 export const adReady = () => ready;
 

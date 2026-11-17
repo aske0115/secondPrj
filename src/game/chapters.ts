@@ -138,11 +138,12 @@ export function stageDef(no: number, rand: () => number): StageDef {
     crumbles.push({ at, r: Math.round((r - (k + 1) * (r - 8.4) / nCr) * 10) / 10 });
   }
   const time: TimeOfDay = ch.night ? 'night' : rand() < 0.2 ? 'dusk' : 'day';
+  const easy = [0.6, 0.75, 0.88][no] ?? 1; // 맨 앞 세 스테이지는 서툴게 해도 깨지게: 적 수는 그대로(줄이면 첫 레벨 업이 41초로 늘어 지루), 피해·큰 적만 줄임(결정 074)
   return {
     no, chapter, inChapter: s, seed: no * 9973 + 17, r, crumbles, time, finale: s === STAGES_PER_CHAPTER - 1,
     // 뒤 장을 가파르게(결정 072): 강화가 체감되게 세진 만큼 1장은 그대로 두고 뒤로 갈수록 더 단단하게
-    spawn: 0.55 + p * 1.4 + inCh * 0.15, big: 0.45 + p * 1.4, hp: 0.6 + p * 3.2 + inCh * 0.3,
-    speed: 0.85 + p * 0.3, dmg: 0.45 + p * 1.0,
+    spawn: 0.55 + p * 1.4 + inCh * 0.15, big: (0.45 + p * 1.4) * easy, hp: 0.6 + p * 3.2 + inCh * 0.3,
+    speed: 0.85 + p * 0.3, dmg: (0.45 + p * 1.0) * easy,
   };
 }
 

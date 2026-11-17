@@ -79,6 +79,7 @@ body[data-mode="bonus"] #sweep { opacity: .35; }
   padding: calc(env(safe-area-inset-top) + 24px) 22px calc(env(safe-area-inset-bottom) + 24px); background: #1f2f4499; text-align: center; }
 #overlay[hidden] { display: none; }
 #overlay > * { animation: rise .35s cubic-bezier(.2, 1.4, .4, 1) both; }
+#overlay[data-still] > * { animation: none; }
 #overlay > :nth-child(2) { animation-delay: .06s; }
 #overlay > :nth-child(3) { animation-delay: .12s; }
 #overlay > :nth-child(4) { animation-delay: .18s; }
@@ -135,7 +136,7 @@ body[data-mode="bonus"] #sweep { opacity: .35; }
 .sub { width: min(100%, 300px); border: 0; border-radius: 16px; padding: 12px; font-size: 16px; font-weight: 800; background: #ffffffe6; box-shadow: var(--shadow); }
 .row { display: flex; gap: 10px; width: min(100%, 300px); }
 .row .sub { flex: 1; }
-.stage { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; width: min(100%, 300px); }
+.stage { display: grid; grid-template-columns: 40px 40px 1fr 40px 40px; align-items: center; gap: 6px; width: min(100%, 340px); } /* « ‹ 이름 › » 다섯 칸 */
 .stage > div { background: #ffffffe6; border-radius: 16px; padding: 8px; box-shadow: var(--shadow); }
 .stage small { display: block; font-size: 12px; font-weight: 700; opacity: .6; }
 .stage b { font-size: 19px; }

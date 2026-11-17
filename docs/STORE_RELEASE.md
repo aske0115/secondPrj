@@ -7,7 +7,7 @@ Google Play 먼저, iOS는 개발자 계정 문제로 나중. 패키지 `kr.co.d
 
 ## 0. 사용자가 할 일 — 순서대로
 
-1. 업로드 키 만들기(§1, 한 번만) → 키 파일·비밀번호 파일을 **따로 백업**.
+1. 업로드 키 준비(§1): 쓸어킬 키를 링크로 연결(이 PC는 완료). 다른 PC는 §1-2로 받아서 연결.
 2. 서명된 출시 AAB 만들기(§2) → `~/keys/release/tumble-isle-1.0.0-1.aab`로 복사.
 3. 개인정보 처리방침을 daeun.dev에 올리기(§4) → `https://daeun.dev/privacy/tumble-isle/` 열리는지 확인.
 4. Play Console 앱 만들기 → 앱 콘텐츠 선언(§3) → 스토어 등록정보(§5).
@@ -15,30 +15,41 @@ Google Play 먼저, iOS는 개발자 계정 문제로 나중. 패키지 `kr.co.d
 6. 게시 개요에서 「검토를 위해 전송」.
 7. 공개된 뒤 AdMob → 앱(Tumble Isle 안드로이드) → **앱 스토어 추가**로 Play 등록정보 연결(그 뒤 AdMob 검토·게재 시작, 결정 075).
 
-## 1. 업로드 키 (서명)
+## 1. 업로드 키 (서명) — 쓸어킬과 같은 키를 쓴다(결정 084)
 
-`android/app/build.gradle`이 저장소 밖 `~/keys/tumble-isle-signing.properties`를 읽어 서명한다(다른 위치는 환경 변수 `TUMBLE_SIGNING=<경로>`). 파일이 없으면 **서명 없는 AAB**가 만들어지고 Play에 올라가지 않는다.
+Play 앱 서명이 켜져 있으면 실제 배포 키는 Google이 앱마다 따로 보관하고, 개발자의 **업로드 키는 "올린 사람 확인"용**이라 여러 앱이 같은 키를 써도 된다. 망치섬은 쓸어킬의 업로드 키(`~/keys/neon-rush-upload.jks`, 별칭 `upload`)를 그대로 쓴다.
+- 장점: 키·비밀번호를 하나만 관리. 위험: 키를 잃거나 새면 두 앱 모두 영향(Play Console → 앱 무결성 → 업로드 키 재설정 요청으로 복구 가능).
 
-키 만들기(비밀번호를 두 번 묻는다. 이름·조직 질문은 아무 값이나 괜찮다):
+`android/app/build.gradle`은 저장소 밖 `~/keys/tumble-isle-signing.properties`를 읽는다(다른 위치는 환경 변수 `TUMBLE_SIGNING=<경로>`). 이 파일은 **쓸어킬 설정 파일을 가리키는 링크**로 둔다 — 비밀번호를 복사하지 않고 위치만 가리킨다.
+
+### 1-1. 키가 이 컴퓨터에 있을 때 (한 번만)
 
 ```bash
-mkdir -p ~/keys
-keytool -genkeypair -v -keystore ~/keys/tumble-isle-upload.jks -alias upload \
-  -keyalg RSA -keysize 2048 -validity 10000
-chmod 600 ~/keys/tumble-isle-upload.jks
+ln -s ~/keys/neon-rush-signing.properties ~/keys/tumble-isle-signing.properties
+ls -l ~/keys/tumble-isle-signing.properties   # → … -> …/neon-rush-signing.properties 이면 됨
 ```
 
-`~/keys/tumble-isle-signing.properties` (직접 만들고 `chmod 600`):
+(2026-11-17 회사 PC에는 만들어 둠.)
 
-```properties
-storeFile=/Users/<사용자>/keys/tumble-isle-upload.jks
-storePassword=<위에서 정한 비밀번호>
-keyAlias=upload
-keyPassword=<같은 비밀번호>
-```
+### 1-2. 키가 이 컴퓨터에 없을 때 (새 PC·집 PC)
 
-- 키·비밀번호 파일은 **절대 저장소에 넣지 않는다**(`android/.gitignore`에 `*.jks`·`*.keystore`). 잃어버리면 Play Console에서 업로드 키 재설정 요청을 해야 한다.
-- Play 앱 서명(Google이 실제 배포 키 보관)은 첫 AAB 업로드 때 기본으로 켜진다. 그대로 둔다.
+키·비밀번호 파일은 **공개 저장소(secondPrj·neon-rush 등)에 절대 올리지 않는다.** 백업해 둔 비공개 보관 위치에서 받아 같은 자리에 둔 뒤 1-1을 한다.
+
+1. 보관소에서 두 파일을 받는다: `neon-rush-upload.jks`, `neon-rush-signing.properties`
+   - 비공개 git 보관소에서 받을 때:
+     ```bash
+     git clone <키 보관 비공개 저장소 주소> ~/keys-src   # 사용자 확인 필요: 보관소 이름
+     mkdir -p ~/keys && chmod 700 ~/keys
+     cp ~/keys-src/neon-rush-upload.jks ~/keys-src/neon-rush-signing.properties ~/keys/
+     rm -rf ~/keys-src                                  # 사본을 남기지 않는다
+     ```
+2. 권한을 막는다: `chmod 600 ~/keys/neon-rush-upload.jks ~/keys/neon-rush-signing.properties`
+3. 설정 파일 안의 `storeFile=` 경로가 **이 컴퓨터의 경로**인지 본다(예: `/Users/<이 PC 사용자>/keys/neon-rush-upload.jks`). 다르면 그 한 줄만 고친다.
+4. 1-1의 링크를 만든다.
+5. 확인: `cd android && ./gradlew bundleRelease` 뒤 `jarsigner -verify app/build/outputs/bundle/release/app-release.aab` → `jar verified.` (실제 광고가 들어가지 않은 빌드로 확인해도 서명 확인은 된다. 확인 뒤 AAB는 지운다.)
+
+- 키를 아예 잃어버렸다면: 새 키를 만들고(`keytool -genkeypair -v -keystore ~/keys/upload-new.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`) Play Console → 앱 무결성 → **업로드 키 재설정 요청**(두 앱 모두). 승인까지 며칠 걸린다.
+- 역할(에이전트)은 키·비밀번호 파일을 열거나 복사하지 않는다. 받기·두기는 사용자가 하고, 역할은 링크·경로 확인과 서명 확인(`jarsigner -verify`)만 한다.
 
 ## 2. 출시 AAB 만들기
 

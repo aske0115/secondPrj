@@ -7,12 +7,14 @@
     "dev": "vite --port 5317 --host",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "native": "npm run build && npx cap sync ios",
+    "native": "npm run build && npx cap sync",
     "ios": "npm run native && npx cap open ios",
+    "android": "npm run native && npx cap open android",
     "build:release": "tsc --noEmit && vite build --mode release",
-    "native:release": "npm run build:release && npx cap sync ios"
+    "native:release": "npm run build:release && npx cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.2",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.2",
     "@capacitor/haptics": "^8.0.2",

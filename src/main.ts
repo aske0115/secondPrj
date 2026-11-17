@@ -1536,6 +1536,18 @@ function pause() {
   resetInput();
   showPause();
 }
+function resume() {
+  overlay.hidden = true;
+  mode = pausedFrom;
+}
+// 안드로이드 뒤로 가기(결정 071): 판 도중 → 일시정지, 일시정지 → 이어 하기, 상점·설정·결과 → 시작 화면, 시작 화면 → 묻고 종료
+void App.addListener('backButton', () => {
+  if (mode === 'play' || mode === 'bonus') return pause();
+  if (mode === 'pause') return resume();
+  if (mode === 'pick' || mode === 'bonusIntro') return; // 고르는 화면은 고른 뒤에 나간다
+  if (overlay.className !== 'title') return showTitle();
+  if (window.confirm(L('망치섬을 종료할까요? 진행 기록은 저장되어 있어요.', 'Quit Tumble Isle? Your progress is saved.'))) void App.exitApp();
+});
 const toggleRow = (act: string, label: string, on: boolean) =>
   `<button class="set" data-act="${act}" aria-pressed="${on}"><span>${label}</span><b>${on ? L('켬', 'On') : L('끔', 'Off')}</b></button>`;
 /** 언어를 바꾸면 다시 불러오므로 판 도중(일시정지)에는 빼고 보여 준다 */
@@ -1597,11 +1609,7 @@ overlay.addEventListener('click', (ev) => {
     return mode === 'pause' ? showPause() : showSettings();
   }
   if (act === 'lang') return setLang(lang === 'ko' ? 'en' : 'ko');
-  if (act === 'resume') {
-    overlay.hidden = true;
-    mode = pausedFrom;
-    return;
-  }
+  if (act === 'resume') return resume();
   if (act === 'quit') return end(false);
   if (act === 'title') return showTitle();
   if (act === 'prev' || act === 'next') {

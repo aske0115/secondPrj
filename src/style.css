@@ -226,3 +226,4 @@ body:not([data-mode="play"]):not([data-mode="bonus"]) #pause { visibility: hidde
 .set b { min-width: 52px; padding: 4px 10px; border-radius: 99px; background: #0000000f; color: #8a8174; }
 .set[aria-pressed="true"] b { background: var(--teal); color: #fff; }
 .credit { margin: 4px 0 0; font-size: 12px; color: #fff; opacity: .75; text-align: center; }
+.reveal .sub { color: var(--ink); } /* 캡슐 화면은 글자가 흰색이라 밝은 버튼 글자를 되돌린다 */

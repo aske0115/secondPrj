@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tumble Isle</string>
+    <string name="title_activity_main">Tumble Isle</string>
+    <string name="package_name">kr.co.daeun.tumbleisle</string>
+    <string name="custom_url_scheme">kr.co.daeun.tumbleisle</string>
+</resources>

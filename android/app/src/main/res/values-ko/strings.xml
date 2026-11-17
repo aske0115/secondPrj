@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- 한국어 기기에서 보이는 앱 이름(기본 values는 영어, 결정 054) -->
+<resources>
+    <string name="app_name">망치섬</string>
+    <string name="title_activity_main">망치섬</string>
+</resources>

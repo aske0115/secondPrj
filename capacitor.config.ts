@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   appId: 'kr.co.daeun.secondprj',
   appName: 'secondPrj',
   webDir: 'dist',
-  backgroundColor: '#241b14',
+  backgroundColor: '#bfe6f5', // 앱이 켜지는 순간 보이는 바탕(하늘색, 결정 052)
   ios: { contentInset: 'never' },
 };
 

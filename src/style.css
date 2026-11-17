@@ -152,3 +152,10 @@ body[data-mode="bonus"] #sweep { opacity: .35; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; }
 }
+
+/* 촬영 모드(__demo.shot): 화면 글자를 모두 숨긴다 */
+body[data-mode="shot"] #hud, body[data-mode="shot"] #sweep, body[data-mode="shot"] #overlay, body[data-mode="shot"] #toast, body[data-mode="shot"] #hint, body[data-mode="shot"] #warn { display: none !important; }
+
+/* 불러오는 동안 시작 화면 그림을 깔아 둔다(iOS 시작 화면이 사라진 뒤 모델을 읽는 1~2초, 결정 052) */
+#boot { position: fixed; inset: 0; z-index: 10; background: #bfe6f5 url(/splash.jpg) center / cover; transition: opacity .4s; pointer-events: none; }
+#boot.done { opacity: 0; }

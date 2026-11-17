@@ -1217,11 +1217,67 @@ function frame(now: number) {
 }
 showTitle();
 requestAnimationFrame(frame);
+const boot = $('boot');
+boot.classList.add('done');
+setTimeout(() => boot.remove(), 500);
 
 // 개발 훅: 콘솔에서 상태 확인·부하 시험(__demo.stress(300))
 if (DEV)
   Object.assign(window, {
     __demo: {
+      /** 촬영 모드: 연출 장면을 정해진 크기로 렌더해 docs/art/<kind>.png로 저장(개발 서버 vite.config.ts) */
+      shot: async (kind: 'icon' | 'splash') => {
+        const size = kind === 'icon' ? 1024 : 2732;
+        stageIdx = 0;
+        applyStage();
+        startRun();
+        mode = 'title'; // 시간을 멈춘다
+        document.body.dataset.mode = 'shot';
+        const sk = (x: number, z: number, big = false, out = false, y = 0) =>
+          g.enemies.push({ x, z, y, vy: 0, kx: 0, kz: 0, hp: 1, big, out, flash: 0, hop: Math.random() * 6, age: 1, bladeCd: 0 });
+        g.enemies.length = 0;
+        g.drops.length = 0;
+        if (kind === 'icon') {
+          g.golden = 1; // 금색 망치를 크게
+          g.face = 1.1;
+          g.swingT = 0.32;
+          g.swingYaw = 1.1;
+          sk(1.9, 0.9, false, true, 1.3); // 망치에 맞아 날아가는 해골
+          sk(1.5, -1.2);
+          sk(-1.6, -0.9, true);
+        } else {
+          g.face = 0.4;
+          for (let k = 0; k < 14; k++) {
+            const a = (k / 14) * Math.PI * 2 + 0.3, r = 2.6 + (k % 3) * 1.6;
+            sk(Math.sin(a) * r, Math.cos(a) * r, k % 5 === 0);
+          }
+          sk(11.4, 3, false, true, -1.5);
+          sk(-10.8, -4.5, false, true, -2.5);
+        }
+        g.inv = 0;
+        draw(0, performance.now());
+        const fog = scene.fog;
+        scene.fog = null;
+        renderer.setPixelRatio(1);
+        renderer.setSize(size, size, false);
+        composer.setSize(size, size);
+        camera.aspect = 1;
+        camera.near = 1; // 가까이 찍을 때 주인공이 잘리지 않게
+        camera.updateProjectionMatrix();
+        tilt.uniforms.v.value = 5 / size;
+        const target = new THREE.Vector3(0, kind === 'icon' ? 0.55 : 0, 0);
+        camera.position.copy(target).addScaledVector(CAM_DIR, kind === 'icon' ? 9 : 52);
+        camera.lookAt(target);
+        composer.render();
+        const blob = await new Promise<Blob | null>((ok) => renderer.domElement.toBlob(ok, 'image/png'));
+        scene.fog = fog;
+        camera.near = 10;
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        resize();
+        showTitle();
+        if (!blob) return 'no image';
+        return (await fetch(`/__shot?name=${kind}`, { method: 'POST', body: blob })).text();
+      },
       get g() { return g; },
       stats: () => ({ fps, mode, aim: aim.visible, enemies: g.enemies.length, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
       stress: (n = R.MAX_ENEMIES) => { while (g.enemies.length < n) spawn(); },

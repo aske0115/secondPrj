@@ -332,7 +332,7 @@ function applyStage() {
 }
 
 // ───────── 상태 ─────────
-type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind };
+type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind; pct?: number; stag?: number };
 type Drop = { x: number; z: number; y: number; type: R.DropId; life: number };
 type Helper = { x: number; z: number; t: number; cd: number; face: number; hop: number };
 type Gadget = { x: number; z: number; hx: number; hz: number; cd: number; squash: number; vx: number; vz: number; left: number; gone: number; on: number };
@@ -356,6 +356,8 @@ let g = newGame();
 let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' = 'title';
 const eScale = (e: Enemy) => (e.kind === 'boss' ? R.BOSS_SCALE : e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
+/** 밀리는 정도: 왕좀비는 맞을수록(%) 더 멀리 */
+const knockOf = (e: Enemy) => (e.kind === 'boss' ? R.bossKnock(e.pct ?? 0) : R.KIND_KNOCK[e.kind]);
 function resetIsland() {
   const r = stage().r, k = r / R.ISLAND_R;
   islandVis = r;
@@ -474,7 +476,11 @@ function hit(i: number, dmg: number, kx: number, kz: number, byHammer = false) {
   e.hp -= dmg;
   e.flash = 0.1;
   sfx.bonk();
-  let km = R.knockMul(g.lv.knock) * MT.shoveMul(meta) * R.KIND_KNOCK[e.kind] * (e.kind === 'boss' && e.age < 2.5 ? 0 : 1); // 왕좀비는 등장 2.5초 동안 안 밀림
+  if (e.kind === 'boss' && e.age >= 2.5) { // 왕좀비: 맞을수록 %가 오르고 잠깐 휘청
+    e.pct = (e.pct ?? 0) + dmg * R.BOSS_PCT_PER_DMG;
+    e.stag = R.BOSS_STAGGER;
+  }
+  let km = R.knockMul(g.lv.knock) * MT.shoveMul(meta) * knockOf(e) * (e.kind === 'boss' && e.age < 2.5 ? 0 : 1); // 왕좀비는 등장 2.5초 동안 안 밀림
   if (e.y > 0.3 && e.kind !== 'boss') { // 공중에 뜬 적을 또 치면 더 세게
     km *= R.JUGGLE_KNOCK;
     g.juggles++;
@@ -496,7 +502,7 @@ function blast(x: number, z: number) {
   for (const o of g.enemies) {
     const dx = o.x - x, dz = o.z - z, d = Math.hypot(dx, dz) || 1;
     if (o.out || d > R.BOMB_RADIUS) continue;
-    const k = R.BOMB_KNOCK * (1 - d / R.BOMB_RADIUS * 0.5) * R.KIND_KNOCK[o.kind];
+    const k = R.BOMB_KNOCK * (1 - d / R.BOMB_RADIUS * 0.5) * knockOf(o);
     o.kx += (dx / d) * k;
     o.kz += (dz / d) * k;
     o.flash = 0.1;
@@ -513,7 +519,7 @@ function spawnBoss() {
   g.bossSpawned = true;
   const a = Math.atan2(g.pz, g.px) + Math.PI, d = g.isl * 0.45; // 주인공 반대편, 섬 안쪽에서(가장자리에서 나오면 바로 휩쓸려 떨어졌다)
   g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: Infinity, big: true, out: false, flash: 0, hop: 0, age: 0, bladeCd: 0, kind: 'boss' });
-  toast(L('왕좀비 등장! 밀어서 떨어뜨려라', 'King zombie! Knock it off!'));
+  toast(L('왕좀비 등장! 때릴수록 %가 오르고 멀리 날아간다', 'King zombie! Each hit raises % — then knock it off!'));
   sfx.rumble();
   g.shake = 0.8;
 }
@@ -1010,7 +1016,8 @@ function update(dt: number) {
       if (e.y === 0) e.vy = 0;
     }
     const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz) || 1;
-    const sp = bonus ? 0 : (e.kind === 'boss' ? 0.9 : R.enemySpeed(g.t, e.big) * (e.kind === 'balloon' ? 1.15 : 1)) * stage().speed;
+    if (e.stag && e.stag > 0) e.stag -= dt;
+    const sp = bonus || (e.stag ?? 0) > 0 ? 0 : (e.kind === 'boss' ? 0.9 : R.enemySpeed(g.t, e.big) * (e.kind === 'balloon' ? 1.15 : 1)) * stage().speed;
     e.x += ((dx / d) * sp + e.kx) * dt;
     e.z += ((dz / d) * sp + e.kz) * dt;
     e.kx *= decay;
@@ -1048,8 +1055,8 @@ function update(dt: number) {
       if (d >= min) continue;
       const push = ((min - d) / d) * 0.5;
       const ka = Math.hypot(a.kx, a.kz), kb = Math.hypot(b.kx, b.kz);
-      if (ka > 3 && ka > kb * 1.5) { const t = 0.7 * R.KIND_KNOCK[b.kind]; b.kx += a.kx * t; b.kz += a.kz * t; a.kx *= 0.55; a.kz *= 0.55; b.flash = 0.1; }
-      else if (kb > 3 && kb > ka * 1.5) { const t = 0.7 * R.KIND_KNOCK[a.kind]; a.kx += b.kx * t; a.kz += b.kz * t; b.kx *= 0.55; b.kz *= 0.55; a.flash = 0.1; }
+      if (ka > 3 && ka > kb * 1.5) { const t = 0.7 * knockOf(b); b.kx += a.kx * t; b.kz += a.kz * t; a.kx *= 0.55; a.kz *= 0.55; b.flash = 0.1; }
+      else if (kb > 3 && kb > ka * 1.5) { const t = 0.7 * knockOf(a); a.kx += b.kx * t; a.kz += b.kz * t; b.kx *= 0.55; b.kz *= 0.55; a.flash = 0.1; }
       a.x -= dx * push;
       a.z -= dz * push;
       b.x += dx * push;
@@ -1529,10 +1536,23 @@ function end(win: boolean) {
 $('sweep').querySelector('span')!.textContent = L('쾅!', 'SLAM!');
 
 // 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
+const bossPct = $('bossPct');
 const hud = { hint: $('hint'), toast: $('toast'), warn: $('warn'), hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
 const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '', warnText: '', hint: '' };
 const hpFill = $('hpFill'), hpLag = $('hpLag'), hpText = $('hpText');
+const BP = new THREE.Vector3();
+function drawBossPct() { // 왕좀비 머리 위에 %(높을수록 빨갛게)
+  const b = g.enemies.find((e) => e.kind === 'boss' && !e.out);
+  if (!b || (mode !== 'play' && mode !== 'pick')) return void (bossPct.hidden = true);
+  BP.set(b.x, b.y + R.BOSS_SCALE * 1.35, b.z).project(camera);
+  const pct = Math.round(b.pct ?? 0);
+  bossPct.hidden = false;
+  bossPct.style.transform = `translate(${((BP.x + 1) / 2) * innerWidth}px, ${((1 - BP.y) / 2) * innerHeight}px) translate(-50%, -100%)`;
+  bossPct.textContent = `${pct}%`;
+  bossPct.style.color = `hsl(${Math.max(0, 50 - pct * 0.3)}, 100%, ${pct > 100 ? 55 : 98}%)`;
+}
 function drawHud() {
+  drawBossPct();
   if (shown.mode !== mode) document.body.dataset.mode = shown.mode = mode;
   if (shown.hp !== g.hp) { // 체력 게이지: 줄어든 만큼 흰 잔상이 남았다가 따라 줄어든다
     const pct = (g.hp / g.maxHp) * 100;
@@ -1731,7 +1751,7 @@ if (DEV)
       },
       sweep,
       /** 그리기 한 번 + 베스트 컷 찍기(화면 갱신이 멈춘 미리보기에서 시험용) */
-      renderOnce: () => { draw(1 / 60, performance.now()); composer.render(); captureShot(); return bestShot.length; },
+      renderOnce: () => { draw(1 / 60, performance.now()); composer.render(); captureShot(); drawHud(); return bestShot.length; },
       // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다
       bench: (n = 30) => {
         const gl = renderer.getContext(), t0 = performance.now();

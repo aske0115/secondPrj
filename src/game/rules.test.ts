@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { dayNumber, dailyStage, seeded, WEATHER_AT, WEATHER_SECONDS, WEATHER_PUSH, BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { bossKnock, dayNumber, dailyStage, seeded, WEATHER_AT, WEATHER_SECONDS, WEATHER_PUSH, BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -132,4 +132,10 @@ test('오늘의 섬: 같은 날은 같은 섬·같은 수열, 다른 날은 다�
   expect(c()).not.toBe(xs[0]);
   for (const x of xs) expect(x >= 0 && x < 1).toBe(true);
   expect(dailyStage(d)).toBeGreaterThanOrEqual(0);
+});
+
+test('왕좀비는 때릴수록 더 멀리 날아간다', () => {
+  expect(bossKnock(0)).toBeCloseTo(0.35);
+  expect(bossKnock(100)).toBeGreaterThan(1);
+  expect(bossKnock(200)).toBeGreaterThan(bossKnock(100));
 });

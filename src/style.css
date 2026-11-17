@@ -187,3 +187,8 @@ body[data-mode="shot"] #hud, body[data-mode="shot"] #sweep, body[data-mode="shot
 .bestcut .sub { width: auto; padding: 8px 12px; font-size: 14px; }
 .sub.daily { background: linear-gradient(#e8f6ff, #cfe9ff); }
 #overlay { overflow-y: auto; }
+
+/* 왕좀비 % (결정 064) */
+#bossPct { position: fixed; left: 0; top: 0; pointer-events: none; font-size: 26px; font-weight: 900; font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 0 #3a1a1a, 0 0 8px #0008; }
+#bossPct[hidden] { display: none; }

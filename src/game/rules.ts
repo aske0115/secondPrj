@@ -118,7 +118,11 @@ export function pickDrop(hpFull: boolean, rand = Math.random, helperUsed = false
 export const BOSS_AT = 95;
 export const BOSS_WARN = 3;
 export const BOSS_SCALE = 2.6;
-export const BOSS_KNOCK = 0.35; // 무거워서 덜 밀린다
+export const BOSS_KNOCK = 0.35; // 무거워서 덜 밀린다(0%일 때)
+/** 때릴수록 오르는 %(결정 064): 피해만큼 오르고, %가 높을수록 멀리 날아간다. 망치만으로는 넉백이 걷는 속도를 못 이겨 떨어뜨릴 수 없었다 */
+export const BOSS_PCT_PER_DMG = 0.8;
+export const bossKnock = (pct: number) => BOSS_KNOCK * (1 + pct / 45);
+export const BOSS_STAGGER = 0.7; // 맞으면 이만큼 멈칫(걷지 않음)
 export const BOSS_DMG = 30;
 export const bossCoins = (stage: number) => 80 * (stage + 1);
 

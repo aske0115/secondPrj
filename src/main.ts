@@ -10,8 +10,9 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { App } from '@capacitor/app';
 import * as CH from './game/chapters';
-import { L } from './i18n';
+import { L, lang, setLang } from './i18n';
 import * as sfx from './audio';
 import * as R from './game/rules';
 import * as MT from './game/meta';
@@ -450,7 +451,7 @@ const newGame = () => ({
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
 let g = newGame();
-let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' = 'title';
+let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' | 'pause' = 'title';
 const eScale = (e: Enemy) => (e.kind === 'boss' ? R.BOSS_SCALE * (curDef.finale ? 1.25 : 1) : e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 /** 밀리는 정도: 왕좀비는 맞을수록(%) 더 멀리 */
@@ -528,10 +529,20 @@ addEventListener('pointermove', (e) => e.pointerType === 'mouse' && inputMove(-2
 addEventListener('pointerup', (e) => e.pointerType === 'mouse' && inputEnd(-2, e.clientX, e.clientY));
 // 앱이 뒤로 가거나 창이 흐려지면 손을 뗀 것으로 본다
 addEventListener('blur', resetInput);
-document.addEventListener('visibilitychange', resetInput);
+document.addEventListener('visibilitychange', () => {
+  resetInput();
+  if (document.hidden) pause(); // 앱이 뒤로 가면 저절로 멈춘다
+});
+// 전화가 오거나 제어 센터를 내리는 등 잠깐 비활성이 되어도 멈추고, 돌아오면 일시정지 화면에서 이어 한다(결정 070)
+void App.addListener('appStateChange', ({ isActive }) => {
+  if (isActive) return;
+  resetInput();
+  pause();
+});
 addEventListener('keydown', (e) => (e.code === 'Space' ? sweep() : keys.add(e.code)));
 addEventListener('keyup', (e) => keys.delete(e.code));
 $('sweep').addEventListener('pointerdown', () => sweep());
+$('pause').addEventListener('click', () => { sfx.tap(); pause(); });
 
 // ───────── 규칙 ─────────
 function spawn() {
@@ -1486,7 +1497,7 @@ function showTitle() {
       `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
       `<button class="sub daily" data-act="daily">${L('오늘의 섬', "Today's isle")} · ${stageName(R.dailyStage(today()))}${loadDaily().best ? L(` · 최고 ${loadDaily().best}마리`, ` · best ${loadDaily().best}`) : ''}</button>` +
       `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button>` +
-      `<button class="sub" data-act="music" aria-pressed="${sfx.isMusicOn()}">${sfx.isMusicOn() ? L('♪ 음악 켬', '♪ Music on') : L('♪ 음악 끔', '♪ Music off')}</button></div></div>`,
+      `<button class="sub" data-act="settings">${L('설정', 'Settings')}</button></div></div>`,
     'title',
   );
 }
@@ -1515,6 +1526,36 @@ function showCapsule(got: MT.CharId, dup: boolean) {
     dup ? sfx.coins() : sfx.fanfare();
     sfx.buzz(30);
   }, 1150);
+}
+// ───── 일시정지·설정(결정 070) ─────
+let pausedFrom: 'play' | 'bonus' = 'play';
+function pause() {
+  if (mode !== 'play' && mode !== 'bonus') return;
+  pausedFrom = mode;
+  mode = 'pause';
+  resetInput();
+  showPause();
+}
+const toggleRow = (act: string, label: string, on: boolean) =>
+  `<button class="set" data-act="${act}" aria-pressed="${on}"><span>${label}</span><b>${on ? L('켬', 'On') : L('끔', 'Off')}</b></button>`;
+/** 언어를 바꾸면 다시 불러오므로 판 도중(일시정지)에는 빼고 보여 준다 */
+const settingsRows = (withLang: boolean) =>
+  `<div class="settings">${toggleRow('music', L('음악', 'Music'), sfx.isMusicOn())}${toggleRow('sound', L('효과음', 'Sound effects'), sfx.isSfxOn())}${toggleRow('haptic', L('진동', 'Vibration'), sfx.isHapticOn())}` +
+  (withLang ? `<button class="set" data-act="lang"><span>${L('언어', 'Language')}</span><b>${lang === 'ko' ? '한국어' : 'English'}</b></button>` : '') + `</div>`;
+function showPause() {
+  show(
+    `<h2 class="big-title" style="font-size:30px">${L('일시정지', 'Paused')}</h2>${settingsRows(false)}` +
+      `<button class="go" data-act="resume">${L('계속하기', 'Resume')}</button><button class="sub" data-act="quit">${L('그만하기', 'Quit')}</button>`,
+    'shop',
+  );
+}
+function showSettings() {
+  mode = 'title';
+  show(
+    `<h2 class="big-title" style="font-size:30px">${L('설정', 'Settings')}</h2>${settingsRows(true)}` +
+      `<p class="credit">${L('그래픽·효과음', 'Art & sound')}: Kenney (kenney.nl, CC0)</p><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`,
+    'shop',
+  );
 }
 function showShop() {
   mode = 'title';
@@ -1550,10 +1591,18 @@ overlay.addEventListener('click', (ev) => {
     return;
   }
   if (act === 'shop') return showShop();
-  if (act === 'music') {
-    sfx.toggleMusic();
-    return showTitle();
+  if (act === 'settings') return showSettings();
+  if (act === 'music' || act === 'sound' || act === 'haptic') {
+    (act === 'music' ? sfx.toggleMusic : act === 'sound' ? sfx.toggleSfx : sfx.toggleHaptic)();
+    return mode === 'pause' ? showPause() : showSettings();
   }
+  if (act === 'lang') return setLang(lang === 'ko' ? 'en' : 'ko');
+  if (act === 'resume') {
+    overlay.hidden = true;
+    mode = pausedFrom;
+    return;
+  }
+  if (act === 'quit') return end(false);
   if (act === 'title') return showTitle();
   if (act === 'prev' || act === 'next') {
     stageIdx = Math.max(0, Math.min(CH.STAGE_COUNT - 1, stageIdx + (act === 'next' ? 1 : -1)));

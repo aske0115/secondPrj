@@ -10,7 +10,7 @@ button { font: inherit; color: inherit; }
 
 /* ───── 상단 정보 ───── */
 #hud { position: fixed; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 10px) 14px 0; pointer-events: none;
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px 10px; transition: opacity .25s; }
+  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px 10px; transition: opacity .25s; }
 body[data-mode="title"] #hud, body[data-mode="title"] #sweep, body[data-mode="over"] #sweep { opacity: 0; }
 .pill { background: var(--paper); border-radius: 999px; padding: 6px 12px; box-shadow: var(--shadow); font-weight: 900; }
 #hearts { display: flex; align-items: center; gap: 8px; padding: 7px 12px; }
@@ -214,3 +214,15 @@ body[data-mode="shot"] #hud, body[data-mode="shot"] #sweep, body[data-mode="shot
 .reveal b { color: var(--gold); font-size: 18px; }
 .reveal h2 { margin: 0; font-size: 32px; }
 .reveal small { font-size: 15px; opacity: .9; margin-bottom: 8px; }
+
+/* 일시정지·설정(결정 070) */
+#pause { grid-column: 4; grid-row: 1; pointer-events: auto; position: relative; width: 38px; height: 38px; border: 0; border-radius: 50%; background: var(--paper); box-shadow: var(--shadow); }
+#pause::before, #pause::after { content: ''; position: absolute; top: 12px; width: 4px; height: 14px; border-radius: 2px; background: var(--ink); }
+#pause::before { left: 13px; } #pause::after { right: 13px; }
+#pause:active { transform: scale(.92); }
+body:not([data-mode="play"]):not([data-mode="bonus"]) #pause { visibility: hidden; }
+.settings { display: grid; gap: 8px; width: min(100%, 320px); }
+.set { display: flex; justify-content: space-between; align-items: center; border: 0; border-radius: 14px; padding: 13px 16px; background: var(--paper); box-shadow: 0 3px 0 var(--edge); font: inherit; font-weight: 900; color: var(--ink); }
+.set b { min-width: 52px; padding: 4px 10px; border-radius: 99px; background: #0000000f; color: #8a8174; }
+.set[aria-pressed="true"] b { background: var(--teal); color: #fff; }
+.credit { margin: 4px 0 0; font-size: 12px; color: #fff; opacity: .75; text-align: center; }

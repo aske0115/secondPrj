@@ -1,8 +1,9 @@
 // 소리: 타격·물건 소리는 Kenney CC0 녹음(public/sfx, 결정 046), 음 높이가 있는 신호음과 배경음악은 합성.
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { App } from '@capacitor/app';
 let ctx: AudioContext | null = null;
-let master: GainNode, musicGain: GainNode;
+let master: GainNode, musicGain: GainNode, sfxBus: GainNode; // 효과음은 모두 sfxBus를 지나 설정에서 한 번에 끈다
 let noise: AudioBuffer;
 
 const SAMPLES = ['whack', 'bonk1', 'bonk2', 'bonk3', 'pop', 'creak1', 'creak2', 'squish', 'clang', 'swish1', 'swish2', 'coins', 'chime', 'fanfare', 'tap'] as const;
@@ -12,7 +13,7 @@ const lastPlay = new Map<Sample, number>();
 
 export function unlockAudio() {
   if (ctx) {
-    if (ctx.state === 'suspended') void ctx.resume();
+    if (ctx.state !== 'running') void ctx.resume(); // iOS는 전화가 끝나면 'interrupted'로 남아 있어 다음 터치 때 되살린다
     return;
   }
   ctx = new AudioContext();
@@ -22,6 +23,9 @@ export function unlockAudio() {
   musicGain = ctx.createGain();
   musicGain.gain.value = 0.16;
   musicGain.connect(master);
+  sfxBus = ctx.createGain();
+  sfxBus.gain.value = sfxOn ? 1 : 0;
+  sfxBus.connect(master);
   noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noise.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -39,6 +43,10 @@ document.addEventListener('visibilitychange', () => {
   if (!ctx) return;
   void (document.hidden ? ctx.suspend() : ctx.resume());
 });
+// 전화·제어 센터처럼 잠깐 비활성이 될 때도(visibilitychange는 완전히 뒤로 갈 때만 온다)
+void App.addListener('appStateChange', ({ isActive }) => {
+  if (ctx) void (isActive ? ctx.resume() : ctx.suspend());
+});
 
 /** 녹음 효과음. 같은 소리는 gap초 안에 다시 울리지 않고(한꺼번에 맞을 때 뭉개짐 방지), 음 높이를 조금씩 흔든다 */
 function play(name: Sample, vol = 1, gap = 0.05, delay = 0, rate = 1) {
@@ -51,7 +59,7 @@ function play(name: Sample, vol = 1, gap = 0.05, delay = 0, rate = 1) {
   src.buffer = buf;
   src.playbackRate.value = rate * (0.93 + Math.random() * 0.14);
   g.gain.value = vol;
-  src.connect(g).connect(master);
+  src.connect(g).connect(sfxBus);
   src.start(t);
 }
 
@@ -65,7 +73,7 @@ function tone(freq: number, dur: number, type: OscillatorType, vol: number, dela
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(vol, t + 0.005);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(out ?? master);
+  o.connect(g).connect(out ?? sfxBus);
   o.start(t);
   o.stop(t + dur + 0.02);
 }
@@ -88,7 +96,7 @@ export function fall() {
   o.frequency.exponentialRampToValueAtTime(160, t + 0.5);
   g.gain.setValueAtTime(0.05, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-  o.connect(g).connect(master);
+  o.connect(g).connect(sfxBus);
   o.start(t);
   o.stop(t + 0.6);
 }
@@ -119,7 +127,7 @@ export function rumble() {
   f.frequency.value = 320;
   g.gain.setValueAtTime(0.45, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
-  src.connect(f).connect(g).connect(master);
+  src.connect(f).connect(g).connect(sfxBus);
   src.start(t);
   src.stop(t + 1.2);
   tone(55, 0.8, 'sine', 0.25);
@@ -142,6 +150,7 @@ export function finale() {
 
 /** 짧은 진동. iPhone 웹뷰는 navigator.vibrate를 무시하므로 앱에서는 네이티브 햅틱을 쓴다 */
 export function buzz(ms = 12) {
+  if (!hapticOn) return;
   if (Capacitor.isNativePlatform()) {
     void Haptics.impact({ style: ms >= 20 ? ImpactStyle.Medium : ImpactStyle.Light }).catch(() => {});
     return;
@@ -154,9 +163,10 @@ export function buzz(ms = 12) {
 }
 
 // ───── 배경음악: 마림바·오르골 느낌의 밝은 반복(합성) ─────
-let musicOn = (() => {
-  try { return localStorage.getItem('music') !== 'off'; } catch { return true; }
-})();
+// 설정(결정 070): 음악·효과음·진동. 기본은 모두 켬, 기기에 저장
+const savedOn = (k: string) => { try { return localStorage.getItem(k) !== 'off'; } catch { return true; } };
+const saveOn = (k: string, on: boolean) => { try { localStorage.setItem(k, on ? 'on' : 'off'); } catch { /* 이번 실행에서만 */ } };
+let musicOn = savedOn('music'), sfxOn = savedOn('sound'), hapticOn = savedOn('haptic');
 let musicTimer = 0, nextNote = 0, stepIdx = 0, tempo = 1;
 // C 장조 I–vi–IV–V. 화음 음(반음 단위, C4=0)과 베이스
 const CHORDS = [[0, 4, 7, 12], [-3, 0, 4, 9], [-7, -3, 0, 5], [-5, -1, 2, 7]];
@@ -205,7 +215,18 @@ export function setMusicFast(fast: boolean) {
 export const isMusicOn = () => musicOn;
 export function toggleMusic() {
   musicOn = !musicOn;
-  try { localStorage.setItem('music', musicOn ? 'on' : 'off'); } catch { /* 이번 실행에서만 */ }
+  saveOn('music', musicOn);
   musicOn ? startMusic() : stopMusic();
   return musicOn;
+}
+export const isSfxOn = () => sfxOn;
+export function toggleSfx() {
+  sfxOn = !sfxOn;
+  saveOn('sound', sfxOn);
+  if (sfxBus) sfxBus.gain.value = sfxOn ? 1 : 0;
+}
+export const isHapticOn = () => hapticOn;
+export function toggleHaptic() {
+  hapticOn = !hapticOn;
+  saveOn('haptic', hapticOn);
 }

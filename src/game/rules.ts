@@ -54,17 +54,20 @@ export type WeaponStat = {
   damage: number; knocks: readonly number[]; range: number; arc: number; shape: WeaponShape;
   at?: number; core?: number; coreDamage?: number; width?: number; pierce?: number;
   lift: number; flat?: boolean; ignoreShield?: boolean; aim?: boolean; boss: number; good: Trait;
+  windPush?: boolean; // 바람: 적의 무게(넉백 저항)와 상관없이 민다(왕좀비·큰 적 버팀은 그대로)
+  pierceLv?: number; // 카드 레벨마다 관통 +
+  widthLv?: number; // 카드 레벨마다 직선 폭 +(펀치 막대가 뒤 장 떼에 둘러싸여 1~3/20이던 것, 봇)
 };
 const W0 = { windMove: 1, recMove: 1, gap: 0, lift: 0, arc: 1, shape: 'fan' as WeaponShape, boss: 1 };
 export const WEAPON_STATS: Record<WeaponId, WeaponStat> = {
   hammer: { ...W0, good: 'swarm', wind: 0.1, windMove: 0.8, rec: 0.15, recMove: 0.8, rest: 0.65, damage: 14, knocks: [9], range: 1 },
-  squeaky: { ...W0, good: 'air', wind: 0.05, rec: 0.1, recMove: 0.9, rest: 0.38, gap: 0.12, damage: 4.9, knocks: [4.2, 5.9], range: 0.85, arc: 0.8, aim: true },
-  sledge: { ...W0, good: 'pack', wind: 0.45, windMove: 0.7, rec: 0.35, recMove: 0.3, rest: 0.85, damage: 26, knocks: [14], range: 1.9 / 2.12, shape: 'circle', at: 1.3, core: 0.7, coreDamage: 34, lift: LIFT_BASE, boss: 0.6 },
+  squeaky: { ...W0, good: 'air', wind: 0.05, rec: 0.1, recMove: 0.9, rest: 0.38, gap: 0.12, damage: 4.9, knocks: [5.2, 6.2], range: 0.85, arc: 0.8, aim: true },
+  sledge: { ...W0, good: 'pack', wind: 0.45, windMove: 0.7, rec: 0.35, recMove: 0.3, rest: 0.85, damage: 26, knocks: [16], range: 1.9 / 2.12, shape: 'circle', at: 1.3, core: 0.7, coreDamage: 34, lift: LIFT_BASE, boss: 0.6 },
   twin: { ...W0, good: 'rush', wind: 0.03, rec: 0.06, rest: 0.26, gap: 0.07, damage: 2.2, knocks: [2.5, 2.5, 5], range: 1.6 / 2.12, arc: 0.9, aim: true },
   pan: { ...W0, good: 'shield', wind: 0.12, windMove: 0.8, rec: 0.2, recMove: 0.7, rest: 0.5, damage: 12.6, knocks: [9], range: 0.85, arc: 1.3, flat: true, ignoreShield: true },
   bat: { ...W0, good: 'heavy', wind: 0.22, windMove: 0.8, rec: 0.25, recMove: 0.6, rest: 0.6, damage: 18.5, knocks: [18], range: 1.3, arc: 0.9, lift: LIFT_BASE, boss: 1.3 / 2 },
-  pole: { ...W0, good: 'line', wind: 0.15, windMove: 0.7, rec: 0.2, recMove: 0.8, rest: 0.42, damage: 13, knocks: [14], range: 3.4 / 2.12, shape: 'line', width: 1.6, pierce: 3, flat: true },
-  fan: { ...W0, good: 'tough', wind: 0.1, windMove: 0.8, rec: 0.15, recMove: 0.8, rest: 0.55, damage: 6, knocks: [9], range: 3.4 / 2.12, arc: 0.7 },
+  pole: { ...W0, good: 'line', wind: 0.15, windMove: 0.7, rec: 0.2, recMove: 0.8, rest: 0.42, damage: 13, knocks: [14], range: 3.4 / 2.12, shape: 'line', width: 1.6, widthLv: 0.4, pierce: 3, pierceLv: 1, flat: true },
+  fan: { ...W0, good: 'tough', wind: 0.1, windMove: 0.8, rec: 0.15, recMove: 0.8, rest: 0.55, damage: 6, knocks: [9], range: 3.4 / 2.12, arc: 0.7, windPush: true },
 };
 export const WEAPON_MAX_ARC = (240 * Math.PI) / 180;
 /** 숙련으로 바뀌는 값(무기 표에 더하거나 곱함). 단계 0이면 모두 그대로 */
@@ -84,8 +87,8 @@ export const weaponCycle = (id: WeaponId, lv: number, m = NO_MODS) =>
 /** 예전 이름(쿨다운) = 한 바퀴 */
 export const weaponCooldown = weaponCycle;
 export const WIND_REACH = 0.2; // 준비가 이만큼 이상이면 사거리 +0.5칸에서 준비를 시작(걸어오는 적을 미리 노림)
-/** 망치만의 장점 「쾅! 망치」(2-4): 망치를 들면 쾅! 충전 +25%, 반지름 +10% */
-export const HAMMER_SLAM = { charge: 1.25, radius: 1.1 };
+/** 망치만의 장점 「쾅! 망치」(2-4): 망치를 들면 쾅! 충전 +60%, 반지름 +15% */
+export const HAMMER_SLAM = { charge: 1.6, radius: 1.15 }; // 1.25·1.1 → 1.6·1.15(결정 087): 떼 성질에서 망치가 앞서게, 성질 없는 스테이지 승률은 그대로
 
 // ───── 숙련(결정 085 3장): 그 무기로 떨어뜨린 수가 쌓여 0~10단계, 줄 A→B→C 순서로 저절로 ─────
 export const MASTERY_MAX = 10;
@@ -273,27 +276,34 @@ export const TRAITS = ['swarm', 'air', 'pack', 'rush', 'shield', 'heavy', 'line'
 export type Trait = (typeof TRAITS)[number];
 /** spawn·big: 적 수·큰 적 비율 배수, hp: 모든 적 체력 배수, smallHp·smallSpeed: 작은 적 체력·속도 배수,
  *  shield: 큰 적이 방패를 들 확률(shieldAt초부터), smallShield: 작은 적도 방패를 들 확률,
- *  balloon·bomb: 작은 적이 풍선·폭탄일 확률(airAt초부터, 폭탄은 두 배 뒤), pop: 풍선은 첫 타엔 풍선만 터진다(피해·넉백 없음), balloonSpeed: 풍선 해골 속도 배수,
+ *  balloon·bomb: 작은 적이 풍선·폭탄일 확률(airAt초부터, 폭탄은 두 배 뒤), pop: 풍선은 첫 타엔 풍선만 터진다(피해 없음), balloonSpeed: 풍선 해골 속도 배수,
  *  brace: 큰 적(왕좀비 빼고)이 버티는 힘 — 한 타 넉백이 이보다 약하면 밀리지 않는다,
- *  pack: 한 번에 나오는 수·간격 배수, 같이 나온 적은 한 덩어리(총 수는 같음), lanes: 마주 보는 두 방향에서만 줄지어 나온다 */
+ *  pack: 한 번에 나오는 수·간격 배수, 같이 나온 적은 한 덩어리(총 수는 같음), lanes: 마주 보는 두 방향에서만 줄지어 나온다,
+ *  clump: 겹겹이 뭉쳐 관통 직선도 가린 적은 못 맞힌다(원 충격파만 안쪽까지), anchor: 바닥에 붙은 덩어리 — 띄우지 않는 주무기 타에 밀리는 정도(띄우는 타·보조 무기는 그대로), block: 방패가 막고 남기는 비율(작을수록 단단한 방패), braceKeep: 버틸 때도 이만큼은 밀림, cover: 앞 적이 이 폭 안에서 가리면 뒤 적은 부채꼴 공격에 안 맞는다(원 충격파·관통 직선만 뒤까지, 0이면 없음), popMin: 풍선을 터뜨리는 최소 한 타 넉백(스펀지 칼처럼 무른 타는 튕겨 나감),
+ *  weight: 작은·큰 적(왕좀비 빼고)이 밀리는 정도(무게), ring: 주인공 둘레에 이만큼씩 한꺼번에 솟아오른다(0이면 섬 끝에서) */
 export type TraitFx = {
   spawn: number; big: number; hp: number; smallHp: number; smallSpeed: number; shield: number; shieldAt: number; smallShield: number;
   balloon: number; bomb: number; airAt: number; pop: boolean; balloonSpeed: number; brace: number; pack: number; lanes: boolean;
+  weight: number; ring: number; braceKeep: number; cover: number; clump: boolean; block: number; anchor: number;
 };
 const TRAIT_FX0: TraitFx = {
   spawn: 1, big: 1, hp: 1, smallHp: 1, smallSpeed: 1, shield: 0.25, shieldAt: 45, smallShield: 0,
-  balloon: 0.12, bomb: 0.1, airAt: 15, pop: false, balloonSpeed: 1.15, brace: 0, pack: 1, lanes: false,
+  balloon: 0.12, bomb: 0.1, airAt: 15, pop: false, balloonSpeed: 1.15, brace: 0, pack: 1, lanes: false, weight: 1, ring: 0, braceKeep: 0, cover: 0, clump: false, anchor: 1, block: 0.25, // block = SHIELD_BLOCK(아래에서 정의)
 };
 export const NO_TRAIT = TRAIT_FX0;
+export const PACK_R = 4.5; // 뭉침: 덩어리가 떨어지는 거리
+export const PACK_SPREAD = 1; // 덩어리 반지름
+export const RING_R = 5.3; // 떼: 주인공 둘레 이 거리에서 솟아오른다. 쾅! 반지름(5)보다 조금 밖이라 망치의 쾅!(×1.15)만 바로 덮는다
+export const POP_MIN = 5; // 풍선은 이보다 약한 타에는 안 터지고 튕겨 나간다(스펀지 쌍검은 셋째 타 5만, 뿅망치는 첫 타 5.2부터)
 export const TRAIT_FX: Record<Trait, TraitFx> = {
-  swarm: { ...TRAIT_FX0, spawn: 1.3, big: 1 / 1.3 }, // 작은 적이 떼로 → 망치(쾅!이 자주·크게)
-  air: { ...TRAIT_FX0, spawn: 0.65, balloon: 0.75, bomb: 0.1, airAt: 5, pop: true, balloonSpeed: 1.8 }, // 풍선·폭탄 해골 → 뿅망치(연타)
-  pack: { ...TRAIT_FX0, pack: 5, spawn: 1.2 }, // 덩어리로 → 대형 해머(가운데 쿵)
-  rush: { ...TRAIT_FX0, spawn: 1.3, smallHp: 0.25, smallSpeed: 1.35 }, // 빠른 작은 적 → 스펀지 쌍검(준비 없이 계속)
-  shield: { ...TRAIT_FX0, shield: 0.9, shieldAt: 10, big: 1.4, smallShield: 0.3 }, // 방패 좀비 → 프라이팬(방패 무시)
-  heavy: { ...TRAIT_FX0, spawn: 0.45, big: 1.6, brace: 15 }, // 버티는 큰 적 → 야구방망이(넉백 2배)
-  line: { ...TRAIT_FX0, lanes: true, spawn: 1.3 }, // 두 방향 행렬 → 펀치 막대(일직선 관통)
-  tough: { ...TRAIT_FX0, hp: 6, spawn: 0.6 }, // 단단한 적 → 큰 부채(체력 무시하고 밀어 떨어뜨림)
+  swarm: { ...TRAIT_FX0, spawn: 1.2, big: 1 / 1.2, smallHp: 0.35, ring: 12, anchor: 0.5 }, // 주인공 둘레에 솟아오르는 엉겨 붙은 떼(무기엔 덜 밀림) → 망치(쾅!이 자주·크게)
+  air: { ...TRAIT_FX0, spawn: 0.58, smallHp: 0.4, balloon: 0.85, bomb: 0.05, airAt: 5, pop: true, balloonSpeed: 1.8 }, // 풍선 해골(약한 타는 튕김, 터뜨린 뒤 한 번 더) → 뿅망치(첫 타로 터뜨리고 둘째 타로)
+  pack: { ...TRAIT_FX0, pack: 8, hp: 1.5, cover: 0.7, clump: true, anchor: 0.7 }, // 가까이 떨어지는 덩어리(안쪽은 가려짐, 바닥에 붙어 띄우는 타에만 잘 밀림) → 대형 해머(원 충격파·늘 띄움)
+  rush: { ...TRAIT_FX0, spawn: 1.2, smallHp: 0.15, smallSpeed: 1.6 }, // 빠른 작은 적 → 스펀지 쌍검(준비 없이 계속)
+  shield: { ...TRAIT_FX0, shield: 0.9, shieldAt: 10, big: 1.4, smallShield: 0.3, block: 0.28 }, // 방패 좀비(단단한 방패) → 프라이팬(방패 무시)
+  heavy: { ...TRAIT_FX0, spawn: 0.45, big: 1.6, brace: 17, braceKeep: 0.2 }, // 버티는 큰 적 → 야구방망이(넉백 2배)
+  line: { ...TRAIT_FX0, lanes: true, cover: 0.45, spawn: 1, hp: 4 }, // 두 방향 행렬(앞 적이 뒤를 가림, 단단함) → 펀치 막대(관통)
+  tough: { ...TRAIT_FX0, hp: 1.2, spawn: 0.38, weight: 0.3 }, // 무거운 적(덜 밀림) → 큰 부채(바람은 무게와 상관없이 민다)
 };
 /** 특징 → 추천 무기(WEAPON_STATS의 good에서 만든다) */
 export const TRAIT_WEAPON = Object.fromEntries(Object.entries(WEAPON_STATS).map(([id, w]) => [w.good, id])) as Record<Trait, WeaponId>;

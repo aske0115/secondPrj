@@ -7,7 +7,7 @@ export type Perk = (typeof PERKS)[number];
 // 장 10개·150스테이지에 맞춰 단계를 늘리고 값을 가파르게(결정 068): 최대 효과는 예전과 같고, 다 사는 데 한 달쯤
 export const PERK_MAX: Record<Perk, number> = { vigor: 5, shove: 10, charge: 10, cards: 5, revive: 5, purse: 5 };
 const PERK_BASE: Record<Perk, number> = { vigor: 200, shove: 100, charge: 100, cards: 300, revive: 300, purse: 400 };
-export const perkCost = (id: Perk, lv: number) => Math.round(PERK_BASE[id] * (1 + lv) ** 3.5); // 지수 3 → 3.4(결정 078): 하루 6판 중 3판 코인 2배여도 다 사기까지 30일(180판) 넘게 → 3.5(결정 086): 숙련·성질로 진행이 빨라진 만큼
+export const perkCost = (id: Perk, lv: number) => Math.round(PERK_BASE[id] * (1 + lv) ** 3.4); // 지수 3 → 3.4(결정 078): 하루 6판 중 3판 코인 2배여도 다 사기까지 30일(180판) 넘게. 3.5(결정 086) → 3.4(결정 087): 성질이 세져 진행이 다시 느려짐
 
 // 캐릭터(결정 061): 캡슐로 얻는 Kenney 캐릭터, 저마다 작은 특성 하나
 export const CHARS = ['human', 'orc', 'keeper', 'vampire', 'ghost'] as const;

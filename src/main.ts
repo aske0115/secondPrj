@@ -475,7 +475,7 @@ const newGame = (w = runWeapon()) => ({
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
   // 주무기(결정 083·086): wPhase 준비/후딜 단계와 남은 시간 wT, 겨눈 방향 wYaw, 숙련 값 wMods. swing*는 마지막 타의 모양(그리기용)
   weapon: w, wMods: R.masteryMods(w, R.masteryLevel(meta.mastery[w])), wSwings: 0, queue: [] as Strike[], gusts: [] as { x: number; z: number; t: number }[],
-  wPhase: 'idle' as 'idle' | 'windup' | 'recovery', wT: 0, wYaw: 0, hurts: 0, hurtsInWind: 0, laneA: rnd(0, Math.PI), // laneA: 행렬 성질의 두 방향
+  wPhase: 'idle' as 'idle' | 'windup' | 'recovery', wT: 0, wYaw: 0, hurts: 0, hurtsInWind: 0, ringAcc: 0, laneA: rnd(0, Math.PI), // laneA: 행렬 성질의 두 방향
   swingKind: 'main' as Strike['kind'], swingShape: R.WEAPON_STATS[w].shape, swingArc: R.weaponArc(w, 1), swingRad: R.weaponRadius(w, 1) * MT.hammerMul(meta),
   fallBy: { main: 0, log: 0, pumpkin: 0, sweep: 0, other: 0 } as Record<Src, number>,
 });
@@ -484,7 +484,7 @@ let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' | 'pause' 
 const eScale = (e: Enemy) => (e.kind === 'boss' ? R.BOSS_SCALE * (curDef.finale ? 1.25 : 1) : e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 /** 밀리는 정도: 왕좀비는 맞을수록(%) 더 멀리 */
-const knockOf = (e: Enemy) => (e.kind === 'boss' ? R.bossKnock(e.pct ?? 0) : R.KIND_KNOCK[e.kind])
+const knockOf = (e: Enemy) => (e.kind === 'boss' ? R.bossKnock(e.pct ?? 0) : R.KIND_KNOCK[e.kind] * tfx().weight); // 단단 성질: 무거워 덜 밀림
 function resetIsland() {
   const r = stage().r, k = r / R.ISLAND_R;
   islandVis = r;
@@ -584,11 +584,36 @@ function spawnAngle() {
   }
   return a;
 }
-/** pack: 덩어리 성질에서 같은 자리 둘레에 모아 낸다 */
-function spawn(pack?: number) {
-  const fx = tfx(), a = pack === undefined ? spawnAngle() : pack + rnd(-0.08, 0.08);
+/** 떼 성질: 주인공 둘레 RING_R칸에 n마리를 고르게(섬 안으로 당김) */
+function spawnRing(n: number) {
+  const a0 = rnd(0, Math.PI * 2);
+  for (let k = 0; k < n && g.enemies.length < R.MAX_ENEMIES; k++) {
+    spawn();
+    const e = g.enemies[g.enemies.length - 1], a = a0 + (k / n) * Math.PI * 2;
+    let x = g.px + Math.cos(a) * R.RING_R, z = g.pz + Math.sin(a) * R.RING_R;
+    const o = Math.hypot(x, z), lim = g.isl - 0.8;
+    if (o > lim) { x *= lim / o; z *= lim / o; }
+    e.x = x;
+    e.z = z;
+  }
+}
+/** 뭉침 성질: 주인공에게서 PACK_R칸 떨어진 한 점에 n마리가 덩어리로 떨어진다 */
+function spawnPack(n: number) {
+  const a = rnd(0, Math.PI * 2), lim = g.isl - 1.5;
+  let cx = g.px + Math.cos(a) * R.PACK_R, cz = g.pz + Math.sin(a) * R.PACK_R;
+  const o = Math.hypot(cx, cz);
+  if (o > lim) { cx *= lim / o; cz *= lim / o; }
+  for (let k = 0; k < n && g.enemies.length < R.MAX_ENEMIES; k++) {
+    spawn();
+    const e = g.enemies[g.enemies.length - 1], r = Math.sqrt(Math.random()) * R.PACK_SPREAD, b = rnd(0, Math.PI * 2);
+    e.x = cx + Math.cos(b) * r;
+    e.z = cz + Math.sin(b) * r;
+  }
+}
+function spawn() {
+  const fx = tfx(), a = spawnAngle();
   const st = stage(), big = Math.random() < Math.min(0.6, R.bigChance(g.t) * st.big), kind = R.pickKind(g.t, big, Math.random, curDef.trait);
-  const d = g.isl - 0.8 - (pack !== undefined ? rnd(0, 0.8) : fx.lanes ? rnd(0, 1.4) : 0); // 덩어리·행렬은 앞뒤로도 조금 흩어 겹치지 않게
+  const d = g.isl - 0.8 - (fx.lanes ? rnd(0, 1.4) : 0); // 행렬은 앞뒤로도 조금 흩어 겹치지 않게
   g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp * R.KIND_HP[kind] * fx.hp * (big ? 1 : fx.smallHp), big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0, kind, v: Math.random() < 0.5 ? 1 : 0 });
 }
 
@@ -618,10 +643,14 @@ function drop(i: number) {
 /** extra: 덧붙는 타격·뿅망치 둘째 타(공중 콤보로 세지 않는다). lift: 세기와 상관없이 이만큼 띄운다(0이면 세게 맞을 때만) */
 function hit(i: number, dmg: number, kx: number, kz: number, src: Src = 'other', extra = false, lift = 0) {
   const e = g.enemies[i], main = src === 'main', sub = src === 'log' || src === 'pumpkin';
-  if (e.kind === 'shield' && main && !R.WEAPON_STATS[g.weapon].ignoreShield) { dmg *= R.SHIELD_BLOCK; kx *= R.SHIELD_BLOCK; kz *= R.SHIELD_BLOCK; } // 정면 주무기는 방패가 막는다(프라이팬은 무시)
+  if (e.kind === 'shield' && main && !R.WEAPON_STATS[g.weapon].ignoreShield) { const b = tfx().block; dmg *= b; kx *= b; kz *= b; } // 정면 주무기는 방패가 막는다(프라이팬은 무시)
   const fx = tfx();
-  if (fx.pop && e.kind === 'balloon') { e.kind = ''; dmg = 0; kx = kz = 0; } // 풍선 많은 섬: 첫 타엔 풍선만 터진다 → 연타가 유리
-  if (e.big && e.kind !== 'boss' && Math.hypot(kx, kz) < fx.brace) kx = kz = 0; // 무거운 섬: 약한 타격엔 큰 적이 버틴다 → 넉백 큰 무기가 유리
+  if (fx.pop && e.kind === 'balloon') { // 풍선 많은 섬: 첫 타엔 풍선만 터진다(피해 없음, 밀리기는 함) → 연타가 유리. 무른 타는 튕겨 나가 아무 일 없음
+    if (Math.hypot(kx, kz) >= R.POP_MIN) e.kind = '';
+    else kx = kz = 0;
+    dmg = 0;
+  }
+  if (e.big && e.kind !== 'boss' && Math.hypot(kx, kz) < fx.brace) { kx *= fx.braceKeep; kz *= fx.braceKeep; } // 무거운 섬: 약한 타격엔 큰 적이 버틴다 → 넉백 큰 무기가 유리
   e.by = src;
   e.byT = g.t;
   e.hp -= dmg;
@@ -633,6 +662,8 @@ function hit(i: number, dmg: number, kx: number, kz: number, src: Src = 'other',
   }
   let km = R.knockMul(g.lv.knock) * MT.shoveMul(meta) * knockOf(e) * (e.kind === 'boss' && e.age < 2.5 ? 0 : 1); // 왕좀비는 등장 2.5초 동안 안 밀림
   if (sub) km *= R.SUB_KNOCK;
+  if (main && !lift && e.kind !== 'boss') km *= tfx().anchor; // 뭉침 성질: 바닥에 붙은 덩어리는 띄워 치는 타(대형 해머·방망이)에만 제대로 밀린다
+  if (main && R.WEAPON_STATS[g.weapon].windPush && e.kind !== 'boss') km /= tfx().weight; // 부채 바람은 무게와 상관없이
   if (main && e.kind === 'boss') km *= R.WEAPON_STATS[g.weapon].boss; // 방망이·대형 해머는 왕좀비에게 덜(결정 072처럼 너무 빨리 떨구지 않게)
   if (!extra && e.y > 0.3 && e.kind !== 'boss') { // 공중에 뜬 적을 또 치면 더 세게
     km *= R.JUGGLE_KNOCK;
@@ -863,11 +894,21 @@ function strike(s: Strike) {
   const es = g.enemies, fx = Math.sin(s.yaw), fz = Math.cos(s.yaw), circle = s.shape === 'circle';
   const ox = circle ? s.cx : g.px, oz = circle ? s.cz : g.pz;
   const pick: [number, number][] = []; // [적 번호, 피해]
+  const cover = tfx().cover;
+  /** 행렬·뭉침: 주인공과 이 적 사이 좁은 길에 다른 적이 있으면 가려서 안 맞는다(관통하는 직선만 뒤까지) */
+  const hidden = (e: Enemy) => {
+    const ex = e.x - g.px, ez = e.z - g.pz, d = Math.hypot(ex, ez) || 1;
+    return es.some((o) => {
+      if (o === e || o.out) return false;
+      const qx = o.x - g.px, qz = o.z - g.pz, along = (qx * ex + qz * ez) / d;
+      return along > 0.3 && along < d - 0.3 && Math.abs(qx * ez - qz * ex) / d < cover;
+    });
+  };
   if (s.shape === 'line') { // 직선: 가까운 순서로 pierce마리까지, 왕좀비에서 멈춤
     const c: [number, number][] = [];
     es.forEach((e, i) => {
       const rx = e.x - ox, rz = e.z - oz, along = rx * fx + rz * fz, side = Math.abs(rx * fz - rz * fx);
-      if (!e.out && along > -eRadius(e) && along <= s.rad + eRadius(e) && side <= s.width / 2 + eRadius(e)) c.push([i, along]);
+      if (!e.out && along > -eRadius(e) && along <= s.rad + eRadius(e) && side <= s.width / 2 + eRadius(e) && !(tfx().clump && hidden(e))) c.push([i, along]);
     });
     c.sort((a, b) => a[1] - b[1]);
     for (const [i] of c.slice(0, s.pierce)) { pick.push([i, s.dmg]); if (es[i].kind === 'boss') break; }
@@ -875,6 +916,7 @@ function strike(s: Strike) {
     for (let i = 0; i < es.length; i++) {
       const e = es[i], dx = e.x - ox, dz = e.z - oz, d = Math.hypot(dx, dz);
       if (e.out || d > s.rad + eRadius(e)) continue;
+      if (cover > 0 && !circle && hidden(e)) continue; // 원 충격파는 위에서 내려찍어 덩어리 안쪽까지
       if (circle) { pick.push([i, d <= s.core ? s.coreDmg : s.dmg]); continue; }
       let da = Math.atan2(dx, dz) - s.yaw;
       da = Math.atan2(Math.sin(da), Math.cos(da));
@@ -908,7 +950,7 @@ function swingNow(yaw: number) {
   const base: Strike = {
     in: 0, kind: 'main', shape: ws.shape, yaw, half, rad, dmg, knock: knocks[0], dmgHalf: half, lift: ws.lift, extra: false, flat: !!ws.flat,
     cx: g.px + Math.sin(yaw) * at, cz: g.pz + Math.cos(yaw) * at, core: (ws.core ?? 0) * big, coreDmg: (ws.coreDamage ?? 0) * (gold ? 24 / 14 : 1),
-    width: ws.width ?? 0, pierce: (ws.pierce ?? 0) + m.pierce,
+    width: (ws.width ?? 0) + (ws.widthLv ?? 0) * (lv - 1), pierce: (ws.pierce ?? 0) + m.pierce + (ws.pierceLv ?? 0) * (lv - 1),
   };
   let first = base;
   const later = (o: Partial<Strike>) => g.queue.push({ ...base, dmg: 0, extra: true, ...o });
@@ -1286,9 +1328,13 @@ function update(dt: number) {
   // 적이 올라온다
   g.spawnCd -= dt;
   if (!bonus && g.spawnCd <= 0) {
-    const pk = tfx().pack, at = pk > 1 ? spawnAngle() : undefined; // 덩어리 성질: 한 번에 pk배, 간격도 pk배(총 수는 같음)
+    const ring = tfx().ring, pk = tfx().pack; // 덩어리 성질: 한 번에 pk배, 간격도 pk배(총 수는 같음)
     g.spawnCd = (R.spawnInterval(g.t) / stage().spawn / R.calmSpawn(g.calm)) * pk;
-    for (let i = Math.round(R.spawnBatch(g.t) * stage().spawn * pk); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn(at);
+    if (ring) { // 떼 성질: 같은 수를 ring마리씩 모아 주인공 둘레에 한꺼번에 솟아오르게
+      g.ringAcc += R.spawnBatch(g.t) * stage().spawn;
+      if (g.ringAcc >= ring) { g.ringAcc -= ring; spawnRing(ring); }
+    } else if (pk > 1) spawnPack(Math.round(R.spawnBatch(g.t) * stage().spawn * pk));
+    else for (let i = Math.round(R.spawnBatch(g.t) * stage().spawn); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn();
   }
 
   // 적 이동·낙하·접촉

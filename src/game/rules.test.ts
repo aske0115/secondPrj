@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { STAGES, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { BONUS_AT, BONUS_SECONDS, STAGES, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -46,4 +46,25 @@ test('뒤 섬일수록 어렵다', () => {
 test('떨어뜨리기가 그냥 처치보다 보상이 크다', () => {
   expect(FALL_CHARGE).toBeGreaterThan(KILL_CHARGE);
   for (const big of [false, true]) expect(fallXp(big)).toBeGreaterThan(killXp(big));
+});
+
+test('스킬은 레벨이 오를수록 자주·넓게, 망치는 반원을 넘지 않는다', () => {
+  for (let lv = 2; lv <= MAX_LEVEL; lv++) {
+    expect(hammerCooldown(lv)).toBeLessThan(hammerCooldown(lv - 1));
+    expect(logInterval(lv)).toBeLessThan(logInterval(lv - 1));
+    expect(pumpkinInterval(lv)).toBeLessThan(pumpkinInterval(lv - 1));
+  }
+  expect(hammerArc(MAX_LEVEL)).toBeLessThanOrEqual(Math.PI);
+});
+
+test('보너스는 판 안에서 끝나고, 무너짐 경고와 겹치지 않는다', () => {
+  expect(BONUS_AT).toBeLessThan(RUN_SECONDS);
+  for (const st of STAGES) for (const c of st.crumbles) expect(Math.abs(c.at - BONUS_AT)).toBeGreaterThan(3);
+  expect(BONUS_SECONDS).toBeGreaterThan(5);
+});
+
+test('짧게 스친 손가락은 돌진이 아니고, 길게 튕길수록 빠르되 상한이 있다', () => {
+  expect(dashSpeed(5)).toBe(0);
+  expect(dashSpeed(100)).toBeGreaterThan(dashSpeed(40));
+  expect(dashSpeed(5000)).toBe(24);
 });

@@ -170,10 +170,20 @@ heroWalk.play().setEffectiveWeight(0);
 const smallMesh = instanced(skel.geo, skel.mat, R.MAX_ENEMIES, true);
 const bigMesh = instanced(zombie.geo, zombie.mat, R.MAX_ENEMIES, true);
 const C_PLAIN = new THREE.Color(1, 1, 1), C_FLASH = new THREE.Color(3, 3, 3);
+const C_PUMPKIN = new THREE.Color(0xf08a2a);
 const C_SMALL = new THREE.Color(0xe9e4d4), C_BIG = new THREE.Color(0x7fae6a), C_DIRT = new THREE.Color(0x9c7550); // 터질 때 조각 색
-const shotMesh = instanced(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff1a0 }), 64);
-const gemMesh = instanced(new THREE.OctahedronGeometry(0.2), flat(0x55e6d6, { emissive: 0x55e6d6, emissiveIntensity: 0.7 }), 400);
-const bladeMesh = instanced(new THREE.BoxGeometry(0.6, 0.08, 0.18), flat(0xf4f7ff), 6, true);
+// 망치 휘두름: 부채꼴이 잠깐 번쩍인다. 레벨마다 각도가 달라 그때그때 만든다
+const swing = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xfff3c4, transparent: true, depthWrite: false }));
+swing.position.y = 0.08;
+scene.add(swing);
+let swingArc = -1, ringAtHero = true;
+const logMesh = instanced(
+  mergeGeometries([
+    new THREE.CylinderGeometry(0.36, 0.36, 3.2, 9).rotateZ(Math.PI / 2),
+  ]),
+  flat(0x8a5a3c), 4, true,
+);
+const pumpkinMesh = instanced(pumpkin.geo, pumpkin.mat, 12, true);
 const bitMesh = instanced(new THREE.BoxGeometry(0.16, 0.16, 0.16), flat(0xffffff), 256);
 const ring = new THREE.Mesh(
   new THREE.RingGeometry(0.86, 1, 48).rotateX(-Math.PI / 2),
@@ -221,18 +231,19 @@ function applyStage() {
 
 // ───────── 상태 ─────────
 type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number };
-type Shot = { x: number; z: number; dx: number; dz: number; life: number };
-type Gem = { x: number; z: number; xp: number };
+type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number };
+type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: number; t: number; y: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
 const newGame = () => ({
   t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: 0,
   charge: Math.floor(MT.startChargeFrac(meta) * R.sweepCost(0)), kills: 0, falls: 0,
-  lv: R.startLevels(), enemies: [] as Enemy[], shots: [] as Shot[], gems: [] as Gem[], bits: [] as Bit[],
-  shotCd: 0.4, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, orbitA: 0, moving: false,
+  lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
+  hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
+  vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
   isl: R.ISLAND_R as number, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
 let g = newGame();
-let mode: 'title' | 'play' | 'pick' | 'over' = 'title';
+let mode: 'title' | 'play' | 'bonus' | 'pick' | 'over' = 'title';
 const eScale = (e: Enemy) => (e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 function resetIsland() {
@@ -244,25 +255,27 @@ function resetIsland() {
 let joyId = -1, jox = 0, joy = 0, jx = 0, jz = 0;
 const keys = new Set<string>();
 const stick = $('stick'), knob = stick.firstElementChild as HTMLElement;
-renderer.domElement.addEventListener('pointerdown', (e) => {
+// iPhone 웹뷰에서는 터치 이벤트가 가장 확실하다(포인터 이벤트는 떼는 신호를 놓치면 조이스틱이 옛 손가락에 묶였다).
+// 새 손가락은 항상 조이스틱을 넘겨받는다. 데스크톱은 마우스 포인터로 받는다
+function inputStart(id: number, x: number, y: number) {
   sfx.unlockAudio();
-  if (joyId >= 0) return;
-  joyId = e.pointerId;
-  jox = e.clientX;
-  joy = e.clientY;
+  joyId = id;
+  jox = x;
+  joy = y;
+  jx = jz = 0;
   stick.style.cssText = `display:block;left:${jox}px;top:${joy}px`;
   knob.style.cssText = '';
-});
-addEventListener('pointermove', (e) => {
-  if (e.pointerId !== joyId) return;
-  let dx = e.clientX - jox, dy = e.clientY - joy;
-  const d = Math.hypot(dx, dy);
+}
+function inputMove(id: number, x: number, y: number) {
+  if (id !== joyId) return;
+  let dx = x - jox, dy = y - joy, d = Math.hypot(dx, dy);
   if (d < 4) return;
-  if (d > 56) { // 손가락이 원 밖으로 나가면 원점이 따라와서 방향 전환이 바로 먹힌다
+  if (d > 56 && mode !== 'bonus') { // 손가락이 원 밖으로 나가면 원점이 따라와서 방향 전환이 바로 먹힌다(보너스는 튕긴 길이를 재야 해서 제외)
     jox += (dx / d) * (d - 56);
     joy += (dy / d) * (d - 56);
-    dx = e.clientX - jox;
-    dy = e.clientY - joy;
+    dx = x - jox;
+    dy = y - joy;
+    d = 56;
     stick.style.left = `${jox}px`;
     stick.style.top = `${joy}px`;
   }
@@ -271,15 +284,37 @@ addEventListener('pointermove', (e) => {
   jz = (dy / d) * m;
   knob.style.setProperty('--kx', `${jx * 28}px`);
   knob.style.setProperty('--ky', `${jz * 28}px`);
-});
-const release = (e: PointerEvent) => {
-  if (e.pointerId !== joyId) return;
+}
+function inputEnd(id: number, x: number, y: number) {
+  if (id !== joyId) return;
+  if (mode === 'bonus') dash(x - jox, y - joy);
+  resetInput();
+}
+function resetInput() {
   joyId = -1;
   jx = jz = 0;
   stick.style.display = 'none';
-};
-addEventListener('pointerup', release);
-addEventListener('pointercancel', release);
+}
+const canvas = renderer.domElement, opts = { passive: false } as const;
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  const t = e.changedTouches[e.changedTouches.length - 1];
+  inputStart(t.identifier, t.clientX, t.clientY);
+}, opts);
+addEventListener('touchmove', (e) => {
+  if (joyId === -1) return;
+  e.preventDefault(); // 웹뷰가 끌기를 스크롤·제스처로 가로채지 않게
+  for (const t of e.changedTouches) inputMove(t.identifier, t.clientX, t.clientY);
+}, opts);
+const touchEnd = (e: TouchEvent) => { for (const t of e.changedTouches) inputEnd(t.identifier, t.clientX, t.clientY); };
+addEventListener('touchend', touchEnd);
+addEventListener('touchcancel', touchEnd);
+canvas.addEventListener('pointerdown', (e) => e.pointerType === 'mouse' && inputStart(-2, e.clientX, e.clientY));
+addEventListener('pointermove', (e) => e.pointerType === 'mouse' && inputMove(-2, e.clientX, e.clientY));
+addEventListener('pointerup', (e) => e.pointerType === 'mouse' && inputEnd(-2, e.clientX, e.clientY));
+// 앱이 뒤로 가거나 창이 흐려지면 손을 뗀 것으로 본다
+addEventListener('blur', resetInput);
+document.addEventListener('visibilitychange', resetInput);
 addEventListener('keydown', (e) => (e.code === 'Space' ? sweep() : keys.add(e.code)));
 addEventListener('keyup', (e) => keys.delete(e.code));
 $('sweep').addEventListener('pointerdown', () => sweep());
@@ -325,8 +360,7 @@ function hit(i: number, dmg: number, kx: number, kz: number) {
   e.kz += kz * km;
   if (e.hp > 0) return;
   reward(R.KILL_CHARGE);
-  g.gems.push({ x: e.x, z: e.z, xp: R.killXp(e.big) });
-  if (g.gems.length > 400) gainXp(g.gems.shift()!.xp);
+  gainXp(R.killXp(e.big));
   burst(e.x, e.z, e.big ? C_BIG : C_SMALL, e.big ? 12 : 6);
   drop(i);
 }
@@ -336,6 +370,7 @@ function fall(e: Enemy) {
   e.out = true;
   e.vy = 4; // 살짝 튀었다가 떨어진다
   g.falls++;
+  if (mode === 'bonus') g.bonusFalls++;
   g.chain = g.chainT > 0 ? g.chain + 1 : 1;
   g.chainT = 1.2;
   reward(R.FALL_CHARGE);
@@ -396,6 +431,7 @@ function sweep() {
   }
   g.ringT = 0;
   g.ringR = rad;
+  ringAtHero = true;
   g.shake = 0.7;
   g.stop = 0.07; // 짧게 멈춰 타격감을 준다
   sfx.thud();
@@ -403,25 +439,184 @@ function sweep() {
   sfx.buzz(30);
 }
 
+// ───────── 박치기 보너스(판 중간 미니게임) ─────────
+function dash(dx: number, dy: number) {
+  const len = Math.hypot(dx, dy), sp = R.dashSpeed(len);
+  if (!sp) return;
+  g.vx = (dx / len) * sp;
+  g.vz = (dy / len) * sp;
+  sfx.snap();
+  sfx.buzz(12);
+}
+/** 볼링핀처럼 세모로 모인 해골 무리 */
+function spawnPins() {
+  const [cx, cz] = onIsland(0.25, 0.6);
+  if (Math.hypot(cx - g.px, cz - g.pz) < 3) return;
+  const a = Math.atan2(cx - g.px, cz - g.pz);
+  for (let row = 0; row < 3; row++)
+    for (let k = 0; k <= row; k++) {
+      const side = (k - row / 2) * 1, back = row * 0.9;
+      const x = cx + Math.sin(a) * back + Math.cos(a) * side, z = cz + Math.cos(a) * back - Math.sin(a) * side;
+      g.enemies.push({ x, z, y: 0, vy: 0, kx: 0, kz: 0, hp: 1e9, big: false, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0 });
+    }
+}
+function startBonus() {
+  mode = 'bonus';
+  resetInput();
+  g.bt = R.BONUS_SECONDS;
+  g.bonusFalls = 0;
+  for (const e of g.enemies) if (!e.out) { e.out = true; e.vy = 6; e.kx = e.x * 0.3; e.kz = e.z * 0.3; } // 싸우던 적은 치운다(보상 없음)
+  g.logs.length = g.pumpkins.length = 0;
+  for (let i = 0; i < 3; i++) spawnPins();
+  toast(L('보너스! 튕겨서 박치기', 'Bonus! Flick to ram'));
+  sfx.sparkle();
+}
+function endBonus() {
+  for (const e of g.enemies) if (!e.out) { e.out = true; e.vy = 6; }
+  g.bonusDone = true;
+  g.vx = g.vz = 0;
+  resetInput();
+  mode = 'play';
+  toast(L(`보너스 끝! +${g.bonusFalls * R.BONUS_COIN} 코인`, `Bonus over! +${g.bonusFalls * R.BONUS_COIN} coins`));
+  g.inv = 1;
+  if (g.picks) showPick();
+}
+
+function nearest(maxD: number, minD = 0) {
+  let best: Enemy | null = null, bd = maxD;
+  for (const e of g.enemies) {
+    const d = Math.hypot(e.x - g.px, e.z - g.pz);
+    if (!e.out && d < bd && d >= minD) { bd = d; best = e; }
+  }
+  return best;
+}
+function weapons(dt: number) {
+  const es = g.enemies;
+  // 망치: 가까운 적 쪽으로 부채꼴
+  g.hammerCd -= dt;
+  const rad = R.hammerRadius(g.lv.hammer), target = g.hammerCd <= 0 ? nearest(rad + 0.6) : null;
+  if (target) {
+    g.hammerCd = R.hammerCooldown(g.lv.hammer);
+    const yaw = Math.atan2(target.x - g.px, target.z - g.pz), half = R.hammerArc(g.lv.hammer) / 2;
+    for (let i = es.length - 1; i >= 0; i--) {
+      const e = es[i], dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
+      let da = Math.atan2(dx, dz) - yaw;
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (e.out || d > rad + eRadius(e) || Math.abs(da) > half) continue;
+      hit(i, 14, (dx / d) * 9, (dz / d) * 9);
+    }
+    g.swingT = 0;
+    g.swingYaw = yaw;
+    g.face = yaw;
+    sfx.snap();
+  }
+  // 통나무: 주인공 근처를 지나가게 섬 끝에서 굴려 보낸다
+  if (g.lv.log) {
+    g.logCd -= dt;
+    if (g.logCd <= 0) {
+      g.logCd = R.logInterval(g.lv.log);
+      for (let k = 0; k < R.logCount(g.lv.log); k++) {
+        const a = rnd(0, Math.PI * 2), dx = Math.sin(a), dz = Math.cos(a), off = rnd(-1.5, 1.5) + k * 3;
+        const sx = g.px - dx * (g.isl + 2) + dz * off, sz = g.pz - dz * (g.isl + 2) - dx * off;
+        g.logs.push({ x: sx, z: sz, dx, dz, left: (g.isl + 2) * 2 + 4, roll: 0 });
+      }
+      sfx.rumble();
+    }
+  }
+  for (let k = g.logs.length - 1; k >= 0; k--) {
+    const L1 = g.logs[k], step = 10 * dt;
+    L1.x += L1.dx * step;
+    L1.z += L1.dz * step;
+    L1.roll += step / 0.36;
+    if ((L1.left -= step) <= 0) { g.logs.splice(k, 1); continue; }
+    for (let i = es.length - 1; i >= 0; i--) {
+      const e = es[i], rx = e.x - L1.x, rz = e.z - L1.z;
+      const along = rx * L1.dx + rz * L1.dz, side = rx * L1.dz - rz * L1.dx;
+      if (e.out || e.bladeCd > 0 || Math.abs(along) > 0.4 + eRadius(e) || Math.abs(side) > 1.7) continue;
+      e.bladeCd = 0.4;
+      hit(i, 8, L1.dx * 13, L1.dz * 13);
+    }
+  }
+  // 호박 폭탄: 조금 떨어진 적에게 던진다
+  if (g.lv.pumpkin) {
+    g.pumpkinCd -= dt;
+    if (g.pumpkinCd <= 0) {
+      g.pumpkinCd = R.pumpkinInterval(g.lv.pumpkin);
+      for (let k = 0; k < R.pumpkinCount(g.lv.pumpkin); k++) {
+        const t = nearest(9, 2.5 + k * 1.5) ?? nearest(9);
+        if (t) g.pumpkins.push({ x0: g.px, z0: g.pz, x: g.px, z: g.pz, tx: t.x + rnd(-0.5, 0.5), tz: t.z + rnd(-0.5, 0.5), t: 0, y: 0 });
+      }
+    }
+  }
+  for (let k = g.pumpkins.length - 1; k >= 0; k--) {
+    const pk = g.pumpkins[k];
+    pk.t = Math.min(1, pk.t + dt / 0.6);
+    pk.x = pk.x0 + (pk.tx - pk.x0) * pk.t;
+    pk.z = pk.z0 + (pk.tz - pk.z0) * pk.t;
+    pk.y = Math.sin(pk.t * Math.PI) * 2.6;
+    if (pk.t < 1) continue;
+    g.pumpkins.splice(k, 1);
+    const rad = R.pumpkinRadius(g.lv.pumpkin);
+    for (let i = es.length - 1; i >= 0; i--) {
+      const e = es[i], dx = e.x - pk.x, dz = e.z - pk.z, d = Math.hypot(dx, dz) || 1;
+      if (e.out || d > rad) continue;
+      const kk = 11 * (1 - (d / rad) * 0.5);
+      hit(i, 12, (dx / d) * kk, (dz / d) * kk);
+    }
+    burst(pk.x, pk.z, C_PUMPKIN, 10);
+    g.ringT = 0.35;
+    g.ringR = rad;
+    ring.position.set(pk.x, 0.06, pk.z);
+    ringAtHero = false;
+    g.shake = Math.max(g.shake, 0.25);
+    sfx.thud();
+  }
+}
+
 function update(dt: number) {
-  g.t += dt;
-  if (g.t >= R.RUN_SECONDS) return end(true);
+  const bonus = mode === 'bonus';
+  if (bonus) {
+    g.bt -= dt;
+    if (g.bt <= 0) return endBonus();
+  } else {
+    g.t += dt;
+    if (g.t >= R.RUN_SECONDS) return end(true);
+    if (g.t >= R.BONUS_AT && !g.bonusDone) return startBonus();
+  }
   g.inv -= dt;
   g.chainT -= dt;
   const isl = R.islandRadius(g.t, stage().crumbles);
   if (isl < g.isl) crumble(isl);
 
+  if (bonus) { // 돌진: 미끄러지다 멈추고, 가장자리에서는 튕겨 나온다
+    g.px += g.vx * dt;
+    g.pz += g.vz * dt;
+    const f = Math.exp(-2.4 * dt);
+    g.vx *= f;
+    g.vz *= f;
+    const d = Math.hypot(g.px, g.pz), lim = g.isl - 0.7;
+    if (d > lim) {
+      const nx = g.px / d, nz = g.pz / d, dot = g.vx * nx + g.vz * nz;
+      g.px = nx * lim;
+      g.pz = nz * lim;
+      if (dot > 0) { g.vx -= 1.6 * dot * nx; g.vz -= 1.6 * dot * nz; }
+    }
+    g.moving = Math.hypot(g.vx, g.vz) > 1;
+    if (g.moving) g.face = Math.atan2(g.vx, g.vz);
+    if (g.enemies.filter((e) => !e.out).length < 6) spawnPins();
+  }
+
   // 주인공
   let mx = jx, mz = jz;
-  if (joyId < 0) {
+  if (joyId === -1) {
     mx = +(keys.has('KeyD') || keys.has('ArrowRight')) - +(keys.has('KeyA') || keys.has('ArrowLeft'));
     mz = +(keys.has('KeyS') || keys.has('ArrowDown')) - +(keys.has('KeyW') || keys.has('ArrowUp'));
     const m = Math.hypot(mx, mz) || 1;
     mx /= m;
     mz /= m;
   }
-  g.moving = Math.hypot(mx, mz) > 0.05;
-  if (g.moving) {
+  if (!bonus) g.moving = Math.hypot(mx, mz) > 0.05;
+  if (!bonus && g.moving) {
     const sp = R.moveSpeed(g.lv.speed);
     g.px += mx * sp * dt;
     g.pz += mz * sp * dt;
@@ -432,13 +627,13 @@ function update(dt: number) {
 
   // 적이 올라온다
   g.spawnCd -= dt;
-  if (g.spawnCd <= 0) {
+  if (!bonus && g.spawnCd <= 0) {
     g.spawnCd = R.spawnInterval(g.t) / stage().spawn;
     for (let i = Math.round(R.spawnBatch(g.t) * stage().spawn); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn();
   }
 
   // 적 이동·낙하·접촉
-  const decay = Math.exp(-4.5 * dt);
+  const decay = Math.exp((bonus ? -1.4 : -4.5) * dt); // 보너스 판은 볼링 레인처럼 멀리 미끄러진다
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     const e = g.enemies[i];
     e.age += dt;
@@ -453,7 +648,7 @@ function update(dt: number) {
       continue;
     }
     const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz) || 1;
-    const sp = (e.big ? 1.4 : 2.2 + g.t * 0.006) * stage().speed;
+    const sp = bonus ? 0 : (e.big ? 1.4 : 2.2 + g.t * 0.006) * stage().speed;
     e.x += ((dx / d) * sp + e.kx) * dt;
     e.z += ((dz / d) * sp + e.kz) * dt;
     e.kx *= decay;
@@ -464,7 +659,18 @@ function update(dt: number) {
       e.x *= g.isl / off;
       e.z *= g.isl / off;
     } else if (off > g.isl) fall(e); // 맞아서 섬 밖으로 밀리면 떨어진다. 보석을 못 남기니 경험치는 바로 준다
-    else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt();
+    else if (bonus) {
+      // 돌진한 몸에 부딪히면 그 힘을 받아 날아간다
+      const hs = Math.hypot(g.vx, g.vz);
+      if (hs > 2 && d < 0.4 + eRadius(e)) {
+        e.kx += g.vx * 1.15 + (-dx / d) * 3;
+        e.kz += g.vz * 1.15 + (-dz / d) * 3;
+        e.flash = 0.1;
+        g.vx *= 0.75;
+        g.vz *= 0.75;
+        sfx.thud();
+      }
+    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt();
   }
   // 서로 겹치지 않게 밀어낸다
   // shortcut: 모든 쌍을 비교한다(300마리면 4.5만 쌍), 적 상한을 올리면 격자 나누기로 바꾼다
@@ -479,6 +685,9 @@ function update(dt: number) {
       const d = Math.hypot(dx, dz) || 0.01;
       if (d >= min) continue;
       const push = ((min - d) / d) * 0.5;
+      const ka = Math.hypot(a.kx, a.kz), kb = Math.hypot(b.kx, b.kz);
+      if (ka > 3 && ka > kb * 1.5) { b.kx += a.kx * 0.7; b.kz += a.kz * 0.7; a.kx *= 0.55; a.kz *= 0.55; b.flash = 0.1; }
+      else if (kb > 3 && kb > ka * 1.5) { a.kx += b.kx * 0.7; a.kz += b.kz * 0.7; b.kx *= 0.55; b.kz *= 0.55; a.flash = 0.1; }
       a.x -= dx * push;
       a.z -= dz * push;
       b.x += dx * push;
@@ -486,67 +695,7 @@ function update(dt: number) {
     }
   }
 
-  // 돌팔매: 가장 가까운 적에게
-  g.shotCd -= dt;
-  if (g.shotCd <= 0) {
-    let best: Enemy | null = null, bd = 10;
-    for (const e of es) {
-      const d = Math.hypot(e.x - g.px, e.z - g.pz);
-      if (!e.out && d < bd) { bd = d; best = e; }
-    }
-    if (best) {
-      g.shotCd = R.shotCooldown(g.lv.shot);
-      const base = Math.atan2(best.x - g.px, best.z - g.pz), n = R.shotCount(g.lv.shot);
-      for (let k = 0; k < n; k++) {
-        const a = base + (k - (n - 1) / 2) * 0.2;
-        g.shots.push({ x: g.px, z: g.pz, dx: Math.sin(a), dz: Math.cos(a), life: 0.75 });
-      }
-      sfx.tick(false);
-    }
-  }
-  for (let s = g.shots.length - 1; s >= 0; s--) {
-    const b = g.shots[s];
-    b.x += b.dx * 17 * dt;
-    b.z += b.dz * 17 * dt;
-    b.life -= dt;
-    let gone = b.life <= 0;
-    for (let i = es.length - 1; i >= 0 && !gone; i--) {
-      const e = es[i];
-      if (e.out || Math.hypot(e.x - b.x, e.z - b.z) > eRadius(e) + 0.2) continue;
-      hit(i, 10, b.dx * 3, b.dz * 3);
-      gone = true;
-    }
-    if (gone) g.shots.splice(s, 1);
-  }
-
-  // 회전 칼날
-  g.orbitA += dt * 3.4;
-  const blades = R.orbitCount(g.lv.orbit);
-  for (let k = 0; k < blades; k++) {
-    const a = g.orbitA + (k / blades) * Math.PI * 2, bx = g.px + Math.sin(a) * 1.9, bz = g.pz + Math.cos(a) * 1.9;
-    for (let i = es.length - 1; i >= 0; i--) {
-      const e = es[i];
-      if (e.out || e.bladeCd > 0 || Math.hypot(e.x - bx, e.z - bz) > eRadius(e) + 0.35) continue;
-      e.bladeCd = 0.35;
-      const dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
-      hit(i, 7, (dx / d) * 5, (dz / d) * 5);
-    }
-  }
-
-  // 보석: 가까우면 끌려온다
-  const mag = R.magnetRadius(g.lv.magnet);
-  for (let i = g.gems.length - 1; i >= 0; i--) {
-    const m = g.gems[i];
-    const dx = g.px - m.x, dz = g.pz - m.z, d = Math.hypot(dx, dz) || 0.01;
-    if (d < 0.5) {
-      g.gems.splice(i, 1);
-      sfx.tick(true);
-      gainXp(m.xp);
-    } else if (d < mag) {
-      m.x += (dx / d) * 14 * dt;
-      m.z += (dz / d) * 14 * dt;
-    }
-  }
+  if (!bonus) weapons(dt);
 
   for (let i = g.bits.length - 1; i >= 0; i--) {
     const b = g.bits[i];
@@ -568,7 +717,7 @@ function draw(dt: number, now: number) {
   const w = heroWalk.getEffectiveWeight() + (g.moving ? dt : -dt) * 8, ww = Math.min(1, Math.max(0, w));
   heroWalk.setEffectiveWeight(ww);
   heroIdle.setEffectiveWeight(1 - ww);
-  mixer.update(mode === 'play' && g.stop <= 0 ? dt : 0);
+  mixer.update((mode === 'play' || mode === 'bonus') && g.stop <= 0 ? dt : 0);
   hero.position.set(g.px, 0, g.pz);
   hero.rotation.y = g.face;
   hero.visible = g.inv <= 0 || Math.floor(g.inv * 14) % 2 === 0;
@@ -583,16 +732,24 @@ function draw(dt: number, now: number) {
   }
   sync(smallMesh, ns);
   sync(bigMesh, nb);
-  g.shots.forEach((b, i) => put(shotMesh, i, b.x, 0.6, b.z));
-  sync(shotMesh, Math.min(64, g.shots.length));
-  g.gems.forEach((m, i) => put(gemMesh, i, m.x, 0.35 + Math.sin(now * 0.005 + i) * 0.08, m.z, now * 0.003 + i));
-  sync(gemMesh, g.gems.length);
-  const blades = R.orbitCount(g.lv.orbit);
-  for (let k = 0; k < blades; k++) {
-    const a = g.orbitA + (k / blades) * Math.PI * 2;
-    put(bladeMesh, k, g.px + Math.sin(a) * 1.9, 0.5, g.pz + Math.cos(a) * 1.9, a * 4);
+  g.logs.forEach((l, i) => put(logMesh, i, l.x, 0.36, l.z, Math.atan2(l.dx, l.dz), 1, 1, 1, l.roll));
+  sync(logMesh, g.logs.length);
+  g.pumpkins.forEach((pk, i) => put(pumpkinMesh, i, pk.x, pk.y, pk.z, pk.t * 9, 1.1));
+  sync(pumpkinMesh, g.pumpkins.length);
+  g.swingT = Math.min(1, g.swingT + dt * 6);
+  swing.visible = g.swingT < 1;
+  if (swing.visible) {
+    const arc = R.hammerArc(g.lv.hammer);
+    if (arc !== swingArc) { // 부채꼴은 +z 쪽 가운데로 만든다
+      swing.geometry.dispose();
+      swing.geometry = new THREE.RingGeometry(0.4, 1, 24, 1, Math.PI / 2 - arc / 2, arc).rotateX(-Math.PI / 2);
+      swingArc = arc;
+    }
+    swing.position.set(g.px, 0.08, g.pz);
+    swing.rotation.y = g.swingYaw;
+    swing.scale.setScalar(R.hammerRadius(g.lv.hammer) * (0.7 + g.swingT * 0.3));
+    (swing.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - g.swingT);
   }
-  sync(bladeMesh, blades);
   g.bits.forEach((b, i) => {
     put(bitMesh, i, b.x, b.y, b.z, b.life * 20, Math.min(1, b.life * 4));
     bitMesh.setColorAt(i, b.color);
@@ -617,7 +774,7 @@ function draw(dt: number, now: number) {
 
   g.ringT = Math.min(1, g.ringT + dt * 3.2);
   ring.visible = g.ringT < 1;
-  ring.position.set(g.px, 0.06, g.pz);
+  if (ringAtHero) ring.position.set(g.px, 0.06, g.pz);
   ring.scale.setScalar(0.5 + g.ringR * g.ringT);
   (ring.material as THREE.MeshBasicMaterial).opacity = 1 - g.ringT;
 
@@ -632,25 +789,32 @@ function draw(dt: number, now: number) {
 // ───────── 화면 글자 ─────────
 const overlay = $('overlay');
 const ICON: Record<R.UpgradeId | 'heart', string> = {
-  shot: '<circle cx="15" cy="12" r="5.5"/><path d="M3 8h6M2 12h6M3 16h6"/>',
-  orbit: '<circle cx="12" cy="12" r="3"/><path d="M12 3a9 9 0 0 1 9 9M12 21a9 9 0 0 1-9-9"/>',
+  hammer: '<path d="M5 19l8-8M9 5l6-1 5 5-1 6-4-4-2 2-4-4 2-2z"/>',
+  log: '<rect x="2" y="9" width="17" height="6" rx="3"/><ellipse cx="19" cy="12" rx="2.5" ry="3"/>',
+  pumpkin: '<path d="M12 7c-5 0-8 3-8 7s3 6 8 6 8-2 8-6-3-7-8-7zM12 7V4M12 7c-1.5 3-1.5 9 0 13"/>',
   sweep: '<path d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0M9 12a3 3 0 0 1 6 0"/>',
   knock: '<path d="M3 12h11M10 6l6 6-6 6M20 5v14"/>',
   speed: '<path d="M5 6l6 6-6 6M12 6l6 6-6 6"/>',
-  magnet: '<path d="M6 4v8a6 6 0 0 0 12 0V4M6 8h4M14 8h4"/>',
   heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
 };
 const UPS: Record<R.UpgradeId | 'heart', [string, string, string]> = {
-  shot: [L('돌팔매', 'Sling'), L('더 빨리, 더 많이 던집니다', 'Throws faster and more'), '#f0a24a'],
-  orbit: [L('회전 칼날', 'Orbit blades'), L('주위를 도는 칼날이 하나 늘어납니다', 'One more blade circles you'), '#7d8cf0'],
+  hammer: [L('망치', 'Mallet'), L('더 자주, 더 넓게 휘두릅니다', 'Swings faster and wider'), '#f0a24a'],
+  log: [L('굴러가는 통나무', 'Rolling log'), L('통나무가 섬을 가로질러 적을 쓸어냅니다', 'A log rolls across the isle, sweeping foes'), '#a0703f'],
+  pumpkin: [L('호박 폭탄', 'Pumpkin bomb'), L('던진 호박이 터지며 둥글게 밀어냅니다', 'Thrown pumpkins burst and push foes away'), '#f08a2a'],
   sweep: [L('쓸어내기', 'Sweep'), L('더 넓게 쓸고 더 빨리 찹니다', 'Wider sweep, charges faster'), '#ff8a4c'],
   knock: [L('밀치기', 'Shove'), L('모든 공격이 적을 더 멀리 밀어냅니다', 'Every hit knocks enemies farther'), '#b06ee8'],
   speed: [L('가벼운 신발', 'Light boots'), L('더 빨리 움직입니다', 'Move faster'), '#3fc1a5'],
-  magnet: [L('자석', 'Magnet'), L('보석을 더 멀리서 끌어옵니다', 'Pull gems from farther away'), '#e2577a'],
   heart: [L('회복', 'Heal'), L('체력을 하나 채웁니다', 'Restore one heart'), '#ff5a6e'],
 };
 const svg = (body: string, cls = '') => `<svg viewBox="0 0 24 24" class="${cls}">${body}</svg>`;
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+function toast(text: string) {
+  const el = $('toast');
+  el.textContent = text;
+  el.className = '';
+  void el.offsetWidth;
+  el.className = 'pop';
+}
 function show(html: string, cls = '') {
   overlay.className = cls;
   overlay.innerHTML = html;
@@ -660,6 +824,7 @@ function showPick() {
   const picks = R.pickUpgrades(g.lv, g.hp >= g.maxHp);
   if (!picks.length) return void (g.picks = 0);
   mode = 'pick';
+  resetInput();
   sfx.sparkle();
   const cards = picks.map((id) => {
     const [name, desc, c] = UPS[id], lv = id === 'heart' ? 0 : g.lv[id];
@@ -678,6 +843,7 @@ const coinPill = () => `<div class="coins"><i></i>${meta.coins.toLocaleString()}
 const stageName = (i: number) => L(...R.STAGES[i].name);
 
 function startRun() {
+  resetInput();
   g = newGame();
   camTarget.set(0, 0, 0);
   resetIsland();
@@ -759,7 +925,7 @@ function end(win: boolean) {
   const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls }, best = loadBest();
   const isBest = score.time > best.time || (score.time === best.time && score.kills > best.kills);
   if (isBest) store.set(`best-${stageIdx}`, JSON.stringify(score));
-  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx);
+  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx) + g.bonusFalls * R.BONUS_COIN;
   const unlocked = win && stageIdx === meta.cleared && stageIdx < R.STAGES.length;
   meta = { ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared };
   saveMeta();
@@ -790,10 +956,11 @@ function drawHud() {
     hud.hearts.innerHTML = Array.from({ length: g.maxHp }, (_, i) => svg(HEART, i < g.hp ? '' : i < shown.hp ? 'empty lost' : 'empty')).join('');
     shown.hp = g.hp;
   }
-  const left = Math.max(0, Math.ceil(R.RUN_SECONDS - g.t));
+  const left = Math.max(0, Math.ceil(mode === 'bonus' ? g.bt : R.RUN_SECONDS - g.t));
   if (shown.left !== left) {
     hud.time.textContent = clock(left);
-    hud.time.classList.toggle('hurry', left <= 10);
+    hud.time.classList.toggle('hurry', mode !== 'bonus' && left <= 10);
+    hud.time.classList.toggle('bonus', mode === 'bonus');
     shown.left = left;
   }
   if (shown.level !== g.level) {
@@ -806,12 +973,7 @@ function drawHud() {
   if (shown.xp !== xp) hud.xp.style.width = `${(shown.xp = xp)}%`;
   if (shown.falls !== g.falls) {
     hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
-    if (g.chain >= 2) { // 이어서 떨어뜨리면 가운데에 크게
-      hud.toast.textContent = L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`);
-      hud.toast.className = '';
-      void hud.toast.offsetWidth;
-      hud.toast.className = 'pop';
-    }
+    if (g.chain >= 2) toast(L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`)); // 이어서 떨어뜨리면 가운데에 크게
   }
   const warn = mode === 'play' ? R.crumbleWarning(g.t, stage().crumbles) : -1;
   if (shown.warn !== warn) {
@@ -832,7 +994,7 @@ function frame(now: number) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
-  if (mode === 'play') {
+  if (mode === 'play' || mode === 'bonus') {
     if (g.stop > 0) g.stop -= dt;
     else update(dt);
   }
@@ -845,7 +1007,7 @@ function frame(now: number) {
     fps = Math.round((frames * 1000) / (now - fpsAt));
     frames = 0;
     fpsAt = now;
-    hud.dev.textContent = `${fps}fps · ${g.enemies.length} · ${renderer.info.render.calls}dc`;
+    hud.dev.textContent = `${fps}fps · ${g.enemies.length} · ${renderer.info.render.calls}dc · in ${joyId === -1 ? '-' : `${jx.toFixed(1)},${jz.toFixed(1)}`}`;
   }
 }
 showTitle();
@@ -868,13 +1030,12 @@ if (DEV)
         return +((performance.now() - t0) / n).toFixed(2);
       },
       // 화면이 가려져 프레임이 안 돌 때도 규칙을 시험하려고 시간을 직접 흘린다
-      step: (sec: number, mx = 0, mz = 0) => {
-        jx = mx;
-        jz = mz;
-        joyId = 99;
-        for (let i = 0; i < sec * 60 && mode === 'play'; i++) update(1 / 60);
-        joyId = -1;
-        jx = jz = 0;
+      // 방향(mx, mz)을 주면 그 방향으로 민 것처럼, 안 주면 지금 입력 그대로 시간을 흘린다
+      step: (sec: number, mx?: number, mz?: number) => {
+        const fake = mx !== undefined;
+        if (fake) { jx = mx; jz = mz ?? 0; joyId = 99; }
+        for (let i = 0; i < sec * 60 && (mode === 'play' || mode === 'bonus'); i++) update(1 / 60);
+        if (fake) resetInput();
       },
     },
   });

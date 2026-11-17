@@ -9,3 +9,6 @@ ios/App/App/public/
 ios/build/
 ios/App/Pods/
 ios/DerivedData/
+
+# 개인 작업 도구 설정(절대 경로가 들어 있음)
+.claude/

@@ -1,599 +1,620 @@
-// 사주·타로 운세 펫 프로토타입(결정 024). 계산은 fortune/saju.ts, 여기는 화면과 하루 한 번의 성장만.
-import { L, T, lang, setLang } from './i18n';
+// 미니어처 섬 지키기 프로토타입(결정 032). 드래그로 이동, 공격은 자동, 게이지가 차면 쓸어내기로 적을 섬 밖으로 민다.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { L } from './i18n';
 import * as sfx from './audio';
-import { petSvg, eggSvg, cardFaceSvg, cardBackSvg, svgImage, decoSvg } from './art';
-import { runCatch, modsFor, type CatchResult } from './play/catch';
-import decor from '../content/fortune/decor.json';
-import messages from '../content/fortune/messages.json';
-import tarot from '../content/fortune/tarot.json';
-import sajuText from '../content/fortune/saju.json';
-import {
-  HANGUL, ELEMENTS, dailyFortune, dayKey, luckyElement, sajuProfile, tarotProfile, hash, tenGod, birthClocks, GAN_EL, ZHI_EL,
-  type DailyFortune, type Element, type Profile,
-} from './fortune/saju';
+import * as R from './game/rules';
 
-const app = document.getElementById('app')!;
-const overlay = document.getElementById('overlay')!;
-const TAROT_EL = tarot.cards.map((c) => c.el as Element);
-const EL = messages.elements;
-const CAT = messages.categories;
-const elColor = (e: Element) => EL[e].color.hex;
-const elName = (e: Element) => (lang === 'ko' ? `${EL[e].ko}(${EL[e].hanja})` : EL[e].en);
+const $ = (id: string) => document.getElementById(id)!;
+const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
-// ── 저장(생년월일은 기기 안에만, 서버로 보내지 않는다)
-interface Save {
-  profile: Profile | null;
-  coins: number;
-  streak: number;
-  checkins: number;
-  lastDay: string | null;
-  pettedDay: string | null;
-  /** 모은 기운(꾸미기에 씀)과 누적 기운(성장 단계) */
-  ki: Record<Element, number>;
-  kiTotal: number;
-  playsDay: string | null;
-  playsUsed: number;
-  decor: string[];
-  /** 타로: 오늘의 카드를 뒤집은 날 */
-  revealedDay: string | null;
+// ───────── 장면: 미니어처 느낌은 모델보다 조명·그림자·위아래 흐림에서 나온다 ─────────
+const SKY = 0xbfe6f5;
+const renderer = new THREE.WebGLRenderer({ powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.info.autoReset = false; // 후처리 패스까지 합친 그리기 횟수를 보려고 직접 초기화한다
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 58, 86);
+const camera = new THREE.PerspectiveCamera(26, 1, 10, 200); // 좁은 화각으로 멀리서 봐야 모형처럼 보인다
+const CAM_DIR = new THREE.Vector3(0, 0.8, 0.6).normalize();
+let camDist = 50;
+const camTarget = new THREE.Vector3();
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8fb0c8, 1.25));
+const sun = new THREE.DirectionalLight(0xfff0d2, 2.3);
+sun.position.set(10, 22, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType }));
+composer.addPass(new RenderPass(scene, camera));
+const tilt = new ShaderPass(VerticalTiltShiftShader);
+tilt.uniforms.r.value = 0.5;
+composer.addPass(tilt);
+composer.addPass(new OutputPass());
+
+function resize() {
+  const w = innerWidth, h = innerHeight, t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  camDist = Math.max(9.5 / (2 * t * camera.aspect), 15 / (2 * t)); // 가로 9.5칸은 항상 보이게
+  tilt.uniforms.v.value = 2.4 / h;
 }
-const PLAYS_PER_DAY = 3;
-const KEY = 'fortunePet.v1';
-function loadSave(): Save {
-  try {
-    const s = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    if (s) return { ...fresh(), ...s };
-  } catch {
-    /* 깨진 저장은 새로 시작 */
-  }
-  return fresh();
+addEventListener('resize', resize);
+resize();
+
+// ───────── 모양: 색을 꼭짓점에 구워 한 덩어리로 합친다(그리기 횟수 절약) ─────────
+const flat = (color: number, extra = {}) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra });
+const painted = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+function part(geo: THREE.BufferGeometry, color: number, x = 0, y = 0, z = 0) {
+  const c = new THREE.Color(color), n = geo.attributes.position.count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) c.toArray(a, i * 3);
+  return geo.translate(x, y, z).setAttribute('color', new THREE.BufferAttribute(a, 3));
 }
-function fresh(): Save {
-  return {
-    profile: null, coins: 0, streak: 0, checkins: 0, lastDay: null, pettedDay: null,
-    ki: { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 }, kiTotal: 0, playsDay: null, playsUsed: 0, decor: [], revealedDay: null,
-  };
+function instanced(geo: THREE.BufferGeometry, mat: THREE.Material, max: number, shadow = false) {
+  const m = new THREE.InstancedMesh(geo, mat, max);
+  m.frustumCulled = false; // 인스턴스가 계속 움직여 경계 구가 맞지 않는다
+  m.castShadow = shadow;
+  m.count = 0;
+  scene.add(m);
+  return m;
 }
-function playsLeft() {
-  return save.playsDay === dayKey(new Date()) ? Math.max(0, PLAYS_PER_DAY - save.playsUsed) : PLAYS_PER_DAY;
-}
-function stageOf(total: number) {
-  let i = 0;
-  decor.stages.forEach((st, k) => total >= st.need && (i = k));
-  return i;
-}
-let save = loadSave();
-// 결정 029 이전에 타로로 시작한 저장에는 일주가 없어 운명 카드로 다시 만든다
-if (save.profile?.source === 'tarot' && !save.profile.dayGan) save.profile = { ...tarotProfile(save.profile.card!, save.profile.self), createdAt: save.profile.createdAt };
-function persist() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(save));
-  } catch {
-    /* 저장 실패 시 이번 실행에서만 유지 */
-  }
+const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+function put(mesh: THREE.InstancedMesh, i: number, x: number, y: number, z: number, yaw = 0, sx = 1, sy = sx, sz = sx) {
+  M.compose(P.set(x, y, z), Q.setFromAxisAngle(UP, yaw), S.set(sx, sy, sz));
+  mesh.setMatrixAt(i, M);
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-const toast = (text: string) => {
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = text;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2300);
+// 섬과 장식(장식은 부딪히지 않는다)
+const grass = new THREE.Mesh(new THREE.CylinderGeometry(R.ISLAND_R, R.ISLAND_R - 0.5, 1, 40), flat(0x86c46a));
+grass.position.y = -0.5;
+grass.receiveShadow = true;
+const cliff = new THREE.Mesh(new THREE.CylinderGeometry(R.ISLAND_R - 0.6, 3, 9, 11, 2), flat(0xb89468));
+cliff.position.y = -5.5;
+scene.add(grass, cliff);
+
+const trees = instanced(
+  mergeGeometries([
+    part(new THREE.CylinderGeometry(0.16, 0.24, 0.9, 6), 0x8a5a3c, 0, 0.45),
+    part(new THREE.ConeGeometry(0.95, 1.5, 7), 0x4fae62, 0, 1.5),
+    part(new THREE.ConeGeometry(0.7, 1.2, 7), 0x67c474, 0, 2.3),
+  ]),
+  painted, 9, true,
+);
+const stones = instanced(new THREE.DodecahedronGeometry(0.5), flat(0xb9bfc9), 10, true);
+const flowers = instanced(new THREE.SphereGeometry(0.09, 6, 4), flat(0xffffff), 70);
+const onIsland = (min: number, max: number) => {
+  const a = rnd(0, Math.PI * 2), d = R.ISLAND_R * rnd(min, max);
+  return [Math.cos(a) * d, Math.sin(a) * d] as const;
 };
-const disclaimer = () => `<div class="disclaimer">${L('재미로 보는 운세예요 · 생년월일은 이 기기에만 저장돼요', 'For fun · Your birth info stays on this device')}</div>`;
+for (let i = 0; i < 9; i++) put(trees, i, ...insert(onIsland(0.82, 0.96)), rnd(0, 6), rnd(0.8, 1.3)); // 가장자리에만 둬서 싸움터를 가리지 않는다
+for (let i = 0; i < 10; i++) put(stones, i, ...insert(onIsland(0.3, 0.95), 0.1), rnd(0, 6), rnd(0.5, 1.2), rnd(0.4, 0.8));
+for (let i = 0; i < 70; i++) {
+  put(flowers, i, ...insert(onIsland(0.05, 0.97), 0.08));
+  flowers.setColorAt(i, new THREE.Color([0xffffff, 0xffe27a, 0xff9fb8][i % 3]));
+}
+trees.count = 9;
+stones.count = 10;
+flowers.count = 70;
+function insert([x, z]: readonly [number, number], y = 0) {
+  return [x, y, z] as const;
+}
+const clouds = instanced(new THREE.IcosahedronGeometry(1, 1), flat(0xffffff), 9);
+for (let i = 0; i < 9; i++) put(clouds, i, rnd(-24, 24), rnd(-13, -6), rnd(-26, 14), 0, rnd(3, 6), rnd(1.2, 2), rnd(2.5, 4));
+clouds.count = 9;
 
-// ── 화면: 처음
-function welcome() {
-  app.innerHTML = `
-    <div class="topbar"><span></span><button class="link" id="lang">${lang === 'ko' ? 'English' : '한국어'}</button></div>
-    <h1>${L('운명이 키우는 작은 친구', 'A little friend raised by fate')}</h1>
-    <p class="sub">${L('당신의 기운으로 펫이 태어나고,<br>매일의 운세에 따라 자라요.', 'Your energy hatches a pet,<br>and each day’s fortune helps it grow.')}</p>
-    <div class="egg">${eggSvg(130)}</div>
-    <button class="btn gold" id="saju">${L('생년월일로 보기', 'Use my birth date')}<small>${L('사주팔자로 정확하게', 'Korean Saju, the four pillars')}</small></button>
-    <button class="btn" id="tarot">${L('타로 카드 한 장 뽑기', 'Draw one tarot card')}<small>${L('입력 없이, 처음 뽑은 카드가 운명이 돼요', 'No input — your first card becomes your fate')}</small></button>
-    ${disclaimer()}`;
-  $('lang').onclick = () => setLang(lang === 'ko' ? 'en' : 'ko');
-  $('saju').onclick = () => (sfx.unlockAudio(), sajuForm());
-  $('tarot').onclick = () => (sfx.unlockAudio(), tarotDraw());
+// 주인공(임시 모양, 에셋으로 바꿀 자리). +z를 본다
+const hero = new THREE.Mesh(
+  mergeGeometries([
+    part(new THREE.CylinderGeometry(0.22, 0.34, 0.6, 8), 0x4f7de0, 0, 0.3),
+    part(new THREE.SphereGeometry(0.28, 10, 8), 0xffd9b5, 0, 0.82),
+    part(new THREE.ConeGeometry(0.3, 0.42, 8), 0xe2574c, 0, 1.22),
+    part(new THREE.SphereGeometry(0.05, 6, 4), 0x2a2233, 0.1, 0.86, 0.25),
+    part(new THREE.SphereGeometry(0.05, 6, 4), 0x2a2233, -0.1, 0.86, 0.25),
+  ]),
+  painted,
+);
+hero.castShadow = true;
+scene.add(hero);
+
+// 적: 눈이 달린 말랑한 덩어리. 몸은 흰색으로 굽고 인스턴스 색을 곱해 종류·피격 번쩍임을 낸다
+const enemyMesh = instanced(
+  mergeGeometries([
+    part(new THREE.SphereGeometry(0.5, 12, 8).scale(1, 0.8, 1), 0xffffff, 0, 0.4),
+    part(new THREE.SphereGeometry(0.09, 6, 4), 0x1c1626, 0.17, 0.5, 0.42),
+    part(new THREE.SphereGeometry(0.09, 6, 4), 0x1c1626, -0.17, 0.5, 0.42),
+  ]),
+  painted, R.MAX_ENEMIES, true,
+);
+const C_SMALL = new THREE.Color(0xff8fa3), C_BIG = new THREE.Color(0x8a7cf5), C_FLASH = new THREE.Color(3, 3, 3);
+const shotMesh = instanced(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff1a0 }), 64);
+const gemMesh = instanced(new THREE.OctahedronGeometry(0.2), flat(0x55e6d6, { emissive: 0x55e6d6, emissiveIntensity: 0.7 }), 400);
+const bladeMesh = instanced(new THREE.BoxGeometry(0.6, 0.08, 0.18), flat(0xf4f7ff), 6, true);
+const bitMesh = instanced(new THREE.BoxGeometry(0.16, 0.16, 0.16), flat(0xffffff), 256);
+const ring = new THREE.Mesh(
+  new THREE.RingGeometry(0.86, 1, 48).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false }),
+);
+ring.position.y = 0.06;
+ring.visible = false;
+scene.add(ring);
+
+// ───────── 상태 ─────────
+type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number };
+type Shot = { x: number; z: number; dx: number; dz: number; life: number };
+type Gem = { x: number; z: number; xp: number };
+type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
+const newGame = () => ({
+  t: 0, px: 0, pz: 0, face: 0, hp: R.MAX_HP, inv: 0, level: 0, xp: 0, picks: 0, charge: 0, kills: 0, falls: 0,
+  lv: R.startLevels(), enemies: [] as Enemy[], shots: [] as Shot[], gems: [] as Gem[], bits: [] as Bit[],
+  shotCd: 0.4, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, orbitA: 0, moving: false,
+});
+let g = newGame();
+let mode: 'title' | 'play' | 'pick' | 'over' = 'title';
+const eScale = (e: Enemy) => (e.big ? 1.6 : 0.9);
+const eRadius = (e: Enemy) => 0.45 * eScale(e);
+
+// ───────── 입력: 화면 어디든 누른 자리가 조이스틱 원점 ─────────
+let joyId = -1, jox = 0, joy = 0, jx = 0, jz = 0;
+const keys = new Set<string>();
+const stick = $('stick');
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  sfx.unlockAudio();
+  if (joyId >= 0) return;
+  joyId = e.pointerId;
+  jox = e.clientX;
+  joy = e.clientY;
+  stick.style.cssText = `display:block;left:${jox}px;top:${joy}px`;
+});
+addEventListener('pointermove', (e) => {
+  if (e.pointerId !== joyId) return;
+  let dx = e.clientX - jox, dy = e.clientY - joy;
+  const d = Math.hypot(dx, dy);
+  if (d < 4) return;
+  if (d > 56) { // 손가락이 원 밖으로 나가면 원점이 따라와서 방향 전환이 바로 먹힌다
+    jox += (dx / d) * (d - 56);
+    joy += (dy / d) * (d - 56);
+    dx = e.clientX - jox;
+    dy = e.clientY - joy;
+    stick.style.left = `${jox}px`;
+    stick.style.top = `${joy}px`;
+  }
+  const m = Math.min(1, d / 40);
+  jx = (dx / d) * m;
+  jz = (dy / d) * m;
+});
+const release = (e: PointerEvent) => {
+  if (e.pointerId !== joyId) return;
+  joyId = -1;
+  jx = jz = 0;
+  stick.style.display = 'none';
+};
+addEventListener('pointerup', release);
+addEventListener('pointercancel', release);
+addEventListener('keydown', (e) => (e.code === 'Space' ? sweep() : keys.add(e.code)));
+addEventListener('keyup', (e) => keys.delete(e.code));
+$('sweep').addEventListener('pointerdown', () => sweep());
+
+// ───────── 규칙 ─────────
+function spawn() {
+  let a = 0;
+  for (let tries = 0; tries < 6; tries++) { // 주인공 코앞에서는 올라오지 않게
+    a = rnd(0, Math.PI * 2);
+    if (Math.hypot(Math.cos(a) * R.ISLAND_R - g.px, Math.sin(a) * R.ISLAND_R - g.pz) > 5) break;
+  }
+  const big = Math.random() < R.bigChance(g.t), d = R.ISLAND_R - 0.8;
+  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big), big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0 });
 }
 
-// ── 화면: 사주 입력
-function sajuForm() {
-  const hours = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, '0')}:00 ~ ${String(h).padStart(2, '0')}:59</option>`).join('');
-  app.innerHTML = `
-    <div class="topbar"><button class="link" id="back">← ${L('뒤로', 'Back')}</button><span></span></div>
-    <h1>${L('언제 태어났나요?', 'When were you born?')}</h1>
-    <p class="sub">${L('양력 기준, 한국 표준시로 계산해요.', 'Solar calendar, Korea Standard Time.')}</p>
-    <div class="paper">
-      <label class="field">${L('생년월일', 'Birth date')}<input type="date" id="date" value="1995-06-15" min="1920-01-01" max="${dayKey(new Date())}"></label>
-      <label class="field">${L('태어난 시각', 'Birth time')}
-        <select id="hour"><option value="">${L('모름', 'I don’t know')}</option>${hours}</select></label>
-      <div class="note">${L('시각을 모르면 시주(태어난 시의 두 글자)를 빼고 여섯 글자로 봐요.', 'Without a time we read six characters instead of eight.')}</div>
-    </div>
-    <button class="btn gold" id="go">${L('내 사주로 펫 깨우기', 'Hatch my pet')}</button>
-    ${disclaimer()}`;
-  $('back').onclick = welcome;
-  $('go').onclick = () => {
-    const v = ($('date') as HTMLInputElement).value;
-    if (!v) return toast(L('생년월일을 골라 주세요', 'Pick your birth date'));
-    const [y, m, d] = v.split('-').map(Number);
-    const hv = ($('hour') as HTMLSelectElement).value;
-    save.profile = sajuProfile(y, m, d, hv === '' ? null : Number(hv), 30);
-    persist();
-    born();
-  };
+function burst(x: number, z: number, color: THREE.Color, n: number) {
+  for (let i = 0; i < n && g.bits.length < 256; i++)
+    g.bits.push({ x, y: 0.4, z, vx: rnd(-4, 4), vy: rnd(3, 8), vz: rnd(-4, 4), life: rnd(0.35, 0.6), color });
 }
 
-// ── 화면: 타로 뽑기
-function tarotDraw() {
-  const n = 7;
-  const cards = Array.from({ length: n }, (_, i) => {
-    const a = (i - (n - 1) / 2) * 7;
-    return `<div class="tcard" data-i="${i}" style="transform: translateX(${(i - (n - 1) / 2) * 38}px) rotate(${a}deg) translateY(${Math.abs(a) * 0.8}px)">${cardBackSvg(96)}</div>`;
-  }).join('');
-  app.innerHTML = `
-    <div class="topbar"><button class="link" id="back">← ${L('뒤로', 'Back')}</button><span></span></div>
-    <h1>${L('마음이 끌리는 카드 한 장', 'Pick the card that calls you')}</h1>
-    <p class="sub">${L('처음 뽑은 카드가 당신의 운명 카드가 돼요.<br>다시 뽑을 수 없어요.', 'Your first card becomes your fate card.<br>There are no redraws.')}</p>
-    <div class="spread">${cards}</div>
-    ${disclaimer()}`;
-  $('back').onclick = welcome;
-  // 뽑은 순간의 시각으로 카드를 정한다(같은 자리를 눌러도 사람마다 다르게)
-  app.querySelectorAll<HTMLElement>('.tcard').forEach((el) =>
-    el.addEventListener('click', () => {
-      sfx.sparkle();
-      sfx.buzz(20);
-      const card = hash(`${Date.now()}-${el.dataset.i}-${Math.random()}`) % tarot.cards.length;
-      save.profile = tarotProfile(card, TAROT_EL[card]);
-      persist();
-      reveal(card);
-    }),
+let lastPop = 0, combo = 0;
+function reward(e: Enemy) {
+  g.kills++;
+  g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + 1);
+  const now = performance.now();
+  if (now - lastPop > 45) { // 한꺼번에 죽을 때 소리가 뭉개지지 않게, 이어 죽이면 음이 올라간다
+    combo = now - lastPop < 500 ? combo + 1 : 0;
+    lastPop = now;
+    sfx.pling(combo % 11);
+  }
+}
+// 뒤에서 앞으로 도는 반복문 안에서만 부른다(마지막 칸을 당겨 와 지운다)
+function drop(i: number) {
+  g.enemies[i] = g.enemies[g.enemies.length - 1];
+  g.enemies.pop();
+}
+function hit(i: number, dmg: number, kx: number, kz: number) {
+  const e = g.enemies[i];
+  e.hp -= dmg;
+  e.flash = 0.1;
+  e.kx += kx;
+  e.kz += kz;
+  if (e.hp > 0) return;
+  reward(e);
+  g.gems.push({ x: e.x, z: e.z, xp: e.big ? 3 : 1 });
+  if (g.gems.length > 400) gainXp(g.gems.shift()!.xp);
+  burst(e.x, e.z, e.big ? C_BIG : C_SMALL, e.big ? 12 : 6);
+  drop(i);
+}
+
+function gainXp(n: number) {
+  g.xp += n;
+  while (g.xp >= R.xpNeed(g.level)) {
+    g.xp -= R.xpNeed(g.level);
+    g.level++;
+    g.picks++;
+  }
+  if (g.picks && mode === 'play') showPick();
+}
+
+function hurt() {
+  g.hp--;
+  g.inv = 1.2;
+  g.shake = 0.6;
+  sfx.thud();
+  sfx.buzz(30);
+  for (const e of g.enemies) { // 맞은 직후 숨 쉴 틈
+    const dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
+    if (d < 3.5) { e.kx += (dx / d) * 9; e.kz += (dz / d) * 9; }
+  }
+  if (g.hp <= 0) end(false);
+}
+
+function sweep() {
+  if (mode !== 'play' || g.charge < R.sweepCost(g.lv.sweep)) return;
+  g.charge = 0;
+  const rad = R.sweepRadius(g.lv.sweep);
+  for (let i = g.enemies.length - 1; i >= 0; i--) {
+    const e = g.enemies[i];
+    const dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
+    if (e.out || d > rad) continue;
+    const k = (24 * (1 - (d / rad) * 0.5)) / (e.big ? 1.5 : 1);
+    hit(i, 6, (dx / d) * k, (dz / d) * k);
+  }
+  g.ringT = 0;
+  g.ringR = rad;
+  g.shake = 0.7;
+  g.stop = 0.07; // 짧게 멈춰 타격감을 준다
+  sfx.thud();
+  sfx.splash();
+  sfx.buzz(30);
+}
+
+function update(dt: number) {
+  g.t += dt;
+  if (g.t >= R.RUN_SECONDS) return end(true);
+  g.inv -= dt;
+
+  // 주인공
+  let mx = jx, mz = jz;
+  if (joyId < 0) {
+    mx = +(keys.has('KeyD') || keys.has('ArrowRight')) - +(keys.has('KeyA') || keys.has('ArrowLeft'));
+    mz = +(keys.has('KeyS') || keys.has('ArrowDown')) - +(keys.has('KeyW') || keys.has('ArrowUp'));
+    const m = Math.hypot(mx, mz) || 1;
+    mx /= m;
+    mz /= m;
+  }
+  g.moving = Math.hypot(mx, mz) > 0.05;
+  if (g.moving) {
+    const sp = R.moveSpeed(g.lv.speed);
+    g.px += mx * sp * dt;
+    g.pz += mz * sp * dt;
+    g.face = Math.atan2(mx, mz);
+    const d = Math.hypot(g.px, g.pz), lim = R.ISLAND_R - 0.7;
+    if (d > lim) { g.px *= lim / d; g.pz *= lim / d; }
+  }
+
+  // 적이 올라온다
+  g.spawnCd -= dt;
+  if (g.spawnCd <= 0) {
+    g.spawnCd = R.spawnInterval(g.t);
+    for (let i = R.spawnBatch(g.t); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn();
+  }
+
+  // 적 이동·낙하·접촉
+  const decay = Math.exp(-4.5 * dt);
+  for (let i = g.enemies.length - 1; i >= 0; i--) {
+    const e = g.enemies[i];
+    e.age += dt;
+    e.flash -= dt;
+    e.bladeCd -= dt;
+    if (e.out) {
+      e.vy -= 30 * dt;
+      e.y += e.vy * dt;
+      e.x += e.kx * dt;
+      e.z += e.kz * dt;
+      if (e.y < -16) drop(i);
+      continue;
+    }
+    const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz) || 1;
+    const sp = e.big ? 1.4 : 2.2 + g.t * 0.006;
+    e.x += ((dx / d) * sp + e.kx) * dt;
+    e.z += ((dz / d) * sp + e.kz) * dt;
+    e.kx *= decay;
+    e.kz *= decay;
+    e.hop += dt * (e.big ? 6 : 9);
+    const off = Math.hypot(e.x, e.z);
+    if (off > R.ISLAND_R && Math.hypot(e.kx, e.kz) < 2) { // 자기들끼리 밀려서는 떨어지지 않는다
+      e.x *= R.ISLAND_R / off;
+      e.z *= R.ISLAND_R / off;
+    } else if (off > R.ISLAND_R) { // 맞아서 섬 밖으로 밀리면 떨어진다. 보석을 못 남기니 경험치는 바로 준다
+      e.out = true;
+      g.falls++;
+      reward(e);
+      gainXp(e.big ? 3 : 1);
+    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt();
+  }
+  // 서로 겹치지 않게 밀어낸다
+  // shortcut: 모든 쌍을 비교한다(300마리면 4.5만 쌍), 적 상한을 올리면 격자 나누기로 바꾼다
+  const es = g.enemies;
+  for (let i = 0; i < es.length; i++) {
+    const a = es[i];
+    if (a.out) continue;
+    for (let j = i + 1; j < es.length; j++) {
+      const b = es[j];
+      const dx = b.x - a.x, dz = b.z - a.z, min = eRadius(a) + eRadius(b);
+      if (b.out || Math.abs(dx) > min || Math.abs(dz) > min) continue;
+      const d = Math.hypot(dx, dz) || 0.01;
+      if (d >= min) continue;
+      const push = ((min - d) / d) * 0.5;
+      a.x -= dx * push;
+      a.z -= dz * push;
+      b.x += dx * push;
+      b.z += dz * push;
+    }
+  }
+
+  // 돌팔매: 가장 가까운 적에게
+  g.shotCd -= dt;
+  if (g.shotCd <= 0) {
+    let best: Enemy | null = null, bd = 10;
+    for (const e of es) {
+      const d = Math.hypot(e.x - g.px, e.z - g.pz);
+      if (!e.out && d < bd) { bd = d; best = e; }
+    }
+    if (best) {
+      g.shotCd = R.shotCooldown(g.lv.shot);
+      const base = Math.atan2(best.x - g.px, best.z - g.pz), n = R.shotCount(g.lv.shot);
+      for (let k = 0; k < n; k++) {
+        const a = base + (k - (n - 1) / 2) * 0.2;
+        g.shots.push({ x: g.px, z: g.pz, dx: Math.sin(a), dz: Math.cos(a), life: 0.75 });
+      }
+      sfx.tick(false);
+    }
+  }
+  for (let s = g.shots.length - 1; s >= 0; s--) {
+    const b = g.shots[s];
+    b.x += b.dx * 17 * dt;
+    b.z += b.dz * 17 * dt;
+    b.life -= dt;
+    let gone = b.life <= 0;
+    for (let i = es.length - 1; i >= 0 && !gone; i--) {
+      const e = es[i];
+      if (e.out || Math.hypot(e.x - b.x, e.z - b.z) > eRadius(e) + 0.2) continue;
+      hit(i, 10, b.dx * 3, b.dz * 3);
+      gone = true;
+    }
+    if (gone) g.shots.splice(s, 1);
+  }
+
+  // 회전 칼날
+  g.orbitA += dt * 3.4;
+  const blades = R.orbitCount(g.lv.orbit);
+  for (let k = 0; k < blades; k++) {
+    const a = g.orbitA + (k / blades) * Math.PI * 2, bx = g.px + Math.sin(a) * 1.9, bz = g.pz + Math.cos(a) * 1.9;
+    for (let i = es.length - 1; i >= 0; i--) {
+      const e = es[i];
+      if (e.out || e.bladeCd > 0 || Math.hypot(e.x - bx, e.z - bz) > eRadius(e) + 0.35) continue;
+      e.bladeCd = 0.35;
+      const dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
+      hit(i, 7, (dx / d) * 5, (dz / d) * 5);
+    }
+  }
+
+  // 보석: 가까우면 끌려온다
+  const mag = R.magnetRadius(g.lv.magnet);
+  for (let i = g.gems.length - 1; i >= 0; i--) {
+    const m = g.gems[i];
+    const dx = g.px - m.x, dz = g.pz - m.z, d = Math.hypot(dx, dz) || 0.01;
+    if (d < 0.5) {
+      g.gems.splice(i, 1);
+      sfx.tick(true);
+      gainXp(m.xp);
+    } else if (d < mag) {
+      m.x += (dx / d) * 14 * dt;
+      m.z += (dz / d) * 14 * dt;
+    }
+  }
+
+  for (let i = g.bits.length - 1; i >= 0; i--) {
+    const b = g.bits[i];
+    b.vy -= 24 * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.z += b.vz * dt;
+    if ((b.life -= dt) <= 0) g.bits.splice(i, 1);
+  }
+}
+
+// ───────── 그리기 ─────────
+function sync(mesh: THREE.InstancedMesh, n: number) {
+  mesh.count = n;
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+}
+function draw(dt: number, now: number) {
+  hero.position.set(g.px, g.moving ? Math.abs(Math.sin(now * 0.014)) * 0.14 : 0, g.pz);
+  hero.rotation.y = g.face;
+  hero.visible = g.inv <= 0 || Math.floor(g.inv * 14) % 2 === 0;
+
+  g.enemies.forEach((e, i) => {
+    const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), sc = eScale(e) * Math.min(1, e.age * 4), wide = sc * (1.12 - hop * 0.2);
+    put(enemyMesh, i, e.x, e.y + hop * 0.28, e.z, Math.atan2(g.px - e.x, g.pz - e.z), wide, sc * (0.82 + hop * 0.34), wide);
+    enemyMesh.setColorAt(i, e.flash > 0 ? C_FLASH : e.big ? C_BIG : C_SMALL);
+  });
+  sync(enemyMesh, g.enemies.length);
+  g.shots.forEach((b, i) => put(shotMesh, i, b.x, 0.6, b.z));
+  sync(shotMesh, Math.min(64, g.shots.length));
+  g.gems.forEach((m, i) => put(gemMesh, i, m.x, 0.35 + Math.sin(now * 0.005 + i) * 0.08, m.z, now * 0.003 + i));
+  sync(gemMesh, g.gems.length);
+  const blades = R.orbitCount(g.lv.orbit);
+  for (let k = 0; k < blades; k++) {
+    const a = g.orbitA + (k / blades) * Math.PI * 2;
+    put(bladeMesh, k, g.px + Math.sin(a) * 1.9, 0.5, g.pz + Math.cos(a) * 1.9, a * 4);
+  }
+  sync(bladeMesh, blades);
+  g.bits.forEach((b, i) => {
+    put(bitMesh, i, b.x, b.y, b.z, b.life * 20, Math.min(1, b.life * 4));
+    bitMesh.setColorAt(i, b.color);
+  });
+  sync(bitMesh, g.bits.length);
+
+  g.ringT = Math.min(1, g.ringT + dt * 3.2);
+  ring.visible = g.ringT < 1;
+  ring.position.set(g.px, 0.06, g.pz);
+  ring.scale.setScalar(0.5 + g.ringR * g.ringT);
+  (ring.material as THREE.MeshBasicMaterial).opacity = 1 - g.ringT;
+
+  g.shake = Math.max(0, g.shake - dt * 3);
+  camTarget.lerp(P.set(g.px, 0, g.pz), 1 - Math.exp(-6 * dt));
+  camera.position.copy(camTarget).addScaledVector(CAM_DIR, camDist);
+  camera.position.x += rnd(-1, 1) * g.shake * 0.5;
+  camera.position.y += rnd(-1, 1) * g.shake * 0.5;
+  camera.lookAt(camTarget);
+}
+
+// ───────── 화면 글자 ─────────
+const overlay = $('overlay');
+const UP_TEXT: Record<R.UpgradeId | 'heart', [string, string]> = {
+  shot: [L('돌팔매', 'Sling'), L('더 빨리, 더 많이 던집니다', 'Throws faster and more')],
+  orbit: [L('회전 칼날', 'Orbit blades'), L('주위를 도는 칼날이 하나 늘어납니다', 'One more blade circles you')],
+  sweep: [L('쓸어내기', 'Sweep'), L('더 넓게 쓸고 더 빨리 찹니다', 'Wider sweep, charges faster')],
+  speed: [L('가벼운 신발', 'Light boots'), L('더 빨리 움직입니다', 'Move faster')],
+  magnet: [L('자석', 'Magnet'), L('보석을 더 멀리서 끌어옵니다', 'Pull gems from farther away')],
+  heart: [L('회복', 'Heal'), L('체력을 하나 채웁니다', 'Restore one heart')],
+};
+function show(html: string) {
+  overlay.innerHTML = html;
+  overlay.hidden = false;
+}
+function showPick() {
+  const picks = R.pickUpgrades(g.lv, g.hp >= R.MAX_HP);
+  if (!picks.length) return void (g.picks = 0);
+  mode = 'pick';
+  sfx.sparkle();
+  show(
+    `<h2>${L('레벨 업!', 'Level up!')}</h2>` +
+      picks
+        .map((id) => {
+          const pips = id === 'heart' ? '' : `<i>${'●'.repeat(g.lv[id])}${'○'.repeat(R.MAX_LEVEL - g.lv[id])}</i>`;
+          return `<button class="card" data-id="${id}"><b>${UP_TEXT[id][0]}</b>${pips}<span>${UP_TEXT[id][1]}</span></button>`;
+        })
+        .join(''),
   );
 }
-
-function cardFace(n: number) {
-  const c = tarot.cards[n];
-  const el = c.el as Element;
-  return `<div class="face">${cardFaceSvg(n, el, lang === 'ko' ? c.ko : c.en, 210)}</div>
-    <p class="sub" style="margin:4px 0 8px"><b style="color:#fff">${T(c.kw)}</b><br>${L('기운', 'Element')}: ${elName(el)}</p>`;
-}
-
-function reveal(card: number) {
-  app.innerHTML = `
-    <h1>${L('당신의 운명 카드', 'Your fate card')}</h1>
-    ${cardFace(card)}
-    <p class="sub">${L('이 카드의 기운으로 펫이 깨어나요.', 'Your pet awakens from this card’s energy.')}</p>
-    <button class="btn gold" id="go">${L('펫 만나러 가기', 'Meet my pet')}</button>`;
-  $('go').onclick = born;
-}
-
-// ── 화면: 펫 탄생·내 운명
-const GODS = sajuText.gods as Record<string, { name: { ko: string; en: string; hanja: string }; meaning: { ko: string; en: string }; summary: { ko: string; en: string }[]; love: { ko: string; en: string }; money: { ko: string; en: string }; work: { ko: string; en: string }; health: { ko: string; en: string }; advice: { ko: string; en: string } }>;
-const godName = (g: string) => (lang === 'ko' ? `${GODS[g].name.ko}(${GODS[g].name.hanja})` : GODS[g].name.en);
-
-function pillarsHtml(p: Profile) {
-  // 만세력 관례대로 오른쪽부터 년·월·일·시. 일간(나)은 테두리로 표시하고, 나머지 글자에는 나와의 관계(십신)를 단다
-  const labels = lang === 'ko' ? ['년주', '월주', '일주', '시주'] : ['Year', 'Month', 'Day', 'Hour'];
-  const ch = (c: string, e: Element, god: string | null) =>
-    `<div class="ch${god === null ? ' me' : ''}" style="background:${elColor(e)}">${c}<small>${HANGUL[c]}</small></div><div class="god">${god === null ? L('나', 'Me') : godName(god).replace(/\(.+\)/, '')}</div>`;
-  // 타로 입구는 운명 카드가 정한 일주 한 기둥만 있다
-  const only = p.source === 'tarot' ? [2] : [0, 1, 2, 3];
-  const cols = p.pillars!.map((x, i) => `<div class="pillar"><div class="lbl">${labels[i]}</div>${
-    x
-      ? ch(x.gan, GAN_EL[x.gan], i === 2 ? null : tenGod(p.dayGan!, x.gan)) + ch(x.zhi, ZHI_EL[x.zhi], tenGod(p.dayGan!, x.zhi))
-      : `<div class="ch none">?<small>&nbsp;</small></div><div class="god">${L('모름', 'Unknown')}</div><div class="ch none">?<small>&nbsp;</small></div><div class="god">&nbsp;</div>`
-  }</div>`);
-  const shown = cols.filter((_, i) => only.includes(i));
-  return `<div class="pillars${only.length === 1 ? ' one' : ''}">${shown.reverse().join('')}</div>`;
-}
-
-function barsHtml(p: Profile) {
-  const max = Math.max(...Object.values(p.counts), 1);
-  return `<div class="bars">${ELEMENTS.map((e) => `<div class="bar" style="height:${(p.counts[e] / max) * 100}%;background:${elColor(e)}"><span>${lang === 'ko' ? EL[e].ko : EL[e].en} ${p.counts[e]}</span></div>`).join('')}</div>`;
-}
-
-function born() {
-  const p = save.profile!;
-  const pet = EL[p.self].pet;
-  let body: string;
-  if (p.source === 'saju') {
-    const most = ELEMENTS.reduce((a, b) => (p.counts[b] > p.counts[a] ? b : a));
-    const few = luckyElement(p);
-    const corr = p.birth!.h === null ? null : birthClocks(p.birth!.y, p.birth!.m, p.birth!.d, p.birth!.h, p.birth!.mi).correctionMin;
-    const ET = sajuText.elements as Record<Element, { many: { ko: string; en: string }; few: { ko: string; en: string } }>;
-    body = `<h2>${L('나의 사주팔자', 'My four pillars')}</h2>${pillarsHtml(p)}
-      <div class="note">${p.birth!.y}.${p.birth!.m}.${p.birth!.d} ${p.birth!.h === null ? L('시각 모름', 'time unknown') : `${String(p.birth!.h).padStart(2, '0')}:${String(p.birth!.mi).padStart(2, '0')}`}${corr ? L(` · 서울 기준 태양시 보정 ${corr}분`, ` · solar time ${corr} min`) : ''}</div>
-      <h2 style="margin-top:16px">${L(`나는 ${p.dayGan}(${HANGUL[p.dayGan!]}) — ${EL[p.self].ko}의 사람`, `Day master ${p.dayGan} — ${EL[p.self].en}`)}</h2>
-      <p class="read">${T((sajuText.days as Record<string, { ko: string; en: string }>)[p.dayGan!])}</p>
-      <h2 style="margin-top:16px">${L('다섯 기운의 균형', 'Balance of five elements')}</h2>${barsHtml(p)}
-      <p class="read" style="margin-top:26px">${T(ET[most].many)}</p>
-      <p class="read">${T(ET[few].few)}</p>`;
-  } else {
-    const c = tarot.cards[p.card!];
-    body = `<h2>${L('나의 운명 카드', 'My fate card')}</h2>
-      <div class="face" style="animation:none">${cardFaceSvg(p.card!, c.el as Element, lang === 'ko' ? c.ko : c.en, 150)}</div>
-      <p class="read"><b>${T(c.kw)}</b></p>
-      <p class="read">${T(c.fate)}</p>
-      <h2 style="margin-top:16px">${L('이 카드가 정한 나의 일주', 'Your day pillar, set by this card')}</h2>
-      ${pillarsHtml(p)}
-      <h2 style="margin-top:12px">${L(`나는 ${p.dayGan}(${HANGUL[p.dayGan!]}) — ${EL[p.self].ko}의 사람`, `Day master ${p.dayGan} — ${EL[p.self].en}`)}</h2>
-      <p class="read">${T((sajuText.days as Record<string, { ko: string; en: string }>)[p.dayGan!])}</p>
-      <div class="note">${L('생년월일 대신 이 일주로 매일의 사주 운세를 봐요.', 'Your daily Saju fortune is read from this day pillar instead of a birth date.')}</div>`;
-  }
-  app.innerHTML = `
-    <div class="topbar"><button class="link" id="back">← ${L('펫에게', 'Back')}</button><span></span></div>
-    <div class="stage"><div class="glow" style="background:${elColor(p.self)}"></div><div class="pet hatch">${petSvg(p.self, 170)}</div></div>
-    <div class="petname"><b>${T(pet)}</b> · ${T(pet.trait)}</div>
-    <div class="paper">${body}</div>
-    <button class="btn gold" id="go">${L('오늘의 운세 보기', 'See today’s fortune')}</button>
-    ${disclaimer()}`;
-  sfx.finale();
-  $('go').onclick = home;
-  $('back').onclick = home;
-}
-
-/** 행운의 기운: 사주는 가장 모자란 오행, 타로는 오늘 카드의 원소 */
-const luckyFor = (p: Profile, f: DailyFortune) => (p.dayGan ? luckyElement(p) : f.todayElement);
-
-/** 오늘의 운세 전문 */
-function reading() {
-  const p = save.profile!;
-  const f = fortune;
-  const lucky = luckyFor(p, f);
-  const LUCK = (sajuText.luck as Record<Element, { dir: { ko: string; en: string }; time: { ko: string; en: string }; item: { ko: string; en: string } }>)[lucky];
-  const sec = (icon: string, title: string, text: string) => `<div class="sec"><b>${icon} ${title}</b><p>${esc(text)}</p></div>`;
-  let head: string, total: string, parts: string;
-  if (false) {
-    const c = tarot.cards[f.todayCard!];
-    const fate = tarot.cards[p.card!];
-    head = `<div class="face${f.reversed ? ' rev' : ''}">${cardFaceSvg(f.todayCard!, c.el as Element, lang === 'ko' ? c.ko : c.en, 170)}</div>
-      <h2 style="text-align:center;margin:4px 0">${lang === 'ko' ? c.ko : c.en} · ${f.reversed ? L('역방향', 'Reversed') : L('정방향', 'Upright')}</h2>
-      <div class="note" style="text-align:center">${T(c.kw)}</div>`;
-    // 역방향은 주의점을 먼저 말하고, 카드 본래의 기운은 '약하게 흐른다'고 이어 붙인다
-    total = f.reversed ? `${T(c.rev)} ${L('그래도 이 카드 본래의 기운은 약하게나마 흐르고 있어요 —', 'Still, the card’s original energy flows faintly —')} ${T(c.up.general)}` : T(c.up.general);
-    parts = sec('💗', L('애정', 'Love'), T(c.up.love)) + sec('💰', L('금전', 'Money'), T(c.up.money)) + sec('💼', L('일·공부', 'Work'), T(c.up.work)) + sec('🌙', L('오늘의 조언', 'Advice'), T(c.up.advice))
-      + sec('🔮', L('나의 운명 카드와', 'With your fate card'), L(`운명 카드 「${fate.ko}」(${EL[p.self].ko})에게 오늘 카드 「${c.ko}」(${EL[f.todayElement].ko})는 「${T(CAT[f.category].title)}」의 기운이에요.`, `For your fate card ${fate.en} (${EL[p.self].en}), today's ${c.en} (${EL[f.todayElement].en}) brings “${T(CAT[f.category].title)}”.`));
-  } else {
-    const g = GODS[f.god];
-    head = `<div class="godhead"><span class="gz">${f.todayGanZhi}</span><div><b>${L(`오늘은 ${godName(f.god)}의 날`, `A ${GODS[f.god].name.en} day`)}</b><br><small>${T(g.meaning)}</small></div></div>`;
-    total = T(g.summary[f.seed % g.summary.length]);
-    const br = f.branch ? T((sajuText.branch as Record<string, { ko: string; en: string }>)[f.branch]) : '';
-    parts = (br ? sec(f.branch === 'clash' ? '⚡' : '🤝', f.branch === 'clash' ? L('충(沖)', 'Clash') : L('합(合)', 'Harmony'), br) : '')
-      + sec('💗', L('애정', 'Love'), T(g.love)) + sec('💰', L('금전', 'Money'), T(g.money)) + sec('💼', L('일·공부', 'Work'), T(g.work)) + sec('🍀', L('건강', 'Health'), T(g.health)) + sec('🌙', L('오늘의 조언', 'Advice'), T(g.advice));
-  }
-  const sheet = document.createElement('div');
-  sheet.className = 'sheet reading';
-  sheet.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><span class="stars" style="color:var(--gold);font-size:20px">${'★'.repeat(f.score)}${'☆'.repeat(5 - f.score)}</span><button class="link" id="rd-close" style="color:#8a7a62">${L('닫기', 'Close')}</button></div>
-    ${head}
-    ${sec('✨', L('총운', 'Overall'), total)}
-    ${parts}
-    <div class="lucky lucky3">
-      <div><span class="swatch" style="background:${EL[lucky].color.hex}"></span>${L('색', 'Color')}<br><b>${T(EL[lucky].color)}</b></div>
-      <div>${L('숫자', 'Numbers')}<br><b>${EL[lucky].numbers.join(' · ')}</b></div>
-      <div>${L('방향', 'Direction')}<br><b>${T(LUCK.dir)}</b></div>
-      <div>${L('시간', 'Time')}<br><b>${T(LUCK.time)}</b></div>
-      <div>${L('물건', 'Item')}<br><b>${T(LUCK.item)}</b></div>
-    </div>`;
-  document.body.appendChild(sheet);
-  sheet.querySelector('#rd-close')!.addEventListener('click', () => sheet.remove());
-}
-
-// ── 화면: 홈(오늘의 운세와 펫)
-let fortune: DailyFortune;
-function checkIn() {
-  const today = dayKey(new Date());
-  if (save.lastDay === today) return false;
-  const yesterday = dayKey(new Date(Date.now() - 86400000));
-  save.streak = save.lastDay === yesterday ? save.streak + 1 : 1;
-  save.lastDay = today;
-  save.checkins++;
-  save.coins += 10 + (fortune.category === 'wealth' ? 10 : 0);
-  persist();
-  return true;
-}
-
-function fortuneLine(f: DailyFortune) {
-  const p = save.profile!;
-  if (!p.dayGan) {
-    const c = tarot.cards[f.todayCard!];
-    return f.reversed ? T(c.rev) : T(c.up.general).split(/(?<=[.!?。])\s/)[0];
-  }
-  const g = GODS[f.god];
-  return T(g.summary[f.seed % g.summary.length]).split(/(?<=[.!?。])\s/)[0];
-}
-
-function home() {
-  const p = save.profile!;
-  fortune = dailyFortune(p, new Date(), TAROT_EL);
-  const first = checkIn();
-  const pet = EL[p.self].pet;
-  const lucky = luckyFor(p, fortune);
-  const stage = stageOf(save.kiTotal);
-  const st = decor.stages[stage];
-  const nextSt = decor.stages[stage + 1];
-  const growPct = nextSt ? ((save.kiTotal - st.need) / (nextSt.need - st.need)) * 100 : 100;
-  // 펫 둘레 자리: [가로 중심 %, 바닥에서 px, 앞줄 여부]. 뒷줄은 펫 뒤, 앞줄은 펫 발치 앞에 그려 깊이감을 준다
-  const SLOTS: [number, number, boolean][] = [[9, 100, false], [25, 116, false], [8, 6, true], [23, -2, true], [37, -10, true], [63, -10, true], [77, -2, true], [92, 6, true], [75, 116, false], [91, 100, false]];
-  const d = new Date();
-  const dateText = lang === 'ko' ? `${d.getMonth() + 1}월 ${d.getDate()}일` : d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
-  const todayText = p.dayGan
-    ? `${fortune.todayGanZhi}(${HANGUL[fortune.todayGanZhi![0]]}${HANGUL[fortune.todayGanZhi![1]]})${L('일', ' day')}`
-    : L('오늘의 타로', 'Daily tarot');
-  const tag = p.dayGan
-    ? L(`오늘은 ${godName(fortune.god)}의 날`, `${GODS[fortune.god].name.en} day`)
-    : `${lang === 'ko' ? tarot.cards[fortune.todayCard!].ko : tarot.cards[fortune.todayCard!].en} · ${fortune.reversed ? L('역방향', 'Reversed') : L('정방향', 'Upright')}`;
-  const hidden = false; // 결정 029: 매일 따로 뒤집는 타로 운세는 없앰(모두 사주 운세)
-  app.innerHTML = `
-    <div class="topbar"><span>${dateText} · ${todayText}</span><span><button class="link" id="mine">${L('내 운명', 'My fate')}</button><button class="link" id="lang">${lang === 'ko' ? 'EN' : '한'}</button></span></div>
-    <div class="stage" id="stage"><div class="glow" style="background:${elColor(p.self)}"></div>
-      ${save.decor.map((id) => {
-        const it = decor.items.find((x) => x.id === id)!;
-        const big = it.cost > 20;
-        const [x, y, front] = SLOTS[it.slot];
-        return `<div class="deco" style="left:${x}%;bottom:${y}px;z-index:${front ? 3 : 0}">${decoSvg(id, big ? 68 : 54)}</div>`;
-      }).join('')}
-      <div class="pet" id="pet">${petSvg(p.self, Math.round(170 * st.scale))}</div>
-      <div class="say">${T(CAT[fortune.category].pet)}</div></div>
-    <div class="petname"><b>${T(pet)}</b> · ${T(st)}${nextSt ? `<div class="grow"><b style="width:${growPct}%"></b></div><small>${L(`다음 단계 ${T(nextSt)}까지 기운 ${nextSt.need - save.kiTotal}`, `${nextSt.need - save.kiTotal} energy to ${T(nextSt)}`)}</small>` : ''}</div>
-    ${hidden
-      ? `<div class="paper today flipbox"><div class="mini">${cardBackSvg(70)}</div><div><h2 style="margin:0 0 4px">${L('오늘의 카드가 기다려요', 'Today’s card awaits')}</h2>
-          <div class="note">${L('마음을 가다듬고 카드를 뒤집어 보세요.', 'Take a breath and turn the card.')}</div>
-          <button class="btn gold" id="flip" style="margin:10px 0 0;padding:12px">${L('카드 뒤집기', 'Turn the card')}</button></div></div>`
-      : `<div class="paper today" id="today">
-      ${!p.dayGan ? `<div class="mini${fortune.reversed ? ' rev' : ''}" style="float:right;margin-left:10px">${cardFaceSvg(fortune.todayCard!, fortune.todayElement, '', 56)}</div>` : ''}
-      <div class="head"><h2 style="margin:0">${T(CAT[fortune.category].title)}</h2></div>
-      <div class="cat">${tag} · <span class="stars" style="font-size:14px">${'★'.repeat(fortune.score)}${'☆'.repeat(5 - fortune.score)}</span></div>
-      <div class="line">${esc(fortuneLine(fortune))}</div>
-      <button class="btn" id="more" style="margin:4px 0 0;padding:11px;background:#efe5cf;box-shadow:none;clear:both">${L('오늘의 운세 자세히 보기 ›', 'Read today’s full fortune ›')}</button>
-    </div>`}
-    <div class="stats"><span>🪙 <b>${save.coins}</b></span><span>🔥 <b>${save.streak}</b>${L('일 연속', '-day streak')}</span><span>📅 <b>${save.checkins}</b>${L('일', save.checkins === 1 ? ' day' : ' days')}</span></div>
-    <div class="ki">${ELEMENTS.map((e) => `<span><i style="background:${elColor(e)};color:${elColor(e)}"></i>${save.ki[e]}</span>`).join('')}</div>
-    <button class="btn gold" id="play" ${playsLeft() ? '' : 'disabled'}>${L('오늘의 기운 모으기', 'Gather today’s energy')}<span class="badge">${playsLeft()}/${PLAYS_PER_DAY}</span>
-      <small>${T(modsFor(fortune.category).label)}</small></button>
-    <div class="row2"><button class="btn" id="shop">${L('꾸미기', 'Decorate')}</button><button class="btn" id="share">${L('운세 카드 공유', 'Share card')}</button></div>
-    ${disclaimer()}`;
-  $('lang').onclick = () => setLang(lang === 'ko' ? 'en' : 'ko');
-  $('mine').onclick = born;
-  $('share').onclick = shareCard;
-  $('play').onclick = startCatch;
-  $('shop').onclick = shopSheet;
-  $('pet').onclick = (e) => petTap(e as MouseEvent);
-  // 테스트용: 코인 줄을 2초 안에 5번 누르면 기운·코인 지급(출시 빌드 --mode release 에서는 꺼짐)
-  if (import.meta.env.MODE !== 'release') {
-    let taps: number[] = [];
-    document.querySelector<HTMLElement>('.stats')!.addEventListener('click', () => {
-      const now = Date.now();
-      taps = [...taps.filter((t) => now - t < 2000), now];
-      if (taps.length < 5) return;
-      taps = [];
-      ELEMENTS.forEach((e) => (save.ki[e] += 500));
-      save.kiTotal += 2500;
-      save.coins += 1000;
-      save.playsUsed = 0;
-      persist();
-      sfx.sparkle();
-      toast(L('테스트: 기운 +500씩, 코인 +1000, 판수 초기화', 'Test: +500 each energy, +1000 coins, plays reset'));
-      setTimeout(home, 600);
-    });
-  }
-  if (hidden)
-    $('flip').onclick = () => {
-      save.revealedDay = dayKey(new Date());
-      persist();
-      sfx.sparkle();
-      sfx.buzz(20);
-      home();
-      reading();
-    };
-  else $('more').onclick = reading;
-  if (first) setTimeout(() => toast(L(`오늘 출석! 🪙 +${fortune.category === 'wealth' ? 20 : 10}`, `Checked in! 🪙 +${fortune.category === 'wealth' ? 20 : 10}`)), 400);
-}
-
-async function startCatch() {
-  if (!playsLeft()) return;
-  sfx.unlockAudio();
-  const p = save.profile!;
-  const img = await svgImage(petSvg(p.self, 240));
-  runCatch({ lucky: luckyFor(p, fortune), category: fortune.category, pet: img, L, onEnd: (r) => catchResult(r) });
-}
-
-function catchResult(r: CatchResult) {
-  const today = dayKey(new Date());
-  if (save.playsDay !== today) {
-    save.playsDay = today;
-    save.playsUsed = 0;
-  }
-  save.playsUsed++;
-  const before = stageOf(save.kiTotal);
-  let gained = 0;
-  for (const e of ELEMENTS) {
-    save.ki[e] += r.ki[e];
-    gained += r.ki[e];
-  }
-  save.kiTotal += gained;
-  save.coins += r.coins;
-  persist();
-  const grown = stageOf(save.kiTotal) > before;
-  sfx.finale();
-  overlay.innerHTML = `<div class="paper result" style="width:100%;max-width:420px">
-    <h2>${L('기운을 모았어요!', 'Energy gathered!')}</h2>
-    <div class="big">${r.score}</div>
-    <div class="note">${L(`최고 콤보 ${r.bestCombo} · 금화 🪙 +${r.coins}`, `Best combo ${r.bestCombo} · Coins 🪙 +${r.coins}`)}</div>
-    <div class="ki" style="color:var(--ink)">${ELEMENTS.map((e) => `<span style="background:#efe5cf"><i style="background:${elColor(e)};color:${elColor(e)}"></i>+${r.ki[e]}</span>`).join('')}</div>
-    ${grown ? `<h2 style="color:#c98a12;margin-top:12px">${L(`펫이 ${T(decor.stages[stageOf(save.kiTotal)])}(으)로 자랐어요!`, `Your pet grew into a ${T(decor.stages[stageOf(save.kiTotal)])}!`)}</h2>` : ''}
-  </div>
-  <div class="row" style="margin-top:10px">${playsLeft() ? `<button class="btn gold" id="ov-again">${L(`한 판 더 (${playsLeft()})`, `Again (${playsLeft()})`)}</button>` : ''}<button class="btn" id="ov-home">${L('펫에게 가기', 'Back to pet')}</button></div>`;
-  overlay.hidden = false;
-  $('ov-home').onclick = () => ((overlay.hidden = true), home());
-  if (playsLeft()) $('ov-again').onclick = () => ((overlay.hidden = true), home(), startCatch());
-}
-
-function shopSheet() {
-  const sheet = document.createElement('div');
-  sheet.className = 'sheet';
-  const draw = () => {
-    sheet.innerHTML = `<div class="head" style="display:flex;justify-content:space-between;align-items:center"><h2>${L('펫의 정원 꾸미기', 'Decorate the garden')}</h2><button class="link" id="sh-close" style="color:#8a7a62">${L('닫기', 'Close')}</button></div>
-      <div class="ki" style="color:var(--ink)">${ELEMENTS.map((e) => `<span style="background:#efe5cf"><i style="background:${elColor(e)};color:${elColor(e)}"></i>${save.ki[e]}</span>`).join('')}</div>
-      <div class="shop">${decor.items.map((it) => {
-        const el = it.el as Element;
-        const owned = save.decor.includes(it.id);
-        const can = save.ki[el] >= it.cost;
-        return `<div class="item">${decoSvg(it.id, 64)}<b>${T(it)}</b><br><span style="color:${elColor(el)}">●</span> ${elName(el)} ${it.cost}
-          <button data-id="${it.id}" ${owned || !can ? 'disabled' : ''}>${owned ? L('놓았어요', 'Placed') : can ? L('놓기', 'Place') : L('기운 부족', 'Need more')}</button></div>`;
-      }).join('')}</div>`;
-    sheet.querySelector('#sh-close')!.addEventListener('click', () => (sheet.remove(), home()));
-    sheet.querySelectorAll<HTMLButtonElement>('.item button').forEach((b) =>
-      b.addEventListener('click', () => {
-        const it = decor.items.find((x) => x.id === b.dataset.id)!;
-        save.ki[it.el as Element] -= it.cost;
-        save.decor.push(it.id);
-        persist();
-        sfx.sparkle();
-        sfx.buzz(15);
-        toast(L(`${it.ko}을(를) 놓았어요!`, `${it.en} placed!`));
-        draw();
-      }),
-    );
-  };
-  draw();
-  document.body.appendChild(sheet);
-}
-
-function petTap(e: MouseEvent) {
+overlay.addEventListener('click', (ev) => {
+  const btn = (ev.target as HTMLElement).closest('button');
+  if (!btn) return;
   sfx.unlockAudio();
   sfx.click();
-  sfx.buzz(10);
-  const stage = $('stage');
-  const r = stage.getBoundingClientRect();
-  const h = document.createElement('div');
-  h.className = 'heart';
-  h.textContent = ['💗', '✨', '💛', '🌟'][Math.floor(Math.random() * 4)];
-  h.style.left = `${e.clientX - r.left - 10}px`;
-  h.style.top = `${e.clientY - r.top - 20}px`;
-  stage.appendChild(h);
-  setTimeout(() => h.remove(), 1000);
-  const today = dayKey(new Date());
-  if (save.pettedDay !== today) {
-    save.pettedDay = today;
-    save.coins += 5;
-    persist();
-    toast(L('쓰다듬기 보너스 🪙 +5', 'Petting bonus 🪙 +5'));
-    setTimeout(home, 900);
-  }
-}
-
-// ── 공유 카드(인스타 스토리 비율 1080×1350)
-async function shareCard() {
-  const p = save.profile!;
-  const pet = EL[p.self].pet;
-  const lucky = luckyFor(p, fortune);
-  const W = 1080, H = 1350;
-  const cv = document.createElement('canvas');
-  cv.width = W;
-  cv.height = H;
-  const c = cv.getContext('2d')!;
-  const g = c.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#2a2550');
-  g.addColorStop(1, '#1c1a33');
-  c.fillStyle = g;
-  c.fillRect(0, 0, W, H);
-  for (let i = 0; i < 70; i++) {
-    c.fillStyle = `rgba(255,255,255,${0.2 + ((i * 37) % 60) / 100})`;
-    c.beginPath();
-    c.arc((i * 97) % W, (i * 53) % 700, 1.5 + (i % 3), 0, Math.PI * 2);
-    c.fill();
-  }
-  const font = (w: number, s: number) => `${w} ${s}px -apple-system, "Apple SD Gothic Neo", sans-serif`;
-  c.textAlign = 'center';
-  c.fillStyle = '#b9b2d6';
-  c.font = font(500, 40);
-  c.fillText(dayKey(new Date()).replace(/-/g, '. '), W / 2, 120);
-  c.fillStyle = elColor(p.self);
-  c.globalAlpha = 0.35;
-  c.beginPath();
-  c.arc(W / 2, 380, 210, 0, Math.PI * 2);
-  c.fill();
-  c.globalAlpha = 1;
-  c.drawImage(await svgImage(petSvg(p.self, 380)), W / 2 - 190, 190, 380, 380);
-  c.fillStyle = '#fff';
-  c.font = font(700, 50);
-  c.fillText(T(pet), W / 2, 650);
-  // 종이 카드
-  c.fillStyle = '#f7f0e1';
-  roundRect(c, 90, 720, W - 180, 470, 40);
-  c.fill();
-  c.fillStyle = '#3a2d22';
-  c.font = font(800, 58);
-  c.fillText(T(CAT[fortune.category].title), W / 2, 820);
-  c.fillStyle = '#e3b45a';
-  c.font = font(400, 54);
-  c.fillText('★'.repeat(fortune.score) + '☆'.repeat(5 - fortune.score), W / 2, 895);
-  c.fillStyle = '#3a2d22';
-  c.font = font(500, 40);
-  wrap(c, fortuneLine(fortune), W / 2, 980, W - 280, 58);
-  c.fillStyle = '#7a6a55';
-  c.font = font(500, 34);
-  c.fillText(`${L('행운의 색', 'Lucky color')} ${T(EL[lucky].color)} · ${L('숫자', 'Numbers')} ${EL[lucky].numbers.join(', ')}`, W / 2, 1140);
-  c.fillStyle = '#b9b2d6';
-  c.font = font(600, 36);
-  c.fillText(L('운명이 키우는 작은 친구 · Daeun.dev', 'A friend raised by fate · Daeun.dev'), W / 2, 1270);
-  const url = cv.toDataURL('image/png');
-  overlay.innerHTML = `<img src="${url}" alt=""><div class="hint">${L('이미지를 길게 눌러 저장하거나 공유하세요', 'Long-press the image to save or share')}</div>
-    <div class="row"><button class="btn gold" id="ov-share">${L('공유', 'Share')}</button><button class="btn" id="ov-close">${L('닫기', 'Close')}</button></div>`;
-  overlay.hidden = false;
-  $('ov-close').onclick = () => (overlay.hidden = true);
-  $('ov-share').onclick = async () => {
-    try {
-      const blob = await (await fetch(url)).blob();
-      const file = new File([blob], 'fortune.png', { type: 'image/png' });
-      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file] });
-      else toast(L('이 기기에서는 길게 눌러 저장해 주세요', 'Long-press the image to save'));
-    } catch {
-      /* 공유 취소 */
-    }
-  };
-}
-
-function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  c.beginPath();
-  c.moveTo(x + r, y);
-  c.arcTo(x + w, y, x + w, y + h, r);
-  c.arcTo(x + w, y + h, x, y + h, r);
-  c.arcTo(x, y + h, x, y, r);
-  c.arcTo(x, y, x + w, y, r);
-  c.closePath();
-}
-
-function wrap(c: CanvasRenderingContext2D, text: string, x: number, y: number, max: number, lh: number) {
-  // 한글은 글자 단위, 영어는 단어 단위로 줄을 나눈다
-  const tokens = lang === 'ko' ? [...text] : text.split(/(?<= )/);
-  let line = '';
-  for (const t of tokens) {
-    if (c.measureText(line + t).width > max && line) {
-      c.fillText(line.trim(), x, y);
-      y += lh;
-      line = t;
-    } else line += t;
-  }
-  c.fillText(line.trim(), x, y);
-}
-
-function $(id: string) {
-  return document.getElementById(id)!;
-}
-
-// 시작
-if (save.profile) home();
-else welcome();
-
-// 개발용 훅
-Object.assign(window, {
-  __demo: {
-    reset: () => (localStorage.removeItem(KEY), location.reload()),
-    morePlays: () => ((save.playsUsed = 0), persist(), home()),
-    giveKi: (n = 50) => (ELEMENTS.forEach((e) => (save.ki[e] += n)), (save.kiTotal += n * 5), persist(), home()),
-    save: () => save,
-    fortuneOn: (y: number, m: number, d: number) => save.profile && dailyFortune(save.profile, new Date(y, m - 1, d), TAROT_EL),
-  },
+  const id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
+  if (!id) { // 시작·다시 하기
+    g = newGame();
+    camTarget.set(0, 0, 0);
+  } else if (id === 'heart') g.hp++;
+  else g.lv[id]++;
+  overlay.hidden = true;
+  mode = 'play';
+  g.inv = Math.max(g.inv, 0.6);
+  if (id && --g.picks > 0) showPick();
 });
+function end(win: boolean) {
+  mode = 'over';
+  win ? sfx.finale() : sfx.fail();
+  const sec = Math.floor(g.t);
+  show(
+    `<h1>${win ? L('섬을 지켰습니다!', 'Island defended!') : L('섬을 빼앗겼습니다', 'The island fell')}</h1>` +
+      `<p>${L('버틴 시간', 'Survived')} <b>${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}</b><br>` +
+      `${L('처치', 'Defeated')} <b>${g.kills}</b> · ${L('떨어뜨림', 'Knocked off')} <b>${g.falls}</b> · ${L('레벨', 'Level')} <b>${g.level + 1}</b></p>` +
+      `<button class="go">${L('한 번 더', 'Once more')}</button>`,
+  );
+}
+show(
+  `<h1>${L('섬 지키기', 'Hold the Isle')}</h1>` +
+    `<p>${L('끌어서 이동 · 공격은 자동<br>게이지가 차면 <b>쓸어!</b>로 섬 밖으로 밀어내기', 'Drag to move · attacks are automatic<br>When the gauge fills, <b>Sweep!</b> them off the isle')}</p>` +
+    `<button class="go">${L('시작', 'Start')}</button>`,
+);
+$('sweep').querySelector('span')!.textContent = L('쓸어!', 'Sweep!');
+
+const hud = { hearts: $('hearts'), time: $('time'), xp: $('xp').firstElementChild as HTMLElement, fill: $('sweep').firstElementChild as HTMLElement, dev: $('dev') };
+const DEV = import.meta.env.MODE !== 'release'; // 실기기 성능을 눈으로 보려고 출시 빌드가 아니면 프레임 수를 띄운다
+let last = performance.now(), frames = 0, fpsAt = last, fps = 0;
+function frame(now: number) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.033, (now - last) / 1000);
+  last = now;
+  if (mode === 'play') {
+    if (g.stop > 0) g.stop -= dt;
+    else update(dt);
+  }
+  draw(dt, now);
+  renderer.info.reset();
+  composer.render();
+
+  const left = Math.max(0, Math.ceil(R.RUN_SECONDS - g.t)), cost = R.sweepCost(g.lv.sweep);
+  hud.hearts.textContent = '♥'.repeat(Math.max(0, g.hp)) + '♡'.repeat(R.MAX_HP - Math.max(0, g.hp));
+  hud.time.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  hud.xp.style.width = `${(g.xp / R.xpNeed(g.level)) * 100}%`;
+  hud.fill.style.height = `${(g.charge / cost) * 100}%`;
+  $('sweep').classList.toggle('ready', g.charge >= cost);
+  frames++;
+  if (DEV && now - fpsAt >= 500) {
+    fps = Math.round((frames * 1000) / (now - fpsAt));
+    frames = 0;
+    fpsAt = now;
+    hud.dev.textContent = `${fps}fps · ${g.enemies.length} · ${renderer.info.render.calls}dc`;
+  }
+}
+requestAnimationFrame(frame);
+
+// 개발 훅: 콘솔에서 상태 확인·부하 시험(__demo.stress(300))
+if (DEV)
+  Object.assign(window, {
+    __demo: {
+      get g() { return g; },
+      stats: () => ({ fps, mode, enemies: g.enemies.length, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
+      stress: (n = R.MAX_ENEMIES) => { while (g.enemies.length < n) spawn(); },
+      charge: () => (g.charge = 99),
+      sweep,
+      // 화면이 가려져 프레임이 안 돌 때도 규칙을 시험하려고 시간을 직접 흘린다
+      step: (sec: number, mx = 0, mz = 0) => {
+        jx = mx;
+        jz = mz;
+        joyId = 99;
+        for (let i = 0; i < sec * 60 && mode === 'play'; i++) update(1 / 60);
+        joyId = -1;
+        jx = jz = 0;
+      },
+    },
+  });

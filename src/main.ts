@@ -2403,8 +2403,10 @@ const DEV = import.meta.env.MODE !== 'release';
 const DEBUG = DEV && new URLSearchParams(location.search).has('debug'); // 프레임 수 글씨는 주소에 ?debug일 때만(결정 079)
 hud.dev.hidden = !DEBUG;
 let last = performance.now(), frames = 0, fpsAt = last, fps = 0;
+let frozen = false; // 개발 훅 freeze: 스토어 촬영 때 그 순간을 그대로 멈춘다(renderOnce로만 그림)
 function frame(now: number) {
   requestAnimationFrame(frame);
+  if (frozen) return void (last = now);
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
   if (mode === 'play' || mode === 'bonus') {
@@ -2650,6 +2652,8 @@ if (DEV)
       /** 스테이지 번호(0~149)로 바로 가서 장 모델을 불러온다 */
       goStage: (no: number) => enterStage(no).then(() => showTitle()),
       /** 그리기 한 번 + 베스트 컷 찍기(화면 갱신이 멈춘 미리보기에서 시험용) */
+      /** 화면을 그 순간에 멈추거나(true) 다시 돌린다. 멈춘 동안은 renderOnce로만 그린다(스토어 촬영용) */
+      freeze: (on = true) => { frozen = on; },
       renderOnce: () => { draw(1 / 60, performance.now()); composer.render(); captureShot(); drawHud(); return bestShot.length; },
       // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다
       bench: (n = 30) => {

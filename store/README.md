@@ -5,11 +5,11 @@
 ```
 store/
   play/
-    kr/            휴대폰 스크린샷 1080×1920(9:16) 6장 + feature-graphic-1024x500.png
+    kr/            휴대폰 스크린샷 1080×1920(9:16) 8장(`docs/STORE_LISTING.md` 6장 표 순서) + feature-graphic-1024x500.png
     en/            같은 구성(영어)
     icon-512.png   Play 고해상도 아이콘 512×512 (docs/art/icon.png를 줄인 것, 알파 없음)
   raw/             ↓ 위 이미지를 만드는 「원본 게임 캡처」(스토어에 직접 올리지 않음)
-    kr/ en/        405×720 화면을 3배로(1215×2160). 3-isle-*는 섬 4칸 묶음용, banner는 그래픽 이미지 배경(1024×500의 2배, 글씨 없는 촬영 모드)
+    kr/ en/        405×720 화면을 3배로(1215×2160). 4-w-*는 무기 4칸 묶음용(대형 해머·쌍검·방망이·부채), 6-isle-*는 섬 4칸 묶음용, banner는 그래픽 이미지 배경(1024×500의 2배, 글씨 없는 촬영 모드, 대형 해머 쿵)
 ```
 
 모든 PNG는 24bit(알파 없음)입니다. 확인: `sips -g pixelWidth -g pixelHeight -g hasAlpha store/play/*/*.png store/play/icon-512.png`
@@ -23,7 +23,7 @@ npm exec --yes --package=playwright@1.65.0 -- node scripts/capture-store.mjs
 # 문구만 바꿨을 때: raw를 그대로 쓰고 합성만(몇 초)
 npm exec --yes --package=playwright@1.65.0 -- node scripts/capture-store.mjs compose
 # 장면 하나만 다시 찍기(한·영 둘 다), 그 뒤 compose
-npm exec --yes --package=playwright@1.65.0 -- node scripts/capture-store.mjs raw 2-boss
+npm exec --yes --package=playwright@1.65.0 -- node scripts/capture-store.mjs raw 3-boss
 ```
 
 - 문구는 `scripts/capture-store.mjs` 맨 위 `SLIDES`(스크린샷)·`BANNER`(그래픽 이미지)에서 고칩니다. 한 줄에 안 들어가면 글자가 자동으로 작아집니다.

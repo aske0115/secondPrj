@@ -9,10 +9,10 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- 광고(결정 073): Google 공식 테스트 앱 ID. AdMob에 망치섬을 등록하면 실제 앱 ID로 바꾼다 -->
+        <!-- 광고(결정 075): 망치섬 AdMob 앱 ID. 앱 ID는 실제여도 개발 빌드는 테스트 광고 단위를 쓴다(src/ads.ts) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-5960388113203280~3006745083" />
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"

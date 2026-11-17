@@ -9,6 +9,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import * as CH from './game/chapters';
 import { L } from './i18n';
 import * as sfx from './audio';
@@ -207,6 +208,29 @@ for (const gl of Object.values(heroModels)) {
   gl.scene.scale.setScalar(1.25 / new THREE.Box3().setFromObject(gl.scene).getSize(P).y);
   gl.scene.traverse((o) => (o.castShadow = true));
 }
+// 상점·캡슐에 쓸 캐릭터 초상화: 시작 때 작은 렌더러로 한 번 찍어 그림으로 만들고 바로 버린다
+const portraits = (() => {
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  r.setSize(192, 192, false);
+  const sc = new THREE.Scene(), cam = new THREE.PerspectiveCamera(28, 1, 0.1, 30), sun = new THREE.DirectionalLight(0xffffff, 2.2);
+  sun.position.set(2, 4, 4);
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x9a8f86, 2), sun);
+  const out = {} as Record<MT.CharId, string>;
+  for (const c of MT.CHARS) {
+    const m = cloneSkinned(heroModels[c].scene);
+    m.rotation.y = 0.45;
+    sc.add(m);
+    const box = new THREE.Box3().setFromObject(m), mid = box.getCenter(new THREE.Vector3()), h = box.getSize(new THREE.Vector3()).y;
+    cam.position.set(mid.x, mid.y + h * 0.25, mid.z + h * 2.5);
+    cam.lookAt(mid);
+    r.render(sc, cam);
+    out[c] = r.domElement.toDataURL();
+    sc.remove(m);
+  }
+  r.dispose();
+  r.forceContextLoss();
+  return out;
+})();
 let hero: THREE.Object3D = new THREE.Object3D(), mixer = new THREE.AnimationMixer(hero);
 let heroIdle: THREE.AnimationAction, heroWalk: THREE.AnimationAction;
 function setHero(id: MT.CharId) {
@@ -1473,25 +1497,42 @@ const CHAR_UI: Record<MT.CharId, [string, string]> = {
   vampire: [L('흡혈귀', 'Vampire'), L('4마리마다 체력 +1', '+1 HP per 4 KOs')],
   ghost: [L('유령', 'Ghost'), L('이동 속도 +12%', 'Move speed +12%')],
 };
-let capsuleNote = '';
+/** 캡슐 연출: 흔들흔들(약 1초) → 펑 열리며 캐릭터 등장. 새 캐릭터면 바로 쓰기 버튼 */
+function showCapsule(got: MT.CharId, dup: boolean) {
+  mode = 'title';
+  const [name, perk] = CHAR_UI[got];
+  show(
+    `<div class="gacha"><div class="ball"><i></i></div><div class="reveal ${dup ? 'dup' : ''}"><div class="rays"></div>` +
+      `<img src="${portraits[got]}" alt=""><b>${dup ? L('이미 있는 캐릭터', 'Duplicate') : L('새 캐릭터!', 'New hero!')}</b><h2>${name}</h2>` +
+      `<small>${dup ? L(`+${MT.CAPSULE_REFUND} 코인 돌려받음`, `+${MT.CAPSULE_REFUND} coins back`) : perk}</small>` +
+      (dup ? `<button class="go" data-act="shop">${L('확인', 'OK')}</button>` : `<button class="go" data-act="hero" data-char="${got}">${L('바로 쓰기', 'Use now')}</button><button class="sub" data-act="shop">${L('나중에', 'Later')}</button>`) +
+      `</div></div>`,
+    'shop',
+  );
+  for (let i = 0; i < 4; i++) setTimeout(sfx.pop, i * 280);
+  setTimeout(() => {
+    overlay.querySelector('.gacha')?.classList.add('open');
+    dup ? sfx.coins() : sfx.fanfare();
+    sfx.buzz(30);
+  }, 1150);
+}
 function showShop() {
   mode = 'title';
   const cards = MT.PERKS.map((id) => {
     const [name, desc, c, ico] = PERK_UI[id], lv = meta.perks[id], max = MT.PERK_MAX[id], cost = MT.perkCost(id, lv);
     const btn = lv >= max ? `<button class="buy" disabled>MAX</button>` : `<button class="buy" data-act="buy" data-perk="${id}" ${meta.coins < cost ? 'disabled' : ''}><i></i>${cost}</button>`;
-    return `<div class="card perk" style="--c:${c}"><div class="ico">${svg(ico)}</div><b>${name}</b><em>${'●'.repeat(lv)}${'○'.repeat(max - lv)}</em><span>${desc}</span>${btn}</div>`;
+    return `<div class="card perk" style="--c:${c}"><div class="ico">${svg(ico)}</div><b>${name}</b><em style="--p:${(lv / max) * 100}%">Lv ${lv}/${max}</em><span>${desc}</span>${btn}</div>`;
   });
   const chars = MT.CHARS.map((c) => {
     const [name, perk] = CHAR_UI[c], own = meta.chars.includes(c), on = meta.hero === c;
-    return `<button class="char ${on ? 'on' : ''}" data-act="hero" data-char="${c}" ${own ? '' : 'disabled'}><b>${own ? name : '???'}</b><small>${own ? perk : L('캡슐에서', 'From capsules')}</small></button>`;
+    return `<button class="char ${on ? 'on' : ''}" data-act="hero" data-char="${c}" ${own ? '' : 'disabled'}><img src="${portraits[c]}" alt=""><b>${own ? name : '???'}</b><small>${perk}</small></button>`;
   });
   show(
     `<h2 class="big-title" style="font-size:30px">${L('상점', 'Shop')}</h2>${coinPill()}` +
-      `<div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST} ${L('캡슐 돌리기', 'Spin capsule')}</button>${capsuleNote}</div>` +
+      `<div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST} ${L('캡슐 돌리기', 'Spin capsule')}</button></div>` +
       `<div class="chars">${chars.join('')}</div><div class="cards">${cards.join('')}</div><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`,
     'shop',
   );
-  capsuleNote = '';
 }
 overlay.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
@@ -1529,13 +1570,10 @@ overlay.addEventListener('click', (ev) => {
   }
   if (act === 'capsule') {
     const r = MT.rollCapsule(meta);
-    if (r) {
-      meta = r.meta;
-      saveMeta();
-      capsuleNote = `<p class="capsule-note">${r.dup ? L(`이미 있는 ${CHAR_UI[r.got][0]} · +${MT.CAPSULE_REFUND} 코인`, `Duplicate ${CHAR_UI[r.got][0]} · +${MT.CAPSULE_REFUND} coins`) : L(`새 캐릭터: ${CHAR_UI[r.got][0]}!`, `New: ${CHAR_UI[r.got][0]}!`)}</p>`;
-      r.dup ? sfx.coins() : sfx.fanfare();
-    }
-    return showShop();
+    if (!r) return showShop();
+    meta = r.meta;
+    saveMeta();
+    return showCapsule(r.got, r.dup);
   }
   if (act === 'hero') {
     meta = { ...meta, hero: btn.dataset.char as MT.CharId };

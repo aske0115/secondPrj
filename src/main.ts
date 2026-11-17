@@ -1700,9 +1700,11 @@ if (DEV)
       charge: () => (g.charge = 99),
       /** 밸런스 봇(결정 043·045): 망치 거리를 지키며 싸우고 상자를 줍고 공격 스킬을 고른다.
        *  sloppy(0~1)가 클수록 반응이 늦고 가끔 멈칫한다(사람형 0.6). 강화는 지금 저장된 그대로 쓴다 */
-      bot: async (runs = 10, sloppy = 0.6, stageNo = 0) => {
-        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number }[] = [];
+      /** chaseBoss: 왕좀비가 나오면 사람처럼 노린다(왕좀비와 섬 중심 사이에서 바깥으로 치기, 근처에서 쾅!) */
+      bot: async (runs = 10, sloppy = 0.6, stageNo = 0, chaseBoss = false) => {
+        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number; bossSecs: number; bossPct: number; diedVsBoss: boolean }[] = [];
         for (let r = 0; r < runs; r++) {
+          let lastBossPct = 0;
           stageIdx = stageNo;
           applyStage();
           startRun();
@@ -1717,8 +1719,15 @@ if (DEV)
             if (mode === 'bonus') { for (let i = 0; i < 30; i++) update(1 / 60); continue; }
             if (mode !== 'play') break;
             let mx = 0, mz = 0, near: Enemy | null = null, nd = 99;
+            const boss = chaseBoss ? g.enemies.find((e) => e.kind === 'boss' && !e.out) : undefined;
+            if (boss) { // 왕좀비 안쪽 2.3칸 자리로
+              lastBossPct = boss.pct ?? 0;
+              const bd = Math.hypot(boss.x, boss.z) || 1, tx = boss.x - (boss.x / bd) * 2.3, tz = boss.z - (boss.z / bd) * 2.3;
+              const dx = tx - g.px, dz = tz - g.pz, d = Math.hypot(dx, dz) || 1;
+              if (d > 0.3) { mx += (dx / d) * 1.4; mz += (dz / d) * 1.4; }
+            }
             for (const e of g.enemies) {
-              if (e.out) continue;
+              if (e.out || (boss && e === boss && Math.hypot(g.px - e.x, g.pz - e.z) > 1.7)) continue;
               const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz);
               if (d < nd) { nd = d; near = e; }
               const avoid = e.kind === 'boss' ? 4.5 : 2.2, w = e.kind === 'boss' ? 4 : 1; // 사람은 큰 왕좀비를 멀리서부터 피한다
@@ -1735,19 +1744,23 @@ if (DEV)
             dir = [lag[0] * sloppy + dir[0] * (1 - sloppy), lag[1] * sloppy + dir[1] * (1 - sloppy)];
             lag = dir;
             if (Math.random() < sloppy * 0.3) dir = [0, 0];
-            if (g.charge >= R.sweepCost(g.lv.sweep) && g.enemies.filter((e) => !e.out && Math.hypot(e.x - g.px, e.z - g.pz) < 5).length >= 8) sweep();
+            if (g.charge >= R.sweepCost(g.lv.sweep) && (g.enemies.filter((e) => !e.out && Math.hypot(e.x - g.px, e.z - g.pz) < 5).length >= 8 || (boss && Math.hypot(boss.x - g.px, boss.z - g.pz) < 4))) sweep();
             jx = dir[0];
             jz = dir[1];
             joyId = 99;
             for (let i = 0; i < 6 && mode === 'play'; i++) update(1 / 60);
             resetInput();
           }
-          out.push({ win: g.t >= R.RUN_SECONDS - 0.1 || g.bossDown, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes });
+          const win = g.t >= R.RUN_SECONDS - 0.1 || g.bossDown;
+          out.push({ win, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes, bossSecs: g.bossDown ? g.t - R.BOSS_AT : 0, bossPct: g.bossDown ? lastBossPct : 0, diedVsBoss: !win && g.t >= R.BOSS_AT });
           await new Promise((res) => setTimeout(res, 0));
         }
         const avg = (f: (x: (typeof out)[number]) => number) => +(out.reduce((a, x) => a + f(x), 0) / runs).toFixed(2);
         showTitle();
-        return { wins: `${out.filter((x) => x.win).length}/${runs}`, avgT: avg((x) => x.t), avgLv: avg((x) => x.lv), fallShare: avg((x) => x.falls / Math.max(1, x.kills)), missShare: avg((x) => x.misses / Math.max(1, x.swings)), bossDowns: out.filter((x) => x.boss).length, strikes: avg((x) => x.strikes) };
+        return { wins: `${out.filter((x) => x.win).length}/${runs}`, avgT: avg((x) => x.t), avgLv: avg((x) => x.lv), fallShare: avg((x) => x.falls / Math.max(1, x.kills)), missShare: avg((x) => x.misses / Math.max(1, x.swings)), bossDowns: out.filter((x) => x.boss).length, strikes: avg((x) => x.strikes),
+          bossSecs: +(out.filter((x) => x.boss).reduce((a, x) => a + x.bossSecs, 0) / Math.max(1, out.filter((x) => x.boss).length)).toFixed(1),
+          bossPct: Math.round(out.filter((x) => x.boss).reduce((a, x) => a + x.bossPct, 0) / Math.max(1, out.filter((x) => x.boss).length)),
+          diedVsBoss: out.filter((x) => x.diedVsBoss).length };
       },
       sweep,
       /** 그리기 한 번 + 베스트 컷 찍기(화면 갱신이 멈춘 미리보기에서 시험용) */

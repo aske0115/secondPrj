@@ -40,7 +40,15 @@ body[data-mode="bonus"] #sweep { opacity: .35; }
 @keyframes toast { 0% { opacity: 0; transform: scale(.6); } 15% { opacity: 1; transform: scale(1.15); } 30% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-16px); } }
 #warn { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 128px); transform: translateX(-50%); pointer-events: none; white-space: nowrap;
   padding: 7px 14px; border-radius: 999px; background: #ff5a3c; color: #fff; font-weight: 900; font-size: 15px; box-shadow: var(--shadow); animation: beat .5s ease-in-out infinite; }
-#warn[hidden] { display: none; }
+#warn[hidden], #hint[hidden] { display: none; }
+#hint { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 128px); transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+  padding: 7px 14px; border-radius: 999px; background: #fffaf0; color: #8a5a00; font-weight: 900; font-size: 15px; box-shadow: var(--shadow); }
+.bonus-how { text-align: left; }
+.bonus-how svg { display: block; width: 100%; max-width: 240px; margin: 0 auto 6px; }
+.bonus-how .finger { animation: flick 1.6s ease-in-out infinite; }
+@keyframes flick { 0%, 15% { transform: translateX(0); } 60% { transform: translateX(90px); } 75%, 100% { transform: translateX(90px); opacity: 0; } }
+.bonus-how p { margin: 8px 0; font-size: 15px; line-height: 1.4; }
+.bonus-how b { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 6px; border-radius: 50%; background: var(--gold); color: #5a3a00; font-size: 13px; }
 
 /* ───── 조이스틱 ───── */
 #stick { display: none; position: fixed; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%;

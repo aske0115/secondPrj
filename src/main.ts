@@ -212,6 +212,13 @@ const dropViews = Array.from({ length: 3 }, () => {
   scene.add(box, mark);
   return { box, band, canopy, lines, mark };
 });
+const arrowShape = new THREE.Shape([
+  new THREE.Vector2(-0.12, 0), new THREE.Vector2(0.12, 0), new THREE.Vector2(0.12, 0.72),
+  new THREE.Vector2(0.3, 0.72), new THREE.Vector2(0, 1), new THREE.Vector2(-0.3, 0.72), new THREE.Vector2(-0.12, 0.72),
+]);
+const aim = new THREE.Mesh(new THREE.ShapeGeometry(arrowShape).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffb84d, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+aim.visible = false;
+scene.add(aim);
 const helperMesh = new THREE.Mesh(keeper.geo, keeper.mat);
 helperMesh.castShadow = true;
 helperMesh.visible = false;
@@ -280,7 +287,7 @@ const newGame = () => ({
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
 let g = newGame();
-let mode: 'title' | 'play' | 'bonus' | 'pick' | 'over' = 'title';
+let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' = 'title';
 const eScale = (e: Enemy) => (e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 function resetIsland() {
@@ -292,7 +299,7 @@ function resetIsland() {
 }
 
 // ───────── 입력: 화면 어디든 누른 자리가 조이스틱 원점 ─────────
-let joyId = -1, jox = 0, joy = 0, jx = 0, jz = 0;
+let joyId = -1, jox = 0, joy = 0, jx = 0, jz = 0, jdx = 0, jdy = 0;
 const keys = new Set<string>();
 const stick = $('stick'), knob = stick.firstElementChild as HTMLElement;
 // iPhone 웹뷰에서는 터치 이벤트가 가장 확실하다(포인터 이벤트는 떼는 신호를 놓치면 조이스틱이 옛 손가락에 묶였다).
@@ -309,6 +316,8 @@ function inputStart(id: number, x: number, y: number) {
 function inputMove(id: number, x: number, y: number) {
   if (id !== joyId) return;
   let dx = x - jox, dy = y - joy, d = Math.hypot(dx, dy);
+  jdx = dx;
+  jdy = dy;
   if (d < 4) return;
   if (d > 56 && mode !== 'bonus') { // 손가락이 원 밖으로 나가면 원점이 따라와서 방향 전환이 바로 먹힌다(보너스는 튕긴 길이를 재야 해서 제외)
     jox += (dx / d) * (d - 56);
@@ -332,7 +341,7 @@ function inputEnd(id: number, x: number, y: number) {
 }
 function resetInput() {
   joyId = -1;
-  jx = jz = 0;
+  jx = jz = jdx = jdy = 0;
   stick.style.display = 'none';
 }
 const canvas = renderer.domElement, opts = { passive: false } as const;
@@ -509,9 +518,20 @@ function startBonus() {
   for (const e of g.enemies) if (!e.out) { e.out = true; e.vy = 6; e.kx = e.x * 0.3; e.kz = e.z * 0.3; } // 싸우던 적은 치운다(보상 없음)
   g.logs.length = g.pumpkins.length = 0;
   for (let i = 0; i < 3; i++) spawnPins();
-  toast(L('보너스! 튕겨서 박치기', 'Bonus! Flick to ram'));
   sfx.fanfare();
-  sfx.setMusicFast(true);
+  // 처음 보는 규칙이라 시간을 멈추고 할 일을 먼저 보여 준다(사용자: "뭘 어쩌라는 건지 모르다가 끝났다")
+  mode = 'bonusIntro';
+  show(
+    `<h2 class="big-title" style="font-size:34px">${L('보너스 판!', 'Bonus round!')}</h2>` +
+      `<div class="panel bonus-how">` +
+      `<svg viewBox="0 0 200 110" aria-hidden="true"><circle cx="40" cy="60" r="14" fill="#f08a2a"/>` +
+      `<path d="M58 60 H150" stroke="#ffb84d" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 14"/><path d="M146 44 L170 60 L146 76 Z" fill="#ffb84d"/>` +
+      `<g class="finger"><circle cx="60" cy="88" r="9" fill="#ffffff" stroke="#2f3a4a" stroke-width="3"/></g></svg>` +
+      `<p><b>1</b> ${L('화면을 누른 채 가고 싶은 쪽으로 끌고', 'Press and drag toward where you want to go')}</p>` +
+      `<p><b>2</b> ${L('손을 놓으면 그쪽으로 몸통 돌진!', 'Release to dash that way!')}</p>` +
+      `<p><b>3</b> ${L(`해골을 섬 밖으로 날리면 한 마리당 ${R.BONUS_COIN}코인`, `${R.BONUS_COIN} coins per skeleton knocked off`)}</p>` +
+      `</div><button class="go" data-act="bonusGo">${L(`시작! (${R.BONUS_SECONDS}초)`, `Go! (${R.BONUS_SECONDS}s)`)}</button>`,
+  );
 }
 function endBonus() {
   for (const e of g.enemies) if (!e.out) { e.out = true; e.vy = 6; }
@@ -865,6 +885,14 @@ function draw(dt: number, now: number) {
     mm.color.setHex(DROP_COLOR[d.type]);
     mm.opacity = 0.45 + 0.35 * Math.sin(now * 0.008);
   });
+  // 보너스 중 끌고 있으면 돌진 방향·세기를 바닥에 보여 준다(화면 아래 = +z)
+  const pull = Math.hypot(jdx, jdy), power = R.dashSpeed(pull);
+  aim.visible = mode === 'bonus' && joyId !== -1 && power > 0;
+  if (aim.visible) {
+    aim.position.set(g.px, 0.07, g.pz);
+    aim.rotation.y = Math.atan2(jdx, jdy);
+    aim.scale.set(1.2, 1, 0.8 + (power / 24) * 4.2);
+  }
   const h = g.helper;
   helperMesh.visible = !!h && (h.t > 2 || Math.floor(now / 110) % 2 === 0);
   if (h) {
@@ -1035,6 +1063,12 @@ overlay.addEventListener('click', (ev) => {
   sfx.tap();
   const act = btn.dataset.act, id = btn.dataset.id as R.UpgradeId | 'heart' | undefined;
   if (act === 'start') return startRun();
+  if (act === 'bonusGo') {
+    overlay.hidden = true;
+    mode = 'bonus';
+    sfx.setMusicFast(true);
+    return;
+  }
   if (act === 'shop') return showShop();
   if (act === 'music') {
     sfx.toggleMusic();
@@ -1101,8 +1135,8 @@ function end(win: boolean) {
 $('sweep').querySelector('span')!.textContent = L('쓸어!', 'Sweep!');
 
 // 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
-const hud = { toast: $('toast'), warn: $('warn'), hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
-const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '', warn: -1 };
+const hud = { hint: $('hint'), toast: $('toast'), warn: $('warn'), hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
+const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '', warn: -1, hint: '' };
 const HEART = '<path d="M12 21s-8-5-8-11.5A4.5 4.5 0 0 1 12 6.6a4.5 4.5 0 0 1 8 2.9C20 16 12 21 12 21z"/>';
 function drawHud() {
   if (shown.mode !== mode) document.body.dataset.mode = shown.mode = mode;
@@ -1128,6 +1162,12 @@ function drawHud() {
   if (shown.falls !== g.falls) {
     hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
     if (g.chain >= 2) toast(L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`)); // 이어서 떨어뜨리면 가운데에 크게
+  }
+  const hint = mode === 'bonus' ? `${L('끌었다 놓으면 돌진!', 'Drag & release to dash!')} · ${L('떨어뜨림', 'Knocked')} ${g.bonusFalls} (+${g.bonusFalls * R.BONUS_COIN})` : '';
+  if (shown.hint !== hint) {
+    shown.hint = hint;
+    hud.hint.hidden = !hint;
+    hud.hint.textContent = hint;
   }
   const warn = mode === 'play' ? R.crumbleWarning(g.t, stage()) : -1;
   if (shown.warn !== warn) {
@@ -1172,7 +1212,7 @@ if (DEV)
   Object.assign(window, {
     __demo: {
       get g() { return g; },
-      stats: () => ({ fps, mode, enemies: g.enemies.length, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
+      stats: () => ({ fps, mode, aim: aim.visible, enemies: g.enemies.length, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
       stress: (n = R.MAX_ENEMIES) => { while (g.enemies.length < n) spawn(); },
       charge: () => (g.charge = 99),
       /** 밸런스 봇(결정 043·045): 망치 거리를 지키며 싸우고 상자를 줍고 공격 스킬을 고른다.
@@ -1190,6 +1230,7 @@ if (DEV)
               (picks.find((c) => c.dataset.id === 'heart' && g.hp <= 2) ?? picks.find((c) => R.ATTACKS.includes(c.dataset.id as R.UpgradeId)) ?? picks[0]).click();
               continue;
             }
+            if (mode === 'bonusIntro') { overlay.querySelector<HTMLButtonElement>('[data-act="bonusGo"]')!.click(); continue; }
             if (mode === 'bonus') { for (let i = 0; i < 30; i++) update(1 / 60); continue; }
             if (mode !== 'play') break;
             let mx = 0, mz = 0, near: Enemy | null = null, nd = 99;

@@ -275,6 +275,7 @@ const newGame = () => ({
   lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
+  swings: 0, misses: 0,
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
@@ -536,7 +537,10 @@ function weapons(dt: number) {
   const es = g.enemies;
   // 망치: 가까운 적 쪽으로 부채꼴
   g.hammerCd -= dt;
-  const gold = g.golden > 0, rad = R.hammerRadius(g.lv.hammer) + (gold ? 1.2 : 0), target = g.hammerCd <= 0 ? nearest(rad + 0.6) : null;
+  const gold = g.golden > 0, rad = R.hammerRadius(g.lv.hammer) + (gold ? 1.2 : 0);
+  // 실제로 맞는 거리(망치 길이 + 적 몸)에 들어왔을 때만 휘두른다. 예전엔 조금 먼 적에도 헛스윙하고 쿨다운을 통째로 기다렸다
+  const near = g.hammerCd <= 0 ? nearest(rad + 0.7) : null;
+  const target = near && Math.hypot(near.x - g.px, near.z - g.pz) <= rad + eRadius(near) ? near : null;
   if (target) {
     g.hammerCd = R.hammerCooldown(g.lv.hammer) * (gold ? 0.35 : 1);
     const yaw = Math.atan2(target.x - g.px, target.z - g.pz), half = R.hammerArc(g.lv.hammer) / 2;
@@ -552,6 +556,8 @@ function weapons(dt: number) {
     g.swingT = 0;
     g.swingYaw = yaw;
     g.face = yaw;
+    g.swings++;
+    if (!hits) { g.misses++; g.hammerCd = 0.2; } // 헛치면 금방 다시 휘두른다
     hits ? sfx.whack() : sfx.swish();
   }
   // 통나무: 주인공 근처를 지나가게 섬 끝에서 굴려 보낸다
@@ -1169,6 +1175,55 @@ if (DEV)
       stats: () => ({ fps, mode, enemies: g.enemies.length, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
       stress: (n = R.MAX_ENEMIES) => { while (g.enemies.length < n) spawn(); },
       charge: () => (g.charge = 99),
+      /** 밸런스 봇(결정 043·045): 망치 거리를 지키며 싸우고 상자를 줍고 공격 스킬을 고른다.
+       *  sloppy(0~1)가 클수록 반응이 늦고 가끔 멈칫한다(사람형 0.6). 강화는 지금 저장된 그대로 쓴다 */
+      bot: async (runs = 10, sloppy = 0.6, stageNo = 0) => {
+        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number }[] = [];
+        for (let r = 0; r < runs; r++) {
+          stageIdx = stageNo;
+          applyStage();
+          startRun();
+          let lag = [0, 0];
+          for (;;) {
+            if (mode === 'pick') {
+              const picks = [...overlay.querySelectorAll<HTMLButtonElement>('.card')];
+              (picks.find((c) => c.dataset.id === 'heart' && g.hp <= 2) ?? picks.find((c) => R.ATTACKS.includes(c.dataset.id as R.UpgradeId)) ?? picks[0]).click();
+              continue;
+            }
+            if (mode === 'bonus') { for (let i = 0; i < 30; i++) update(1 / 60); continue; }
+            if (mode !== 'play') break;
+            let mx = 0, mz = 0, near: Enemy | null = null, nd = 99;
+            for (const e of g.enemies) {
+              if (e.out) continue;
+              const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz);
+              if (d < nd) { nd = d; near = e; }
+              if (d < 2.2) { mx += dx / (d * d); mz += dz / (d * d); }
+            }
+            if (near && nd > 3) { mx -= ((g.px - near.x) / nd) * 0.3; mz -= ((g.pz - near.z) / nd) * 0.3; }
+            const rr = Math.hypot(g.px, g.pz) / g.isl;
+            mx -= g.px * rr * rr * 0.15;
+            mz -= g.pz * rr * rr * 0.15;
+            const box = g.drops.find((d) => d.y <= 0);
+            if (box) { const dx = box.x - g.px, dz = box.z - g.pz, d = Math.hypot(dx, dz) || 1; mx += (dx / d) * 0.4; mz += (dz / d) * 0.4; }
+            const n = Math.hypot(mx, mz);
+            let dir = n > 0.01 ? [mx / n, mz / n] : [0, 0];
+            dir = [lag[0] * sloppy + dir[0] * (1 - sloppy), lag[1] * sloppy + dir[1] * (1 - sloppy)];
+            lag = dir;
+            if (Math.random() < sloppy * 0.3) dir = [0, 0];
+            if (g.charge >= R.sweepCost(g.lv.sweep) && g.enemies.filter((e) => !e.out && Math.hypot(e.x - g.px, e.z - g.pz) < 5).length >= 8) sweep();
+            jx = dir[0];
+            jz = dir[1];
+            joyId = 99;
+            for (let i = 0; i < 6 && mode === 'play'; i++) update(1 / 60);
+            resetInput();
+          }
+          out.push({ win: g.t >= R.RUN_SECONDS - 0.1, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1 });
+          await new Promise((res) => setTimeout(res, 0));
+        }
+        const avg = (f: (x: (typeof out)[number]) => number) => +(out.reduce((a, x) => a + f(x), 0) / runs).toFixed(2);
+        showTitle();
+        return { wins: `${out.filter((x) => x.win).length}/${runs}`, avgT: avg((x) => x.t), avgLv: avg((x) => x.lv), fallShare: avg((x) => x.falls / Math.max(1, x.kills)), missShare: avg((x) => x.misses / Math.max(1, x.swings)) };
+      },
       sweep,
       // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다
       bench: (n = 30) => {

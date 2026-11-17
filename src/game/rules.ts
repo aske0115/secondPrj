@@ -111,3 +111,32 @@ export function pickDrop(hpFull: boolean, rand = Math.random, helperUsed = false
   const pool = DROPS.filter((d) => !(hpFull && d === 'heart') && !(helperUsed && d === 'helper'));
   return pool[Math.floor(rand() * pool.length)];
 }
+
+// ───── 왕좀비 피날레(결정 057): 체력으로는 못 쓰러뜨리고 섬 밖으로 밀어야 한다. 떨어뜨리면 그 자리에서 클리어 ─────
+export const BOSS_AT = 95;
+export const BOSS_WARN = 3;
+export const BOSS_SCALE = 2.6;
+export const BOSS_KNOCK = 0.35; // 무거워서 덜 밀린다
+export const BOSS_DMG = 30;
+export const bossCoins = (stage: number) => 80 * (stage + 1);
+
+// ───── 손맛 보너스(결정 058) ─────
+export const STRIKE_CHAIN = 6; // 한 번에 이만큼 이어 떨어뜨리면 STRIKE!
+export const STRIKE_COINS = 10;
+export const JUGGLE_KNOCK = 1.4; // 공중에 뜬 적을 또 치면 더 세게 날아간다
+
+// ───── 새 적(결정 058) ─────
+export type Kind = '' | 'balloon' | 'shield' | 'bomb' | 'boss';
+/** 시간이 지나며 하나씩 등장: 풍선 해골(15초~), 폭탄 해골(30초~), 방패 좀비(45초~) */
+export function pickKind(t: number, big: boolean, rand = Math.random): Kind {
+  const r = rand();
+  if (big) return t >= 45 && r < 0.25 ? 'shield' : '';
+  if (t >= 15 && r < 0.12) return 'balloon';
+  if (t >= 30 && r < 0.22) return 'bomb';
+  return '';
+}
+export const KIND_HP: Record<Kind, number> = { '': 1, balloon: 0.5, shield: 1.2, bomb: 0.8, boss: Infinity };
+export const KIND_KNOCK: Record<Kind, number> = { '': 1, balloon: 2.2, shield: 1, bomb: 1, boss: BOSS_KNOCK };
+export const SHIELD_BLOCK = 0.25; // 방패는 정면에서 오는 망치를 막는다(통나무·호박·쾅!은 그대로)
+export const BOMB_RADIUS = 2.6;
+export const BOMB_KNOCK = 13;

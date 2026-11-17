@@ -192,6 +192,24 @@ const logMesh = instanced(
   flat(0x8a5a3c), 4, true,
 );
 const pumpkinMesh = instanced(pumpkin.geo, pumpkin.mat, 12, true);
+// 새 적 장식(결정 058): 풍선 해골의 풍선, 폭탄 해골의 머리 위 폭탄, 방패 좀비의 방패
+const balloonMesh = instanced(mergeGeometries([new THREE.SphereGeometry(0.32, 12, 8), new THREE.CylinderGeometry(0.01, 0.01, 0.5, 3).translate(0, -0.55, 0)]), flat(0xff5a6e), 80, true);
+const bombMesh = instanced(mergeGeometries([new THREE.SphereGeometry(0.22, 10, 8), new THREE.CylinderGeometry(0.03, 0.03, 0.18, 5).translate(0, 0.24, 0)]), flat(0x2a2a33), 80, true);
+const shieldMesh = instanced(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 10).rotateX(Math.PI / 2), flat(0xb8bcc8), 80, true);
+// 왕좀비: 좀비 모양을 크게, 초록빛 + 금관
+const bossMat = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xd8ffc0 });
+const bossFlash = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
+const bossBody = new THREE.Mesh(zombie.geo, bossMat);
+const crown = new THREE.Mesh(
+  mergeGeometries([0, 1, 2, 3, 4].map((k): THREE.BufferGeometry => new THREE.ConeGeometry(0.07, 0.16, 4).translate(Math.sin((k / 5) * Math.PI * 2) * 0.17, 0.12, Math.cos((k / 5) * Math.PI * 2) * 0.17)).concat([new THREE.CylinderGeometry(0.2, 0.2, 0.1, 10)])),
+  flat(0xffd23f, { emissive: 0x6a4a00 }),
+);
+crown.position.y = 1.08;
+const bossMesh = new THREE.Group();
+bossMesh.add(bossBody, crown);
+bossBody.castShadow = crown.castShadow = true;
+bossMesh.visible = false;
+scene.add(bossMesh);
 const DROP_COLOR: Record<R.DropId, number> = { heart: 0xff5a6e, charge: 0xffb84d, golden: 0xffd23f, helper: 0x7d8cf0 };
 const dropViews = Array.from({ length: 3 }, () => {
   const box = new THREE.Group();
@@ -270,7 +288,7 @@ function applyStage() {
 }
 
 // ───────── 상태 ─────────
-type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number };
+type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind };
 type Drop = { x: number; z: number; y: number; type: R.DropId; life: number };
 type Helper = { x: number; z: number; t: number; cd: number; face: number; hop: number };
 type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number };
@@ -283,12 +301,13 @@ const newGame = () => ({
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
   swings: 0, misses: 0, sweepLock: 0, helperUsed: false,
+  bossSpawned: false, bossDown: false, endIn: 0, extra: 0, strikes: 0, juggles: 0, // 왕좀비·STRIKE·저글(결정 057·058)
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
 });
 let g = newGame();
 let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' = 'title';
-const eScale = (e: Enemy) => (e.big ? 1.5 : 1);
+const eScale = (e: Enemy) => (e.kind === 'boss' ? R.BOSS_SCALE : e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 function resetIsland() {
   const r = stage().r, k = r / R.ISLAND_R;
@@ -375,8 +394,8 @@ function spawn() {
     a = rnd(0, Math.PI * 2);
     if (Math.hypot(Math.cos(a) * g.isl - g.px, Math.sin(a) * g.isl - g.pz) > 5) break;
   }
-  const st = stage(), big = Math.random() < Math.min(0.6, R.bigChance(g.t) * st.big), d = g.isl - 0.8;
-  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp, big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0 });
+  const st = stage(), big = Math.random() < Math.min(0.6, R.bigChance(g.t) * st.big), d = g.isl - 0.8, kind = R.pickKind(g.t, big);
+  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp * R.KIND_HP[kind], big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0, kind });
 }
 
 function burst(x: number, z: number, color: THREE.Color, n: number) {
@@ -400,19 +419,54 @@ function drop(i: number) {
   g.enemies[i] = g.enemies[g.enemies.length - 1];
   g.enemies.pop();
 }
-function hit(i: number, dmg: number, kx: number, kz: number) {
+function hit(i: number, dmg: number, kx: number, kz: number, byHammer = false) {
   const e = g.enemies[i];
+  if (e.kind === 'shield' && byHammer) { dmg *= R.SHIELD_BLOCK; kx *= R.SHIELD_BLOCK; kz *= R.SHIELD_BLOCK; } // 정면 망치는 방패가 막는다
   e.hp -= dmg;
   e.flash = 0.1;
   sfx.bonk();
-  const km = R.knockMul(g.lv.knock) * MT.shoveMul(meta);
+  let km = R.knockMul(g.lv.knock) * MT.shoveMul(meta) * R.KIND_KNOCK[e.kind] * (e.kind === 'boss' && e.age < 2.5 ? 0 : 1); // 왕좀비는 등장 2.5초 동안 안 밀림
+  if (e.y > 0.3 && e.kind !== 'boss') { // 공중에 뜬 적을 또 치면 더 세게
+    km *= R.JUGGLE_KNOCK;
+    g.juggles++;
+    toast(L('공중 콤보!', 'Air combo!'));
+  }
   e.kx += kx * km;
   e.kz += kz * km;
+  if (e.kind !== 'boss' && Math.hypot(kx, kz) * km > 7 && e.y <= 0.01) e.vy = 4.5; // 세게 맞으면 살짝 떠오른다
   if (e.hp > 0) return;
+  if (e.kind === 'bomb') blast(e.x, e.z);
   reward(R.KILL_CHARGE);
   gainXp(R.killXp(e.big));
   burst(e.x, e.z, e.big ? C_BIG : C_SMALL, e.big ? 12 : 6);
   drop(i);
+}
+
+/** 폭탄 해골이 터짐: 둘레를 밀어낸다(연쇄 낙하) */
+function blast(x: number, z: number) {
+  for (const o of g.enemies) {
+    const dx = o.x - x, dz = o.z - z, d = Math.hypot(dx, dz) || 1;
+    if (o.out || d > R.BOMB_RADIUS) continue;
+    const k = R.BOMB_KNOCK * (1 - d / R.BOMB_RADIUS * 0.5) * R.KIND_KNOCK[o.kind];
+    o.kx += (dx / d) * k;
+    o.kz += (dz / d) * k;
+    o.flash = 0.1;
+  }
+  burst(x, z, C_PUMPKIN, 14);
+  g.ringT = 0.3;
+  g.ringR = R.BOMB_RADIUS;
+  ring.position.set(x, 0.06, z);
+  ringAtHero = false;
+  g.shake = Math.max(g.shake, 0.35);
+  sfx.squish();
+}
+function spawnBoss() {
+  g.bossSpawned = true;
+  const a = Math.atan2(g.pz, g.px) + Math.PI, d = g.isl * 0.45; // 주인공 반대편, 섬 안쪽에서(가장자리에서 나오면 바로 휩쓸려 떨어졌다)
+  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: Infinity, big: true, out: false, flash: 0, hop: 0, age: 0, bladeCd: 0, kind: 'boss' });
+  toast(L('왕좀비 등장! 밀어서 떨어뜨려라', 'King zombie! Knock it off!'));
+  sfx.rumble();
+  g.shake = 0.8;
 }
 
 let lastFallSfx = 0;
@@ -423,6 +477,18 @@ function fall(e: Enemy, byCrumble = false) {
   if (mode === 'bonus') g.bonusFalls++;
   g.chain = g.chainT > 0 ? g.chain + 1 : 1;
   g.chainT = 1.2;
+  if (g.chain === R.STRIKE_CHAIN) { g.extra += R.STRIKE_COINS; g.strikes++; sfx.fanfare(); }
+  if (e.kind === 'bomb') blast(e.x, e.z);
+  if (e.kind === 'boss' && !g.bossDown) { // 왕좀비를 떨어뜨리면 그 자리에서 클리어
+    g.bossDown = true;
+    g.extra += R.bossCoins(stageIdx);
+    g.endIn = 1.8;
+    g.stop = 0.45;
+    g.shake = 1.2;
+    toast(L('왕좀비를 떨어뜨렸다!', 'King zombie down!'));
+    sfx.fanfare();
+    sfx.rumble();
+  }
   reward(byCrumble ? 0 : R.FALL_CHARGE); // 무너짐으로 한꺼번에 떨어진 적은 게이지를 채우지 않는다
   gainXp(byCrumble ? R.killXp(e.big) : R.fallXp(e.big));
   const now = performance.now();
@@ -442,7 +508,7 @@ function crumble(r: number) {
     const a = (k / 14) * Math.PI * 2;
     burst(Math.cos(a) * (r + 0.8), Math.sin(a) * (r + 0.8), C_DIRT, 3);
   }
-  for (const e of g.enemies) if (!e.out && Math.hypot(e.x, e.z) > r) fall(e, true); // 무너진 땅 위의 적은 같이 떨어진다
+  for (const e of g.enemies) if (!e.out && e.kind !== 'boss' && Math.hypot(e.x, e.z) > r) fall(e, true); // 왕좀비는 무너짐에 휩쓸리지 않는다 // 무너진 땅 위의 적은 같이 떨어진다
 }
 
 function gainXp(n: number) {
@@ -508,7 +574,7 @@ function spawnPins() {
     for (let k = 0; k <= row; k++) {
       const side = (k - row / 2) * 1, back = row * 0.9;
       const x = cx + Math.sin(a) * back + Math.cos(a) * side, z = cz + Math.cos(a) * back - Math.sin(a) * side;
-      g.enemies.push({ x, z, y: 0, vy: 0, kx: 0, kz: 0, hp: 1e9, big: false, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0 });
+      g.enemies.push({ x, z, y: 0, vy: 0, kx: 0, kz: 0, hp: 1e9, big: false, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0, kind: '' });
     }
 }
 function startBonus() {
@@ -571,7 +637,7 @@ function weapons(dt: number) {
       let da = Math.atan2(dx, dz) - yaw;
       da = Math.atan2(Math.sin(da), Math.cos(da));
       if (e.out || d > rad + eRadius(e) || Math.abs(da) > half) continue;
-      hit(i, gold ? 24 : 14, (dx / d) * (gold ? 12 : 9), (dz / d) * (gold ? 12 : 9));
+      hit(i, gold ? 24 : 14, (dx / d) * (gold ? 12 : 9), (dz / d) * (gold ? 12 : 9), true);
       hits++;
     }
     g.swingT = 0;
@@ -719,7 +785,9 @@ function update(dt: number) {
     if (g.bt <= 0) return endBonus();
   } else {
     g.t += dt;
-    if (g.t >= R.RUN_SECONDS) return end(true);
+    if (g.endIn > 0 && (g.endIn -= dt) <= 0) return end(true);
+    if (g.t >= R.RUN_SECONDS && !g.bossDown) return end(true);
+    if (!g.bossSpawned && g.t >= R.BOSS_AT) spawnBoss();
     if (g.t >= R.BONUS_AT && !g.bonusDone) return startBonus();
   }
   g.inv -= dt;
@@ -787,8 +855,13 @@ function update(dt: number) {
       if (e.y < -16) drop(i);
       continue;
     }
+    if (e.y > 0 || e.vy > 0) { // 맞아서 살짝 뜬 적(저글 기회)
+      e.vy -= 22 * dt;
+      e.y = Math.max(0, e.y + e.vy * dt);
+      if (e.y === 0) e.vy = 0;
+    }
     const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz) || 1;
-    const sp = bonus ? 0 : R.enemySpeed(g.t, e.big) * stage().speed;
+    const sp = bonus ? 0 : (e.kind === 'boss' ? 0.9 : R.enemySpeed(g.t, e.big) * (e.kind === 'balloon' ? 1.15 : 1)) * stage().speed;
     e.x += ((dx / d) * sp + e.kx) * dt;
     e.z += ((dz / d) * sp + e.kz) * dt;
     e.kx *= decay;
@@ -810,7 +883,7 @@ function update(dt: number) {
         g.vz *= 0.75;
         sfx.bonk();
       }
-    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt(R.enemyDamage(e.big) * stage().dmg);
+    } else if (d < 0.35 + eRadius(e) && g.inv <= 0 && e.y < 0.3) hurt((e.kind === 'boss' ? R.BOSS_DMG : R.enemyDamage(e.big)) * stage().dmg);
   }
   // 서로 겹치지 않게 밀어낸다
   // shortcut: 모든 쌍을 비교한다(300마리면 4.5만 쌍), 적 상한을 올리면 격자 나누기로 바꾼다
@@ -826,8 +899,8 @@ function update(dt: number) {
       if (d >= min) continue;
       const push = ((min - d) / d) * 0.5;
       const ka = Math.hypot(a.kx, a.kz), kb = Math.hypot(b.kx, b.kz);
-      if (ka > 3 && ka > kb * 1.5) { b.kx += a.kx * 0.7; b.kz += a.kz * 0.7; a.kx *= 0.55; a.kz *= 0.55; b.flash = 0.1; }
-      else if (kb > 3 && kb > ka * 1.5) { a.kx += b.kx * 0.7; a.kz += b.kz * 0.7; b.kx *= 0.55; b.kz *= 0.55; a.flash = 0.1; }
+      if (ka > 3 && ka > kb * 1.5) { const t = 0.7 * R.KIND_KNOCK[b.kind]; b.kx += a.kx * t; b.kz += a.kz * t; a.kx *= 0.55; a.kz *= 0.55; b.flash = 0.1; }
+      else if (kb > 3 && kb > ka * 1.5) { const t = 0.7 * R.KIND_KNOCK[a.kind]; a.kx += b.kx * t; a.kz += b.kz * t; b.kx *= 0.55; b.kz *= 0.55; a.flash = 0.1; }
       a.x -= dx * push;
       a.z -= dz * push;
       b.x += dx * push;
@@ -862,8 +935,23 @@ function draw(dt: number, now: number) {
   hero.rotation.y = g.face;
   hero.visible = g.inv <= 0 || Math.floor(g.inv * 14) % 2 === 0;
 
-  let ns = 0, nb = 0;
+  let ns = 0, nb = 0, nBal = 0, nBomb = 0, nSh = 0;
+  bossMesh.visible = false;
   for (const e of g.enemies) {
+    const yaw = Math.atan2(g.px - e.x, g.pz - e.z);
+    if (e.kind === 'boss') {
+      const roll = e.out ? Math.min(2.6, -e.y * 0.35 + 0.6) : 0;
+      bossMesh.visible = true;
+      bossMesh.position.set(e.x, e.y + Math.abs(Math.sin(now * 0.004)) * 0.15, e.z);
+      bossMesh.rotation.set(-roll, yaw, 0, 'YXZ');
+      bossMesh.scale.setScalar(R.BOSS_SCALE * Math.min(1, e.age * 2));
+      bossBody.material = e.flash > 0 ? bossFlash : bossMat;
+      continue;
+    }
+    const top = (e.big ? 1.05 * 1.5 : 1.05) + e.y;
+    if (e.kind === 'balloon') put(balloonMesh, nBal++, e.x, top + 0.55, e.z, 0, 1, 1.15, 1);
+    if (e.kind === 'bomb') put(bombMesh, nBomb++, e.x, top + 0.12, e.z, yaw);
+    if (e.kind === 'shield') put(shieldMesh, nSh++, e.x + Math.sin(yaw) * 0.75, e.y + 0.75, e.z + Math.cos(yaw) * 0.75, yaw);
     const hop = e.out ? 0 : Math.abs(Math.sin(e.hop)), sc = eScale(e) * Math.min(1, e.age * 4);
     const mesh = e.big ? bigMesh : smallMesh, i = e.big ? nb++ : ns++;
     const roll = e.out ? Math.min(2.6, -e.y * 0.35 + 0.6) : 0; // 떨어질 때 뒤로 넘어가며 구른다
@@ -872,6 +960,9 @@ function draw(dt: number, now: number) {
   }
   sync(smallMesh, ns);
   sync(bigMesh, nb);
+  sync(balloonMesh, nBal);
+  sync(bombMesh, nBomb);
+  sync(shieldMesh, nSh);
   dropViews.forEach((v, i) => {
     const d = g.drops[i];
     v.box.visible = v.mark.visible = !!d;
@@ -1118,20 +1209,21 @@ function end(win: boolean) {
   const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls }, best = loadBest();
   const isBest = score.time > best.time || (score.time === best.time && score.kills > best.kills);
   if (isBest) store.set(`best-${stageIdx}`, JSON.stringify(score));
-  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx) + g.bonusFalls * R.BONUS_COIN;
+  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx) + g.bonusFalls * R.BONUS_COIN + g.extra;
   const unlocked = win && stageIdx === meta.cleared && stageIdx < R.STAGES.length;
   meta = { ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared };
   saveMeta();
   const hasNext = win && stageIdx + 1 < R.STAGES.length;
   const cell = (label: string, v: string | number, hi = false) => `<div class="${hi ? 'hi' : ''}"><small>${label}</small><strong>${v}</strong></div>`;
   show(
-    `<h1 class="big-title" style="font-size:36px">${win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
+    `<h1 class="big-title" style="font-size:36px">${g.bossDown ? L('왕좀비 격파!', 'King zombie down!') : win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
       `<div class="panel"><div class="stats">` +
       cell(L('버틴 시간', 'Survived'), clock(sec)) + cell(L('레벨', 'Level'), g.level + 1) +
       cell(L('처치', 'KOs'), g.kills) + cell(L('떨어뜨림', 'Knocked off'), g.falls, true) +
       `</div><div class="earn"><i></i>+${coins}</div>` +
       (unlocked && hasNext ? `<span class="badge">${L(`새 섬: ${stageName(stageIdx + 1)}`, `New isle: ${stageName(stageIdx + 1)}`)}</span>` : '') +
-      (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') + `</div>` +
+      (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') +
+      (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + `</div>` +
       (hasNext ? `<button class="go" data-act="nextIsle">${L('다음 섬으로', 'Next isle')}</button><button class="sub" data-act="start">${L('한 번 더', 'Once more')}</button>`
         : `<button class="go" data-act="start">${L('한 번 더', 'Once more')}</button>`) +
       `<div class="row"><button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div>`,
@@ -1141,7 +1233,7 @@ $('sweep').querySelector('span')!.textContent = L('쾅!', 'SLAM!');
 
 // 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
 const hud = { hint: $('hint'), toast: $('toast'), warn: $('warn'), hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
-const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '', warn: -1, hint: '' };
+const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '', warnText: '', hint: '' };
 const hpFill = $('hpFill'), hpLag = $('hpLag'), hpText = $('hpText');
 function drawHud() {
   if (shown.mode !== mode) document.body.dataset.mode = shown.mode = mode;
@@ -1175,7 +1267,8 @@ function drawHud() {
   if (shown.xp !== xp) hud.xp.style.width = `${(shown.xp = xp)}%`;
   if (shown.falls !== g.falls) {
     hud.falls.innerHTML = `${L('떨어뜨림', 'Knocked off')} <b>${(shown.falls = g.falls)}</b>`;
-    if (g.chain >= 2) toast(L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`)); // 이어서 떨어뜨리면 가운데에 크게
+    if (g.chain >= R.STRIKE_CHAIN) toast(`STRIKE! ×${g.chain}`);
+    else if (g.chain >= 2) toast(L(`낙하 ×${g.chain}!`, `Drop ×${g.chain}!`)); // 이어서 떨어뜨리면 가운데에 크게
   }
   const hint = mode === 'bonus' ? `${L('끌었다 놓으면 돌진!', 'Drag & release to dash!')} · ${L('떨어뜨림', 'Knocked')} ${g.bonusFalls} (+${g.bonusFalls * R.BONUS_COIN})` : '';
   if (shown.hint !== hint) {
@@ -1183,11 +1276,13 @@ function drawHud() {
     hud.hint.hidden = !hint;
     hud.hint.textContent = hint;
   }
-  const warn = mode === 'play' ? R.crumbleWarning(g.t, stage()) : -1;
-  if (shown.warn !== warn) {
-    shown.warn = warn;
-    hud.warn.hidden = warn < 0;
-    hud.warn.textContent = L('가장자리가 무너집니다!', 'The edge is crumbling!');
+  const bossSoon = mode === 'play' && !g.bossSpawned && g.t >= R.BOSS_AT - R.BOSS_WARN;
+  const warnText = bossSoon ? L('왕좀비가 온다!', 'The king zombie is coming!')
+    : mode === 'play' && R.crumbleWarning(g.t, stage()) >= 0 ? L('가장자리가 무너집니다!', 'The edge is crumbling!') : '';
+  if (shown.warnText !== warnText) {
+    shown.warnText = warnText;
+    hud.warn.hidden = !warnText;
+    hud.warn.textContent = warnText;
   }
   const p = Math.round((g.charge / R.sweepCost(g.lv.sweep)) * 100);
   if (shown.p !== p) {
@@ -1237,7 +1332,7 @@ if (DEV)
         mode = 'title'; // 시간을 멈춘다
         document.body.dataset.mode = 'shot';
         const sk = (x: number, z: number, big = false, out = false, y = 0) =>
-          g.enemies.push({ x, z, y, vy: 0, kx: 0, kz: 0, hp: 1, big, out, flash: 0, hop: Math.random() * 6, age: 1, bladeCd: 0 });
+          g.enemies.push({ x, z, y, vy: 0, kx: 0, kz: 0, hp: 1, big, out, flash: 0, hop: Math.random() * 6, age: 1, bladeCd: 0, kind: '' });
         g.enemies.length = 0;
         g.drops.length = 0;
         if (kind === 'icon') {
@@ -1288,7 +1383,7 @@ if (DEV)
       /** 밸런스 봇(결정 043·045): 망치 거리를 지키며 싸우고 상자를 줍고 공격 스킬을 고른다.
        *  sloppy(0~1)가 클수록 반응이 늦고 가끔 멈칫한다(사람형 0.6). 강화는 지금 저장된 그대로 쓴다 */
       bot: async (runs = 10, sloppy = 0.6, stageNo = 0) => {
-        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number }[] = [];
+        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number }[] = [];
         for (let r = 0; r < runs; r++) {
           stageIdx = stageNo;
           applyStage();
@@ -1308,7 +1403,8 @@ if (DEV)
               if (e.out) continue;
               const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz);
               if (d < nd) { nd = d; near = e; }
-              if (d < 2.2) { mx += dx / (d * d); mz += dz / (d * d); }
+              const avoid = e.kind === 'boss' ? 4.5 : 2.2, w = e.kind === 'boss' ? 4 : 1; // 사람은 큰 왕좀비를 멀리서부터 피한다
+              if (d < avoid) { mx += (dx / (d * d)) * w; mz += (dz / (d * d)) * w; }
             }
             if (near && nd > 3) { mx -= ((g.px - near.x) / nd) * 0.3; mz -= ((g.pz - near.z) / nd) * 0.3; }
             const rr = Math.hypot(g.px, g.pz) / g.isl;
@@ -1328,12 +1424,12 @@ if (DEV)
             for (let i = 0; i < 6 && mode === 'play'; i++) update(1 / 60);
             resetInput();
           }
-          out.push({ win: g.t >= R.RUN_SECONDS - 0.1, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1 });
+          out.push({ win: g.t >= R.RUN_SECONDS - 0.1 || g.bossDown, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes });
           await new Promise((res) => setTimeout(res, 0));
         }
         const avg = (f: (x: (typeof out)[number]) => number) => +(out.reduce((a, x) => a + f(x), 0) / runs).toFixed(2);
         showTitle();
-        return { wins: `${out.filter((x) => x.win).length}/${runs}`, avgT: avg((x) => x.t), avgLv: avg((x) => x.lv), fallShare: avg((x) => x.falls / Math.max(1, x.kills)), missShare: avg((x) => x.misses / Math.max(1, x.swings)) };
+        return { wins: `${out.filter((x) => x.win).length}/${runs}`, avgT: avg((x) => x.t), avgLv: avg((x) => x.lv), fallShare: avg((x) => x.falls / Math.max(1, x.kills)), missShare: avg((x) => x.misses / Math.max(1, x.swings)), bossDowns: out.filter((x) => x.boss).length, strikes: avg((x) => x.strikes) };
       },
       sweep,
       // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다

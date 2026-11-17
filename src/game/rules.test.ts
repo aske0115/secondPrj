@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -98,4 +98,20 @@ test('레벨업은 공격 스킬 위주: 매번 하나 이상, 전체로는 패�
 
 test('필요 경험치는 레벨마다 더 크게 는다', () => {
   for (let l = 2; l < 40; l++) expect(xpNeed(l) - xpNeed(l - 1)).toBeGreaterThanOrEqual(xpNeed(l - 1) - xpNeed(l - 2));
+});
+
+test('왕좀비는 보너스·무너짐 경고와 겹치지 않고, 판이 끝나기 전에 온다', () => {
+  expect(BOSS_AT).toBeLessThan(RUN_SECONDS - 10);
+  expect(Math.abs(BOSS_AT - BONUS_AT)).toBeGreaterThan(BONUS_SECONDS);
+  for (const st of STAGES) for (const c of st.crumbles) expect(Math.abs(c.at - BOSS_AT)).toBeGreaterThan(BOSS_WARN);
+});
+
+test('새 적은 정해진 시간 뒤에만 나온다', () => {
+  for (let i = 0; i < 100; i++) {
+    expect(pickKind(10, false, () => i / 100)).toBe('');
+    expect(pickKind(40, true, () => i / 100)).toBe('');
+  }
+  const later = new Set(Array.from({ length: 100 }, (_, i) => pickKind(60, false, () => i / 100)));
+  expect(later.has('balloon') && later.has('bomb')).toBe(true);
+  expect(new Set(Array.from({ length: 100 }, (_, i) => pickKind(60, true, () => i / 100))).has('shield')).toBe(true);
 });

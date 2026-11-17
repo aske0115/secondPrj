@@ -46,7 +46,7 @@ test('뒤 섬일수록 좁다(떨어뜨리기가 늘어난다)', () => {
 
 test('뒤 섬일수록 어렵다', () => {
   for (let i = 1; i < STAGES.length; i++)
-    for (const k of ['spawn', 'big', 'hp', 'speed'] as const) expect(STAGES[i][k]).toBeGreaterThanOrEqual(STAGES[i - 1][k]);
+    for (const k of ['spawn', 'big', 'hp', 'speed', 'dmg'] as const) expect(STAGES[i][k]).toBeGreaterThanOrEqual(STAGES[i - 1][k]);
 });
 
 test('떨어뜨리기가 그냥 처치보다 보상이 크다', () => {

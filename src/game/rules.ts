@@ -78,16 +78,16 @@ export const fallXp = (big: boolean) => killXp(big) * 2;
 export type Crumble = { readonly at: number; readonly r: number };
 export type Stage = {
   name: readonly [string, string]; r: number; grass: number; cliff: number; sky: number; sun: number;
-  crumbles: readonly Crumble[]; spawn: number; big: number; hp: number; speed: number;
+  crumbles: readonly Crumble[]; spawn: number; big: number; hp: number; speed: number; dmg: number;
 };
 export const STAGES: readonly Stage[] = [
   // 크기는 노는 방식: 좁을수록 가장자리가 가까워 떨어뜨리기가 늘어난다. 넓히면 오히려 어려워져서(봇 측정) 첫 섬이 가장 넓다(결정 045)
   { name: ['풀밭 섬', 'Meadow Isle'], r: 13, grass: 0x86c46a, cliff: 0xb89468, sky: 0xbfe6f5, sun: 0xfff0d2,
-    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.8, big: 0.8, hp: 0.8, speed: 0.9 }, // 첫 섬은 배우는 섬
+    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.65, big: 0.5, hp: 0.7, speed: 0.85, dmg: 0.6 }, // 첫 섬은 배우는 섬: 처음 하는 사람도 몇 판 안에 깨게(결정 050)
   { name: ['단풍 섬', 'Maple Isle'], r: 12, grass: 0xd9a24e, cliff: 0x9a6b4a, sky: 0xf6dcc0, sun: 0xffd9a8,
-    crumbles: [{ at: 30, r: 11 }, { at: 60, r: 10 }, { at: 90, r: 9 }], spawn: 1.15, big: 1.25, hp: 1.2, speed: 1.05 },
+    crumbles: [{ at: 30, r: 11 }, { at: 60, r: 10 }, { at: 90, r: 9 }], spawn: 1.15, big: 1.25, hp: 1.2, speed: 1.05, dmg: 1 },
   { name: ['달빛 묘지 섬', 'Moonlit Isle'], r: 10.5, grass: 0x5f8a7a, cliff: 0x6b6378, sky: 0x2d3555, sun: 0xb9c6ff,
-    crumbles: [{ at: 25, r: 10 }, { at: 50, r: 9.4 }, { at: 75, r: 8.8 }, { at: 100, r: 8.2 }], spawn: 1.42, big: 1.55, hp: 1.52, speed: 1.13 },
+    crumbles: [{ at: 25, r: 10 }, { at: 50, r: 9.4 }, { at: 75, r: 8.8 }, { at: 100, r: 8.2 }], spawn: 1.42, big: 1.55, hp: 1.52, speed: 1.13, dmg: 1.1 },
 ];
 export const CRUMBLE_WARN = 3;
 export const islandRadius = (t: number, st: Stage = STAGES[0]) => st.crumbles.reduce((r, c) => (t >= c.at ? c.r : r), st.r);

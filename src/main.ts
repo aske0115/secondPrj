@@ -807,7 +807,7 @@ function update(dt: number) {
         g.vz *= 0.75;
         sfx.bonk();
       }
-    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt(R.enemyDamage(e.big));
+    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt(R.enemyDamage(e.big) * stage().dmg);
   }
   // 서로 겹치지 않게 밀어낸다
   // shortcut: 모든 쌍을 비교한다(300마리면 4.5만 쌍), 적 상한을 올리면 격자 나누기로 바꾼다
@@ -1028,6 +1028,7 @@ function startRun() {
   overlay.hidden = true;
   mode = 'play';
   g.inv = 0.6;
+  toast(L(`${clock(R.RUN_SECONDS)} 버티기!`, `Survive ${clock(R.RUN_SECONDS)}!`));
 }
 function showTitle() {
   mode = 'title';
@@ -1041,6 +1042,7 @@ function showTitle() {
       `<div><small>${L('섬', 'Isle')} ${stageIdx + 1} / ${R.STAGES.length}</small><b>${locked ? '🔒 ' : ''}${stageName(stageIdx)}</b></div>` +
       `<button data-act="next" ${stageIdx < R.STAGES.length - 1 ? '' : 'disabled'} aria-label="${L('다음 섬', 'Next isle')}">›</button></div>` +
       (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을 지키면 열립니다`, `Defend ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
+      `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>` +
       `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
       `<div class="row"><button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button>` +
       `<button class="sub" data-act="music" aria-pressed="${sfx.isMusicOn()}">${sfx.isMusicOn() ? L('♪ 음악 켬', '♪ Music on') : L('♪ 음악 끔', '♪ Music off')}</button></div></div>`,

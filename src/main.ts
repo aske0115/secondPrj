@@ -6,11 +6,12 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { L } from './i18n';
 import * as sfx from './audio';
 import * as R from './game/rules';
 import * as MT from './game/meta';
+import * as MS from './game/missions';
 
 const $ = (id: string) => document.getElementById(id)!;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -133,10 +134,10 @@ const onIsland = (min: number, max: number) => {
 function insert([x, z]: readonly [number, number], y = 0) {
   return [x, y, z] as const;
 }
-const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, heroGltf, keeper, barrel, lantern] = await Promise.all([
+const [pine, pine2, rocks, rocksTall, trunk, pumpkin, skel, zombie, keeper, barrel, lantern] = await Promise.all([
   bake('graveyard/pine', 3.2), bake('graveyard/pine-crooked', 3), bake('graveyard/rocks', 0.6), bake('graveyard/rocks-tall', 1.1),
   bake('graveyard/trunk', 0.5), bake('graveyard/pumpkin', 0.5), bake('graveyard/character-skeleton', 1.05),
-  bake('graveyard/character-zombie', 1.05), model('dungeon/character-human'), bake('graveyard/character-keeper', 1.15),
+  bake('graveyard/character-zombie', 1.05), bake('graveyard/character-keeper', 1.15),
   bake('dungeon/barrel', 0.8), bake('graveyard/lantern-candle', 1.3),
 ]);
 // 나무는 가장자리에만 둬서 싸움터를 가리지 않는다
@@ -158,15 +159,30 @@ for (let i = 0; i < 9; i++) put(clouds, i, rnd(-24, 24), rnd(-13, -6), rnd(-26, 
 clouds.count = 9;
 
 // 주인공: 한 명뿐이라 뼈대 애니메이션을 그대로 쓴다. +z를 본다
-const hero = heroGltf.scene;
-hero.scale.setScalar(1.25 / new THREE.Box3().setFromObject(hero).getSize(P).y);
-hero.traverse((o) => (o.castShadow = true));
-scene.add(hero);
-const mixer = new THREE.AnimationMixer(hero);
-const clip = (name: string) => mixer.clipAction(THREE.AnimationClip.findByName(heroGltf.animations, name)!);
-const heroIdle = clip('idle'), heroWalk = clip('sprint');
-heroIdle.play();
-heroWalk.play().setEffectiveWeight(0);
+// 주인공은 고른 캐릭터(결정 061). 모두 Kenney 모델이고 같은 이름의 애니메이션(idle·sprint)을 가진다
+const HERO_PATH: Record<MT.CharId, string> = {
+  human: 'dungeon/character-human', orc: 'dungeon/character-orc', keeper: 'graveyard/character-keeper',
+  vampire: 'graveyard/character-vampire', ghost: 'graveyard/character-ghost',
+};
+const heroModels = Object.fromEntries(await Promise.all(MT.CHARS.map(async (c) => [c, await model(HERO_PATH[c])] as const))) as Record<MT.CharId, GLTF>;
+for (const gl of Object.values(heroModels)) {
+  gl.scene.scale.setScalar(1.25 / new THREE.Box3().setFromObject(gl.scene).getSize(P).y);
+  gl.scene.traverse((o) => (o.castShadow = true));
+}
+let hero: THREE.Object3D = new THREE.Object3D(), mixer = new THREE.AnimationMixer(hero);
+let heroIdle: THREE.AnimationAction, heroWalk: THREE.AnimationAction;
+function setHero(id: MT.CharId) {
+  scene.remove(hero);
+  const gl = heroModels[id];
+  hero = gl.scene;
+  scene.add(hero);
+  mixer = new THREE.AnimationMixer(hero);
+  const clip = (name: string) => mixer.clipAction(THREE.AnimationClip.findByName(gl.animations, name)!);
+  heroIdle = clip('idle');
+  heroWalk = clip('sprint');
+  heroIdle.play();
+  heroWalk.play().setEffectiveWeight(0);
+}
 
 // 적: 작은 놈은 해골, 큰 놈은 좀비. 인스턴스 색을 곱해 피격 번쩍임을 낸다
 const smallMesh = instanced(skel.geo, skel.mat, R.MAX_ENEMIES, true);
@@ -217,6 +233,11 @@ const lanternMesh = instanced(lantern.geo, lantern.mat, R.GADGET_COUNT, true);
 const pullRing = instanced(new THREE.RingGeometry(0.9, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.5, depthWrite: false }), R.GADGET_COUNT);
 // 날씨 줄무늬(바람에 날리는 흰 선)
 const streakMesh = instanced(new THREE.BoxGeometry(0.04, 0.04, 1.4), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }), 40);
+// 내 섬 트로피(결정 060): 떨어뜨린 왕좀비는 금 동상, 미션 3개마다 금 호박. 시작 화면에서만 보인다
+const goldMat = flat(0xffc94d, { emissive: 0x5a3a00 });
+const statueMesh = instanced(zombie.geo, goldMat, 3, true);
+const goldPumpkinMesh = instanced(pumpkin.geo, goldMat, 8, true);
+const STATUE_AT = [[-2.6, -3.4], [2.8, -3.2], [0, -5]] as const;
 // 왕좀비: 좀비 모양을 크게, 초록빛 + 금관
 const bossMat = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xd8ffc0 });
 const bossFlash = new THREE.MeshLambertMaterial({ map: (zombie.mat as THREE.MeshLambertMaterial).map, color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
@@ -293,6 +314,8 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* 저장 실패 시 이번 실행에서만 */ } },
 };
 let meta = MT.loadMeta(store.get('meta'), R.STAGES.length);
+meta.missions = MS.fillMissions(meta.missions);
+setHero(meta.hero);
 const saveMeta = () => store.set('meta', JSON.stringify(meta));
 let stageIdx = Math.min(meta.cleared, R.STAGES.length - 1);
 const stage = () => R.STAGES[stageIdx];
@@ -324,6 +347,7 @@ const newGame = () => ({
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
   swings: 0, misses: 0, sweepLock: 0, helperUsed: false,
   gadgets: [] as Gadget[], weather: '' as R.Weather | '', wt: 0, wx: 0, wz: 0, weatherDone: false,
+  opened: 0, slams: 0, done: [] as string[], // 미션(결정 060)
   bossSpawned: false, bossDown: false, endIn: 0, extra: 0, strikes: 0, juggles: 0, // 왕좀비·STRIKE·저글(결정 057·058)
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
@@ -429,6 +453,8 @@ function burst(x: number, z: number, color: THREE.Color, n: number) {
 let lastPop = 0, combo = 0;
 function reward(charge: number) {
   g.kills++;
+  const he = MT.healEvery(meta);
+  if (he && g.kills % he === 0) g.hp = Math.min(g.maxHp, g.hp + 1); // 흡혈귀
   if (g.sweepLock <= 0) g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge);
   const now = performance.now();
   if (now - lastPop > 45) { // 한꺼번에 죽을 때 소리가 뭉개지지 않게, 이어 죽이면 음이 올라간다
@@ -561,6 +587,7 @@ function sweep() {
   if (mode !== 'play' || g.charge < R.sweepCost(g.lv.sweep)) return;
   g.charge = 0;
   g.sweepLock = R.SWEEP_LOCK;
+  g.slams++;
   const rad = R.sweepRadius(g.lv.sweep);
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     const e = g.enemies[i];
@@ -748,6 +775,7 @@ const DROP_NAME: Record<R.DropId, string> = {
   heart: L('회복!', 'Heal!'), charge: L('쾅! 충전!', 'Slam charged!'), golden: L('황금 망치!', 'Golden mallet!'), helper: L('묘지기가 도와줍니다!', 'The keeper joins you!'),
 };
 function openDrop(d: Drop) {
+  g.opened++;
   if (d.type === 'heart') g.hp = Math.min(g.maxHp, g.hp + R.HEAL);
   else if (d.type === 'charge') g.charge = R.sweepCost(g.lv.sweep);
   else if (d.type === 'golden') g.golden = R.GOLDEN_SECONDS;
@@ -881,7 +909,24 @@ function weather(dt: number) {
   if (g.weather === 'quake') g.shake = Math.max(g.shake, 0.25);
 }
 
+const runStats = (): MS.RunStats => ({
+  falls: g.falls, kills: g.kills, strikes: g.strikes, juggles: g.juggles, opened: g.opened, slams: g.slams,
+  time: Math.floor(g.t), boss: g.bossDown ? 1 : 0, level: g.level + 1,
+});
+let missionCheck = 0;
+function checkMissions() {
+  const st = runStats();
+  for (const id of meta.missions)
+    if (!g.done.includes(id) && MS.isDone(id, st)) {
+      g.done.push(id);
+      const m = MS.missionById(id)!;
+      toast(L(`미션 완료! ${m.ko}`, `Mission done! ${m.en}`));
+      sfx.chime();
+    }
+}
+
 function update(dt: number) {
+  if ((missionCheck += dt) > 0.5 && mode === 'play') { missionCheck = 0; checkMissions(); }
   const bonus = mode === 'bonus';
   if (bonus) {
     g.bt -= dt;
@@ -928,7 +973,7 @@ function update(dt: number) {
   }
   if (!bonus) g.moving = Math.hypot(mx, mz) > 0.05;
   if (!bonus && g.moving) {
-    const sp = R.moveSpeed(g.lv.speed);
+    const sp = R.moveSpeed(g.lv.speed) * MT.speedMul(meta);
     g.px += mx * sp * dt;
     g.pz += mz * sp * dt;
     g.face = Math.atan2(mx, mz);
@@ -1123,6 +1168,12 @@ function draw(dt: number, now: number) {
       }
     });
   sync(springMesh, nSp);
+  const onTitle = mode === 'title';
+  const statues = onTitle ? Math.min(3, meta.bossDowns) : 0, golds = onTitle ? Math.min(8, Math.floor(meta.missionsDone / 3)) : 0;
+  for (let k = 0; k < statues; k++) put(statueMesh, k, STATUE_AT[k][0], 0, STATUE_AT[k][1], 0.3 - k * 0.3, 1.9);
+  for (let k = 0; k < golds; k++) put(goldPumpkinMesh, k, Math.cos(k * 0.8 + 2) * 3.6, 0, Math.sin(k * 0.8 + 2) * 3.6 - 0.5, k, 1.3);
+  sync(statueMesh, statues);
+  sync(goldPumpkinMesh, golds);
   sync(barrelMesh, nBa);
   sync(lanternMesh, nLa);
   sync(pullRing, nRing);
@@ -1264,6 +1315,14 @@ function startRun() {
   g.inv = 0.6;
   toast(L(`${clock(R.RUN_SECONDS)} 버티기!`, `Survive ${clock(R.RUN_SECONDS)}!`));
 }
+/** 미션 목록: 달성한 것은 체크 표시와 함께 */
+function missionList(ids: readonly string[], done: readonly string[] = []) {
+  const rows = ids.map((id) => {
+    const m = MS.missionById(id)!, ok = done.includes(id);
+    return `<li class="${ok ? 'ok' : ''}"><i></i>${L(m.ko, m.en)}<b>+${m.coins}</b></li>`;
+  });
+  return `<ul class="missions">${rows.join('')}</ul>`;
+}
 function showTitle() {
   mode = 'title';
   applyStage();
@@ -1277,12 +1336,21 @@ function showTitle() {
       `<button data-act="next" ${stageIdx < R.STAGES.length - 1 ? '' : 'disabled'} aria-label="${L('다음 섬', 'Next isle')}">›</button></div>` +
       (locked ? `<p class="best">${L(`${stageName(stageIdx - 1)}을 지키면 열립니다`, `Defend ${stageName(stageIdx - 1)} to unlock`)}</p>` : bestLine()) +
       `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>` +
+      missionList(meta.missions) +
       `<button class="go" data-act="start" ${locked ? 'disabled' : ''}>${L('시작', 'Start')}</button>` +
-      `<div class="row"><button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button>` +
+      `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button>` +
       `<button class="sub" data-act="music" aria-pressed="${sfx.isMusicOn()}">${sfx.isMusicOn() ? L('♪ 음악 켬', '♪ Music on') : L('♪ 음악 끔', '♪ Music off')}</button></div></div>`,
     'title',
   );
 }
+const CHAR_UI: Record<MT.CharId, [string, string]> = {
+  human: [L('모험가', 'Adventurer'), L('기본', 'Basic')],
+  orc: [L('오크', 'Orc'), L('최대 체력 +20', 'Max HP +20')],
+  keeper: [L('묘지기', 'Keeper'), L('넉백 +15%', 'Knockback +15%')],
+  vampire: [L('흡혈귀', 'Vampire'), L('4마리마다 체력 +1', '+1 HP per 4 KOs')],
+  ghost: [L('유령', 'Ghost'), L('이동 속도 +12%', 'Move speed +12%')],
+};
+let capsuleNote = '';
 function showShop() {
   mode = 'title';
   const cards = MT.PERKS.map((id) => {
@@ -1290,7 +1358,17 @@ function showShop() {
     const btn = lv >= max ? `<button class="buy" disabled>MAX</button>` : `<button class="buy" data-act="buy" data-perk="${id}" ${meta.coins < cost ? 'disabled' : ''}><i></i>${cost}</button>`;
     return `<div class="card perk" style="--c:${c}"><div class="ico">${svg(ico)}</div><b>${name}</b><em>${'●'.repeat(lv)}${'○'.repeat(max - lv)}</em><span>${desc}</span>${btn}</div>`;
   });
-  show(`<h2 class="big-title" style="font-size:32px">${L('강화 상점', 'Upgrades')}</h2>${coinPill()}<div class="cards">${cards.join('')}</div><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`, 'shop');
+  const chars = MT.CHARS.map((c) => {
+    const [name, perk] = CHAR_UI[c], own = meta.chars.includes(c), on = meta.hero === c;
+    return `<button class="char ${on ? 'on' : ''}" data-act="hero" data-char="${c}" ${own ? '' : 'disabled'}><b>${own ? name : '???'}</b><small>${own ? perk : L('캡슐에서', 'From capsules')}</small></button>`;
+  });
+  show(
+    `<h2 class="big-title" style="font-size:30px">${L('상점', 'Shop')}</h2>${coinPill()}` +
+      `<div class="capsule"><button class="buy" data-act="capsule" ${meta.coins < MT.CAPSULE_COST ? 'disabled' : ''}><i></i>${MT.CAPSULE_COST} ${L('캡슐 돌리기', 'Spin capsule')}</button>${capsuleNote}</div>` +
+      `<div class="chars">${chars.join('')}</div><div class="cards">${cards.join('')}</div><button class="sub" data-act="title">${L('돌아가기', 'Back')}</button>`,
+    'shop',
+  );
+  capsuleNote = '';
 }
 overlay.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
@@ -1319,6 +1397,22 @@ overlay.addEventListener('click', (ev) => {
     stageIdx++;
     applyStage();
     return startRun();
+  }
+  if (act === 'capsule') {
+    const r = MT.rollCapsule(meta);
+    if (r) {
+      meta = r.meta;
+      saveMeta();
+      capsuleNote = `<p class="capsule-note">${r.dup ? L(`이미 있는 ${CHAR_UI[r.got][0]} · +${MT.CAPSULE_REFUND} 코인`, `Duplicate ${CHAR_UI[r.got][0]} · +${MT.CAPSULE_REFUND} coins`) : L(`새 캐릭터: ${CHAR_UI[r.got][0]}!`, `New: ${CHAR_UI[r.got][0]}!`)}</p>`;
+      r.dup ? sfx.coins() : sfx.fanfare();
+    }
+    return showShop();
+  }
+  if (act === 'hero') {
+    meta = { ...meta, hero: btn.dataset.char as MT.CharId };
+    saveMeta();
+    setHero(meta.hero);
+    return showShop();
   }
   if (act === 'buy') {
     const next = MT.buy(meta, btn.dataset.perk as MT.Perk);
@@ -1349,9 +1443,17 @@ function end(win: boolean) {
   const sec = Math.floor(g.t), score = { time: sec, kills: g.kills, falls: g.falls }, best = loadBest();
   const isBest = score.time > best.time || (score.time === best.time && score.kills > best.kills);
   if (isBest) store.set(`best-${stageIdx}`, JSON.stringify(score));
-  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx) + g.bonusFalls * R.BONUS_COIN + g.extra;
+  checkMissions();
+  const doneMs = g.done.map((id) => MS.missionById(id)!);
+  const missionCoins = doneMs.reduce((a, m) => a + m.coins, 0);
+  const coins = MT.coinsFor(g.kills, g.falls, win, stageIdx) + g.bonusFalls * R.BONUS_COIN + g.extra + missionCoins;
+  const missionsNow = meta.missions;
   const unlocked = win && stageIdx === meta.cleared && stageIdx < R.STAGES.length;
-  meta = { ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared };
+  meta = {
+    ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared,
+    missionsDone: meta.missionsDone + g.done.length, bossDowns: meta.bossDowns + (g.bossDown ? 1 : 0),
+    missions: MS.fillMissions(meta.missions.filter((id) => !g.done.includes(id))), // 달성한 미션은 새 것으로
+  };
   saveMeta();
   const hasNext = win && stageIdx + 1 < R.STAGES.length;
   const cell = (label: string, v: string | number, hi = false) => `<div class="${hi ? 'hi' : ''}"><small>${label}</small><strong>${v}</strong></div>`;
@@ -1363,10 +1465,10 @@ function end(win: boolean) {
       `</div><div class="earn"><i></i>+${coins}</div>` +
       (unlocked && hasNext ? `<span class="badge">${L(`새 섬: ${stageName(stageIdx + 1)}`, `New isle: ${stageName(stageIdx + 1)}`)}</span>` : '') +
       (isBest ? `<span class="badge">${L('최고 기록!', 'New best!')}</span>` : '') +
-      (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + `</div>` +
+      (g.strikes ? `<span class="badge">STRIKE ×${g.strikes}</span>` : '') + missionList(missionsNow, g.done) + `</div>` +
       (hasNext ? `<button class="go" data-act="nextIsle">${L('다음 섬으로', 'Next isle')}</button><button class="sub" data-act="start">${L('한 번 더', 'Once more')}</button>`
         : `<button class="go" data-act="start">${L('한 번 더', 'Once more')}</button>`) +
-      `<div class="row"><button class="sub" data-act="shop">${L('강화 상점', 'Upgrades')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div>`,
+      `<div class="row"><button class="sub" data-act="shop">${L('상점', 'Shop')}</button><button class="sub" data-act="title">${L('처음으로', 'Home')}</button></div>`,
   );
 }
 $('sweep').querySelector('span')!.textContent = L('쾅!', 'SLAM!');

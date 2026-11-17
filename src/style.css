@@ -159,3 +159,22 @@ body[data-mode="shot"] #hud, body[data-mode="shot"] #sweep, body[data-mode="shot
 /* 불러오는 동안 시작 화면 그림을 깔아 둔다(iOS 시작 화면이 사라진 뒤 모델을 읽는 1~2초, 결정 052) */
 #boot { position: fixed; inset: 0; z-index: 10; background: #bfe6f5 url(/splash.jpg) center / cover; transition: opacity .4s; pointer-events: none; }
 #boot.done { opacity: 0; }
+
+/* 미션(결정 060) */
+.missions { list-style: none; margin: 0; padding: 8px 12px; width: min(100%, 320px); border-radius: 14px; background: #ffffffe6; box-shadow: var(--shadow); text-align: left; }
+.missions li { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 14px; font-weight: 700; color: var(--ink); }
+.missions li i { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid #c9b99c; flex: none; }
+.missions li b { margin-left: auto; color: var(--gold-deep); font-size: 13px; }
+.missions li.ok i { border-color: var(--teal); background: var(--teal); box-shadow: inset 0 0 0 2px #fff; }
+.missions li.ok { opacity: .75; }
+.panel .missions { box-shadow: none; background: #f3ead8; margin: 12px auto 0; }
+/* 캐릭터·캡슐(결정 061) */
+.capsule { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.capsule .buy { padding: 10px 16px; font-size: 16px; }
+.capsule-note { order: 2; margin: 0; color: #fff; font-weight: 900; text-align: center; }
+.chars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: min(100%, 340px); }
+.char { border: 0; border-radius: 12px; padding: 8px 2px; background: var(--paper); box-shadow: 0 3px 0 var(--edge); display: grid; gap: 2px; }
+.char b { font-size: 13px; }
+.char small { font-size: 10px; opacity: .7; line-height: 1.2; }
+.char.on { outline: 3px solid var(--teal); }
+.char:disabled { opacity: .5; }

@@ -7,7 +7,7 @@ export type Perk = (typeof PERKS)[number];
 // 장 10개·150스테이지에 맞춰 단계를 늘리고 값을 가파르게(결정 068): 최대 효과는 예전과 같고, 다 사는 데 한 달쯤
 export const PERK_MAX: Record<Perk, number> = { vigor: 5, shove: 10, charge: 10, cards: 5, revive: 5, purse: 5 };
 const PERK_BASE: Record<Perk, number> = { vigor: 200, shove: 100, charge: 100, cards: 300, revive: 300, purse: 400 };
-export const perkCost = (id: Perk, lv: number) => Math.round(PERK_BASE[id] * (1 + lv) ** 3.4); // 지수 3 → 3.4(결정 078): 하루 6판 중 3판 코인 2배여도 다 사기까지 30일(180판) 넘게
+export const perkCost = (id: Perk, lv: number) => Math.round(PERK_BASE[id] * (1 + lv) ** 3.5); // 지수 3 → 3.4(결정 078): 하루 6판 중 3판 코인 2배여도 다 사기까지 30일(180판) 넘게 → 3.5(결정 086): 숙련·성질로 진행이 빨라진 만큼
 
 // 캐릭터(결정 061): 캡슐로 얻는 Kenney 캐릭터, 저마다 작은 특성 하나
 export const CHARS = ['human', 'orc', 'keeper', 'vampire', 'ghost'] as const;
@@ -15,14 +15,25 @@ export type CharId = (typeof CHARS)[number];
 export const CAPSULE_COST = 120;
 export const CAPSULE_REFUND = 40; // 이미 가진 캐릭터가 나오면 돌려주는 코인
 
+// 주무기(결정 082·083): 스테이지를 지키면 열린다. 가진 목록은 저장하지 않고 cleared로 계산한다
+export const WEAPONS = ['hammer', 'squeaky', 'sledge', 'twin', 'pan', 'bat', 'pole', 'fan'] as const;
+export type WeaponId = (typeof WEAPONS)[number];
+// 언락 순서(결정 085): 1장엔 뿅망치 하나, 그 뒤 장 끝마다, 7·9·10장은 숙련 ★이 목표
+export const WEAPON_OPEN: Record<WeaponId, number> = { hammer: 0, squeaky: 8, sledge: 30, twin: 45, pan: 60, bat: 75, pole: 90, fan: 120 };
+export const weaponOpen = (id: WeaponId, cleared: number) => cleared >= WEAPON_OPEN[id];
+
 export type Meta = {
   coins: number; perks: Record<Perk, number>; cleared: number;
   missions: string[]; missionsDone: number; bossDowns: number; // 미션·내 섬 트로피(결정 060)
   chars: CharId[]; hero: CharId; // 캐릭터(결정 061)
+  weapon: WeaponId; // 고른 주무기(결정 082)
+  mastery: Record<WeaponId, number>; // 무기별 숙련 점수 = 그 무기로 떨어뜨린 수 누적(결정 085, 단계는 rules.ts masteryLevel)
+  autoWeapon: boolean; // 켜면 판 시작 때 스테이지 추천 무기가 열려 있으면 그걸 쓴다(결정 083, 기본 켬)
 };
 export const freshMeta = (): Meta => ({
   coins: 0, perks: { vigor: 0, shove: 0, charge: 0, cards: 0, revive: 0, purse: 0 }, cleared: 0,
-  missions: [], missionsDone: 0, bossDowns: 0, chars: ['human'], hero: 'human',
+  missions: [], missionsDone: 0, bossDowns: 0, chars: ['human'], hero: 'human', weapon: 'hammer', autoWeapon: true,
+  mastery: Object.fromEntries(WEAPONS.map((w) => [w, 0])) as Record<WeaponId, number>,
 });
 
 // 효과
@@ -86,5 +97,9 @@ export function loadMeta(raw: string | null, stageCount: number): Meta {
   const isChar = (x: unknown): x is CharId => typeof x === 'string' && (CHARS as readonly string[]).includes(x);
   m.chars = Array.isArray(o.chars) ? [...new Set(['human' as CharId, ...o.chars.filter(isChar)])] : ['human'];
   m.hero = isChar(o.hero) && m.chars.includes(o.hero) ? o.hero : 'human';
+  m.autoWeapon = o.autoWeapon !== false;
+  for (const w of WEAPONS) m.mastery[w] = int((o.mastery as Record<string, unknown> | undefined)?.[w], 1e6); // 안 열린 무기도 값은 보존
+  const w = o.weapon as unknown;
+  m.weapon = typeof w === 'string' && (WEAPONS as readonly string[]).includes(w) && weaponOpen(w as WeaponId, m.cleared) ? (w as WeaponId) : 'hammer';
   return m;
 }

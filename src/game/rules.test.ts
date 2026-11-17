@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { bossKnock, dayNumber, dailyStage, seeded, WEATHER_AT, WEATHER_SECONDS, WEATHER_PUSH, BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost } from './rules';
+import { bossKnock, dayNumber, dailyStage, seeded, WEATHER_AT, WEATHER_SECONDS, WEATHER_PUSH, BOSS_AT, BOSS_WARN, pickKind, ATTACKS, xpNeed, BONUS_AT, BONUS_SECONDS, DROPS, DROP_FALL, FIRST_DROP, STAGES, pickDrop, dashSpeed, hammerArc, hammerCooldown, logInterval, pumpkinInterval, FALL_CHARGE, ISLAND_R, KILL_CHARGE, MAX_LEVEL, RUN_SECONDS, UPGRADES, crumbleWarning, fallXp, islandRadius, killXp, pickUpgrades, spawnBatch, spawnInterval, startLevels, sweepCost, SUBS, WEAPON_STATS, WEAPON_MAX_ARC, weaponArc, weaponCooldown, weaponRadius, hammerRadius, weaponCycle, weaponWind, masteryMods, masteryLevel, masteryGain, MASTERY_MAX } from './rules';
+import { WEAPONS, type WeaponId } from './meta';
 
 test('시간이 갈수록 적이 더 자주·더 많이 나오고, 간격은 0이 되지 않는다', () => {
   for (let t = 1; t <= RUN_SECONDS; t++) {
@@ -152,4 +153,47 @@ test('보너스 뒤 숨 고르기: 적 생성이 4분의 1에서 시작해 원�
   expect(calmSpawn(0)).toBe(1);
   expect(calmSpawn(-1)).toBe(1);
   expect(calmSpawn(BONUS_CALM / 2)).toBeCloseTo(0.5);
+});
+
+test('주무기 8종: 각도 240° 이하, 한 바퀴는 레벨마다 줄고, Lv1 초당 피해는 망치의 0.85~1.15배(부채 0.4~0.6)', () => {
+  const dps = (id: WeaponId) => (WEAPON_STATS[id].damage * WEAPON_STATS[id].knocks.length) / weaponCooldown(id, 1);
+  for (const id of WEAPONS) {
+    for (let lv = 1; lv <= MAX_LEVEL; lv++) expect(weaponArc(id, lv)).toBeLessThanOrEqual(WEAPON_MAX_ARC + 1e-9);
+    for (let lv = 2; lv <= MAX_LEVEL; lv++) expect(weaponCooldown(id, lv)).toBeLessThan(weaponCooldown(id, lv - 1));
+    const lo = id === 'fan' ? 0.4 : 0.85, hi = id === 'fan' ? 0.6 : 1.15; // 부채는 밀기 전용(결정 085)
+    expect(dps(id) / dps('hammer')).toBeGreaterThanOrEqual(lo);
+    expect(dps(id) / dps('hammer')).toBeLessThanOrEqual(hi);
+  }
+  expect(weaponRadius('hammer', 3)).toBe(hammerRadius(3));
+});
+
+test('보조 무기 보장: 통나무·호박이 없으면 3장 중 하나는 꼭 그 둘 중 하나, 하나라도 있으면 보장 없음', () => {
+  for (let s = 1; s < 300; s++) {
+    const r = seeded(s), picks = pickUpgrades({ ...startLevels(), speed: 2 }, s % 2 === 0, r);
+    expect(picks.some((id) => SUBS.includes(id as never))).toBe(true);
+    expect(new Set(picks).size).toBe(picks.length);
+  }
+  let none = 0;
+  for (let s = 1; s < 300; s++) if (!pickUpgrades({ ...startLevels(), log: 1 }, true, seeded(s)).some((id) => SUBS.includes(id as never))) none++;
+  expect(none).toBeGreaterThan(0);
+});
+
+test('박자: 레벨이 올라도 대형 해머는 쌍검보다 훨씬 느리고, 해머 준비는 숙련으로도 하한 아래로 안 내려간다', () => {
+  expect(weaponCycle('sledge', MAX_LEVEL) / weaponCycle('twin', MAX_LEVEL)).toBeGreaterThan(3);
+  expect(weaponWind('sledge', 1, masteryMods('sledge', MASTERY_MAX))).toBeCloseTo(0.33); // 0.45 − 0.04×3, 하한 0.30 위
+  expect(weaponCycle('hammer', 1)).toBeCloseTo(0.9);
+});
+
+test('숙련: 단계 경계(30·n²), 10단계 상한, 줄은 A→B→C 순서, ★는 10단계, 뒤처지면 2배, 장으로 나눔', () => {
+  expect([29, 30, 749, 750, 2999, 3000, 1e6].map(masteryLevel)).toEqual([0, 1, 4, 5, 9, 10, 10]);
+  expect(masteryMods('hammer', 1).range).toBeCloseTo(1.04);
+  expect(masteryMods('hammer', 1).rest).toBe(1);
+  expect(masteryMods('hammer', 2).rest).toBeCloseTo(0.96);
+  expect(masteryMods('hammer', 3).charge).toBeCloseTo(1.05);
+  expect(masteryMods('pole', 9).pierce).toBe(3);
+  expect(masteryMods('hammer', 9).star).toBe(false);
+  expect(masteryMods('hammer', 10).star).toBe(true);
+  expect(masteryGain(10, 0, 2, 5)).toBe(20);
+  expect(masteryGain(10, 0, 3, 5)).toBe(10);
+  expect(masteryGain(300, 2, 5, 5)).toBe(100); // 뒤 장은 장 번호+1로 나눔
 });

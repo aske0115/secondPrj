@@ -391,14 +391,17 @@ const stageName = (no: number) => { const c = CH.CHAPTERS[Math.floor(no / CH.STA
 let curDef = defOf(stageIdx);
 let curStage: R.Stage = toStage(curDef);
 function toStage(d: CH.StageDef): R.Stage {
-  const c = CH.CHAPTERS[d.chapter], dusk = d.time === 'dusk';
+  const c = CH.CHAPTERS[d.chapter], dusk = d.time === 'dusk', fx = d.trait ? R.TRAIT_FX[d.trait] : { spawn: 1, big: 1 };
   return {
     name: [stageName(d.no), stageName(d.no)], r: d.r, crumbles: d.crumbles, gadget: c.gadget,
     grass: c.grass, cliff: c.cliff, sky: dusk ? 0xf3b98f : c.sky, sun: dusk ? 0xffb07a : c.sun,
-    spawn: d.spawn, big: d.big, hp: d.hp, speed: d.speed, dmg: d.dmg,
+    spawn: d.spawn * fx.spawn, big: d.big * fx.big, hp: d.hp, speed: d.speed, dmg: d.dmg, // 스테이지 특징(결정 083)은 적 구성만 바꾼다
   };
 }
 const stage = () => curStage;
+/** 이 스테이지 성질의 적 구성(성질 없으면 기본) */
+const tfx = () => (curDef.trait ? R.TRAIT_FX[curDef.trait] : R.NO_TRAIT);
+let traitOverride: R.Trait | '' | undefined; // 개발 훅: 스테이지 특징 끄고 켜기
 let ruleOverride: R.Rule | '' | undefined; // 개발 훅에서 규칙 켜고 끄기 비교용
 const rule = () => (ruleOverride === undefined ? CH.CHAPTERS[curDef.chapter].rule : ruleOverride || undefined); // 장 규칙(결정 078)
 /** 장 모델(적·소품)을 불러와 끼운다. 이미 불러온 장은 바로 */
@@ -406,6 +409,7 @@ let stageReady: Promise<void> = Promise.resolve();
 function enterStage(no: number) {
   stageIdx = no;
   curDef = defOf(no);
+  if (traitOverride !== undefined) curDef = { ...curDef, trait: traitOverride || undefined }; // 개발 훅 비교용
   curStage = toStage(curDef);
   const ch = CH.CHAPTERS[curDef.chapter], d = curDef;
   stageReady = (async () => {
@@ -435,14 +439,28 @@ function applyStage() {
 }
 
 // ───────── 상태 ─────────
-type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind; pct?: number; stag?: number; v?: number };
+type Enemy = { x: number; z: number; y: number; vy: number; kx: number; kz: number; hp: number; big: boolean; out: boolean; flash: number; hop: number; age: number; bladeCd: number; kind: R.Kind; pct?: number; stag?: number; v?: number; by?: Src; byT?: number };
+/** 떨어뜨린 원인(결정 083): 마지막으로 친 것. 2초 지나면 '그 밖' */
+type Src = 'main' | 'log' | 'pumpkin' | 'sweep' | 'other';
+/** 주무기 한 타(덧붙는 타격은 in 초 뒤 실행). 디자인: kind로 그릴 모양을 고른다 */
+type Strike = {
+  in: number; kind: 'main' | 'tap' | 'back' | 'whirl' | 'shock' | 'full' | 'after' | 'double' | 'spin' | 'ring' | 'fork'; shape: R.WeaponShape;
+  yaw: number; half: number; rad: number; dmg: number; knock: number; dmgHalf: number; lift: number; extra: boolean; flat: boolean;
+  cx: number; cz: number; core: number; coreDmg: number; width: number; pierce: number; // 원: 가운데 자리·가운데 피해 반지름, 직선: 폭·관통 수
+};
 type Drop = { x: number; z: number; y: number; type: R.DropId; life: number };
 type Helper = { x: number; z: number; t: number; cd: number; face: number; hop: number };
 type Gadget = { x: number; z: number; hx: number; hz: number; cd: number; squash: number; vx: number; vz: number; left: number; gone: number; on: number };
-type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number };
+type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number; warn: number }; // warn: 남은 예고 시간(0보다 크면 아직 출발 전, 결정 083)
 type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: number; t: number; y: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
-const newGame = () => ({
+/** 이번 판 주무기: 「추천 무기 자동」(meta.autoWeapon)이 켜져 있으면 추천 무기(잠겼으면 망치), 꺼져 있으면 고른 무기(결정 083·085) */
+function runWeapon(): MT.WeaponId {
+  const rec = CH.recommendedWeapon(curDef);
+  if (!meta.autoWeapon) return meta.weapon;
+  return MT.weaponOpen(rec, meta.cleared) ? rec : 'hammer'; // 추천이 잠겼으면 상징 무기 망치(결정 085 2-4)
+}
+const newGame = (w = runWeapon()) => ({
   t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: MT.startPicks(meta.perks.cards),
   charge: 0, kills: 0, falls: 0, rerolls: MT.rerolls(meta.perks.cards), revived: false, continued: false,
   lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
@@ -455,13 +473,18 @@ const newGame = () => ({
   bossSpawned: false, bossDown: false, endIn: 0, extra: 0, strikes: 0, juggles: 0, // 왕좀비·STRIKE·저글(결정 057·058)
   drops: [] as Drop[], dropCd: R.FIRST_DROP as number, golden: 0, helper: null as Helper | null,
   isl: stage().r, chain: 0, chainT: 0, // 이어서 떨어뜨린 수와 남은 시간
+  // 주무기(결정 083·086): wPhase 준비/후딜 단계와 남은 시간 wT, 겨눈 방향 wYaw, 숙련 값 wMods. swing*는 마지막 타의 모양(그리기용)
+  weapon: w, wMods: R.masteryMods(w, R.masteryLevel(meta.mastery[w])), wSwings: 0, queue: [] as Strike[], gusts: [] as { x: number; z: number; t: number }[],
+  wPhase: 'idle' as 'idle' | 'windup' | 'recovery', wT: 0, wYaw: 0, hurts: 0, hurtsInWind: 0, laneA: rnd(0, Math.PI), // laneA: 행렬 성질의 두 방향
+  swingKind: 'main' as Strike['kind'], swingShape: R.WEAPON_STATS[w].shape, swingArc: R.weaponArc(w, 1), swingRad: R.weaponRadius(w, 1) * MT.hammerMul(meta),
+  fallBy: { main: 0, log: 0, pumpkin: 0, sweep: 0, other: 0 } as Record<Src, number>,
 });
 let g = newGame();
 let mode: 'title' | 'play' | 'bonusIntro' | 'bonus' | 'pick' | 'over' | 'pause' = 'title';
 const eScale = (e: Enemy) => (e.kind === 'boss' ? R.BOSS_SCALE * (curDef.finale ? 1.25 : 1) : e.big ? 1.5 : 1);
 const eRadius = (e: Enemy) => 0.45 * eScale(e);
 /** 밀리는 정도: 왕좀비는 맞을수록(%) 더 멀리 */
-const knockOf = (e: Enemy) => (e.kind === 'boss' ? R.bossKnock(e.pct ?? 0) : R.KIND_KNOCK[e.kind]);
+const knockOf = (e: Enemy) => (e.kind === 'boss' ? R.bossKnock(e.pct ?? 0) : R.KIND_KNOCK[e.kind])
 function resetIsland() {
   const r = stage().r, k = r / R.ISLAND_R;
   islandVis = r;
@@ -551,14 +574,22 @@ $('sweep').addEventListener('pointerdown', () => sweep());
 $('pause').addEventListener('click', () => { sfx.tap(); pause(); });
 
 // ───────── 규칙 ─────────
-function spawn() {
+/** 나올 자리(각도). 행렬 성질은 마주 보는 두 방향에서만 */
+function spawnAngle() {
+  if (tfx().lanes) return g.laneA + (Math.random() < 0.5 ? 0 : Math.PI) + rnd(-0.06, 0.06);
   let a = 0;
   for (let tries = 0; tries < 6; tries++) { // 주인공 코앞에서는 올라오지 않게
     a = rnd(0, Math.PI * 2);
     if (Math.hypot(Math.cos(a) * g.isl - g.px, Math.sin(a) * g.isl - g.pz) > 5) break;
   }
-  const st = stage(), big = Math.random() < Math.min(0.6, R.bigChance(g.t) * st.big), d = g.isl - 0.8, kind = R.pickKind(g.t, big);
-  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp * R.KIND_HP[kind], big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0, kind, v: Math.random() < 0.5 ? 1 : 0 });
+  return a;
+}
+/** pack: 덩어리 성질에서 같은 자리 둘레에 모아 낸다 */
+function spawn(pack?: number) {
+  const fx = tfx(), a = pack === undefined ? spawnAngle() : pack + rnd(-0.08, 0.08);
+  const st = stage(), big = Math.random() < Math.min(0.6, R.bigChance(g.t) * st.big), kind = R.pickKind(g.t, big, Math.random, curDef.trait);
+  const d = g.isl - 0.8 - (pack !== undefined ? rnd(0, 0.8) : fx.lanes ? rnd(0, 1.4) : 0); // 덩어리·행렬은 앞뒤로도 조금 흩어 겹치지 않게
+  g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: R.enemyHp(g.t, big) * st.hp * R.KIND_HP[kind] * fx.hp * (big ? 1 : fx.smallHp), big, out: false, flash: 0, hop: rnd(0, 6), age: 0, bladeCd: 0, kind, v: Math.random() < 0.5 ? 1 : 0 });
 }
 
 function burst(x: number, z: number, color: THREE.Color, n: number) {
@@ -571,7 +602,7 @@ function reward(charge: number) {
   g.kills++;
   const he = MT.healEvery(meta);
   if (he && g.kills % he === 0) g.hp = Math.min(g.maxHp, g.hp + 1); // 흡혈귀
-  if (g.sweepLock <= 0) g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge * MT.chargeMul(meta));
+  if (g.sweepLock <= 0) g.charge = Math.min(R.sweepCost(g.lv.sweep), g.charge + charge * MT.chargeMul(meta) * (g.weapon === 'hammer' ? R.HAMMER_SLAM.charge * g.wMods.charge : 1)); // 쾅! 망치(결정 085)
   const now = performance.now();
   if (now - lastPop > 45) { // 한꺼번에 죽을 때 소리가 뭉개지지 않게, 이어 죽이면 음이 올라간다
     combo = now - lastPop < 500 ? combo + 1 : 0;
@@ -584,9 +615,15 @@ function drop(i: number) {
   g.enemies[i] = g.enemies[g.enemies.length - 1];
   g.enemies.pop();
 }
-function hit(i: number, dmg: number, kx: number, kz: number, byHammer = false) {
-  const e = g.enemies[i];
-  if (e.kind === 'shield' && byHammer) { dmg *= R.SHIELD_BLOCK; kx *= R.SHIELD_BLOCK; kz *= R.SHIELD_BLOCK; } // 정면 망치는 방패가 막는다
+/** extra: 덧붙는 타격·뿅망치 둘째 타(공중 콤보로 세지 않는다). lift: 세기와 상관없이 이만큼 띄운다(0이면 세게 맞을 때만) */
+function hit(i: number, dmg: number, kx: number, kz: number, src: Src = 'other', extra = false, lift = 0) {
+  const e = g.enemies[i], main = src === 'main', sub = src === 'log' || src === 'pumpkin';
+  if (e.kind === 'shield' && main && !R.WEAPON_STATS[g.weapon].ignoreShield) { dmg *= R.SHIELD_BLOCK; kx *= R.SHIELD_BLOCK; kz *= R.SHIELD_BLOCK; } // 정면 주무기는 방패가 막는다(프라이팬은 무시)
+  const fx = tfx();
+  if (fx.pop && e.kind === 'balloon') { e.kind = ''; dmg = 0; kx = kz = 0; } // 풍선 많은 섬: 첫 타엔 풍선만 터진다 → 연타가 유리
+  if (e.big && e.kind !== 'boss' && Math.hypot(kx, kz) < fx.brace) kx = kz = 0; // 무거운 섬: 약한 타격엔 큰 적이 버틴다 → 넉백 큰 무기가 유리
+  e.by = src;
+  e.byT = g.t;
   e.hp -= dmg;
   e.flash = 0.1;
   sfx.bonk();
@@ -595,7 +632,9 @@ function hit(i: number, dmg: number, kx: number, kz: number, byHammer = false) {
     e.stag = R.BOSS_STAGGER;
   }
   let km = R.knockMul(g.lv.knock) * MT.shoveMul(meta) * knockOf(e) * (e.kind === 'boss' && e.age < 2.5 ? 0 : 1); // 왕좀비는 등장 2.5초 동안 안 밀림
-  if (e.y > 0.3 && e.kind !== 'boss') { // 공중에 뜬 적을 또 치면 더 세게
+  if (sub) km *= R.SUB_KNOCK;
+  if (main && e.kind === 'boss') km *= R.WEAPON_STATS[g.weapon].boss; // 방망이·대형 해머는 왕좀비에게 덜(결정 072처럼 너무 빨리 떨구지 않게)
+  if (!extra && e.y > 0.3 && e.kind !== 'boss') { // 공중에 뜬 적을 또 치면 더 세게
     km *= R.JUGGLE_KNOCK;
     g.juggles++;
     toast(L('공중 콤보!', 'Air combo!'));
@@ -603,7 +642,9 @@ function hit(i: number, dmg: number, kx: number, kz: number, byHammer = false) {
   e.kx += kx * km;
   e.kz += kz * km;
   const low = rule() === 'lowGrav';
-  if (e.kind !== 'boss' && Math.hypot(kx, kz) * km > (low ? R.LOW_GRAV_KNOCK : 7) && e.y <= 0.01) e.vy = low ? R.LOW_GRAV_LIFT : 4.5; // 세게 맞으면 살짝 떠오른다
+  const up = low ? R.LOW_GRAV_LIFT : R.LIFT;
+  if (sub) lift = Math.max(lift, up);
+  if (e.kind !== 'boss' && e.y <= 0.01 && (lift || Math.hypot(kx, kz) * km > (low ? R.LOW_GRAV_KNOCK : 7))) e.vy = Math.max(lift, up); // 세게 맞으면 살짝 떠오른다
   if (e.hp > 0) return;
   if (e.kind === 'bomb') blast(e.x, e.z);
   reward(R.KILL_CHARGE);
@@ -644,6 +685,7 @@ function fall(e: Enemy, byCrumble = false) {
   e.out = true;
   e.vy = 4; // 살짝 튀었다가 떨어진다
   g.falls++;
+  g.fallBy[byCrumble || !e.by || g.t - (e.byT ?? 0) > 2 ? 'other' : e.by]++;
   if (mode === 'bonus') g.bonusFalls++;
   g.chain = g.chainT > 0 ? g.chain + 1 : 1;
   g.chainT = 1.2;
@@ -696,6 +738,8 @@ function gainXp(n: number) {
 }
 
 function hurt(dmg: number) {
+  g.hurts++;
+  if (g.wPhase === 'windup') g.hurtsInWind++; // 준비 중 맞은 횟수(대형 해머 준비가 답답한지 보는 봇 지표)
   g.hp = Math.max(0, g.hp - dmg);
   g.inv = R.HURT_INV;
   g.shake = 0.6;
@@ -721,13 +765,13 @@ function sweep() {
   g.charge = 0;
   g.sweepLock = R.SWEEP_LOCK;
   g.slams++;
-  const rad = R.sweepRadius(g.lv.sweep);
+  const rad = R.sweepRadius(g.lv.sweep) * (g.weapon === 'hammer' ? R.HAMMER_SLAM.radius : 1);
   for (let i = g.enemies.length - 1; i >= 0; i--) {
     const e = g.enemies[i];
     const dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
     if (e.out || d > rad) continue;
     const k = (24 * (1 - (d / rad) * 0.5)) / (e.big ? 1.5 : 1);
-    hit(i, 6, (dx / d) * k, (dz / d) * k);
+    hit(i, 6, (dx / d) * k, (dz / d) * k, 'sweep');
   }
   g.ringT = 0;
   g.ringR = rad;
@@ -814,43 +858,150 @@ function nearest(maxD: number, minD = 0) {
   }
   return best;
 }
-function weapons(dt: number) {
-  const es = g.enemies;
-  // 망치: 가까운 적 쪽으로 부채꼴
-  g.hammerCd -= dt;
-  const gold = g.golden > 0, rad = R.hammerRadius(g.lv.hammer) * MT.hammerMul(meta) + (gold ? 1.2 : 0);
-  // 실제로 맞는 거리(망치 길이 + 적 몸)에 들어왔을 때만 휘두른다. 예전엔 조금 먼 적에도 헛스윙하고 쿨다운을 통째로 기다렸다
-  const near = g.hammerCd <= 0 ? nearest(rad + 0.7) : null;
-  const target = near && Math.hypot(near.x - g.px, near.z - g.pz) <= rad + eRadius(near) ? near : null;
-  if (target) {
-    g.hammerCd = R.hammerCooldown(g.lv.hammer) * (gold ? 0.35 : 1);
-    const yaw = Math.atan2(target.x - g.px, target.z - g.pz), half = R.hammerArc(g.lv.hammer) / 2;
-    let hits = 0;
-    for (let i = es.length - 1; i >= 0; i--) {
-      const e = es[i], dx = e.x - g.px, dz = e.z - g.pz, d = Math.hypot(dx, dz) || 1;
+/** 주무기 한 타: 모양(부채꼴·원·직선) 안의 적을 친다. 평행(flat) 무기는 모두 휘두른 쪽으로 민다. 맞힌 수를 돌려준다 */
+function strike(s: Strike) {
+  const es = g.enemies, fx = Math.sin(s.yaw), fz = Math.cos(s.yaw), circle = s.shape === 'circle';
+  const ox = circle ? s.cx : g.px, oz = circle ? s.cz : g.pz;
+  const pick: [number, number][] = []; // [적 번호, 피해]
+  if (s.shape === 'line') { // 직선: 가까운 순서로 pierce마리까지, 왕좀비에서 멈춤
+    const c: [number, number][] = [];
+    es.forEach((e, i) => {
+      const rx = e.x - ox, rz = e.z - oz, along = rx * fx + rz * fz, side = Math.abs(rx * fz - rz * fx);
+      if (!e.out && along > -eRadius(e) && along <= s.rad + eRadius(e) && side <= s.width / 2 + eRadius(e)) c.push([i, along]);
+    });
+    c.sort((a, b) => a[1] - b[1]);
+    for (const [i] of c.slice(0, s.pierce)) { pick.push([i, s.dmg]); if (es[i].kind === 'boss') break; }
+  } else
+    for (let i = 0; i < es.length; i++) {
+      const e = es[i], dx = e.x - ox, dz = e.z - oz, d = Math.hypot(dx, dz);
+      if (e.out || d > s.rad + eRadius(e)) continue;
+      if (circle) { pick.push([i, d <= s.core ? s.coreDmg : s.dmg]); continue; }
+      let da = Math.atan2(dx, dz) - s.yaw;
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (Math.abs(da) <= s.half) pick.push([i, Math.abs(da) <= s.dmgHalf ? s.dmg : 0]);
+    }
+  // hit()이 죽은 적을 뒤에서 당겨 지우므로 큰 번호부터 친다
+  pick.sort((a, b) => b[0] - a[0]);
+  for (const [i, dmg] of pick) {
+    const e = es[i], hx = circle ? g.px : ox, hz = circle ? g.pz : oz; // 원도 주인공 바깥쪽으로 민다(가운데 기준이면 주인공 쪽으로 밀려 왔다)
+    const dx = e.x - hx, dz = e.z - hz, d = Math.hypot(dx, dz) || 1;
+    const ux = s.flat || s.shape === 'line' ? fx : dx / d, uz = s.flat || s.shape === 'line' ? fz : dz / d;
+    hit(i, dmg, ux * s.knock, uz * s.knock, 'main', s.extra, s.lift);
+  }
+  g.swingT = 0;
+  g.swingYaw = s.yaw;
+  g.swingKind = s.kind;
+  g.swingShape = s.shape;
+  g.swingArc = s.shape === 'fan' ? s.half * 2 : Math.PI * 2;
+  g.swingRad = s.rad;
+  return pick.length;
+}
+/** 타격 순간: 무기 표·숙련대로 첫 타를 치고 다음 타·덧붙는 타격(Lv3·Lv5)을 예약한다 */
+function swingNow(yaw: number) {
+  const w = g.weapon, ws = R.WEAPON_STATS[w], lv = g.lv.hammer, m = g.wMods, gold = g.golden > 0, big = MT.hammerMul(meta);
+  const rad = R.weaponRadius(w, lv, m) * big + (gold ? 1.2 : 0), half = R.weaponArc(w, lv, m) / 2, gap = R.weaponGap(w, lv);
+  const dmg = ws.damage * (gold ? 24 / 14 : 1), km = (gold ? 12 / 9 : 1) * m.knock;
+  const A = lv >= R.WEAPON_LV_A || (m.star && lv >= 2), B = lv >= R.WEAPON_LV_B; // ★: 동작 1이 Lv2부터
+  const knocks = ws.knocks.map((k, i, a) => k * km * (a.length > 1 && i === a.length - 1 ? m.lastKnock : 1));
+  if (w === 'squeaky' && A) knocks[1] *= R.SQUEAKY_LV3_KNOCK;
+  const at = (ws.at ?? 0) * big, n = ++g.wSwings, last = gap * (ws.knocks.length - 1);
+  const base: Strike = {
+    in: 0, kind: 'main', shape: ws.shape, yaw, half, rad, dmg, knock: knocks[0], dmgHalf: half, lift: ws.lift, extra: false, flat: !!ws.flat,
+    cx: g.px + Math.sin(yaw) * at, cz: g.pz + Math.cos(yaw) * at, core: (ws.core ?? 0) * big, coreDmg: (ws.coreDamage ?? 0) * (gold ? 24 / 14 : 1),
+    width: ws.width ?? 0, pierce: (ws.pierce ?? 0) + m.pierce,
+  };
+  let first = base;
+  const later = (o: Partial<Strike>) => g.queue.push({ ...base, dmg: 0, extra: true, ...o });
+  for (let h = 1; h < knocks.length; h++) later({ in: gap * h, kind: 'tap', dmg, knock: knocks[h] }); // 다음 타: 피해 있음, 공중 콤보로 세지 않음
+  if (w === 'hammer') {
+    if (B && n % R.HAMMER_WHIRL.every === 0) first = { ...base, kind: 'whirl', half: Math.PI, rad: rad * R.HAMMER_WHIRL.r, knock: knocks[0] * R.HAMMER_WHIRL.knock };
+    else if (A) later({ in: R.HAMMER_BACK.delay, kind: 'back', yaw: yaw + Math.PI, knock: knocks[0] * R.HAMMER_BACK.knock });
+  } else if (w === 'squeaky') {
+    if (B) later({ in: last, kind: 'shock', shape: 'fan', half: Math.PI, rad: R.SQUEAKY_SHOCK_R, knock: R.SQUEAKY_SHOCK_KNOCK });
+  } else if (w === 'sledge') {
+    if (A) later({ in: R.SLEDGE_AFTER.delay, kind: 'after', rad: rad * R.SLEDGE_AFTER.r, core: 0, knock: knocks[0] * R.SLEDGE_AFTER.knock });
+    if (B && n % R.SLEDGE_DOUBLE.every === 0) later({ in: 0.15, kind: 'double', knock: knocks[0] * R.SLEDGE_DOUBLE.knock });
+  } else if (w === 'twin') {
+    if (A) later({ in: gap * knocks.length, kind: 'tap', knock: R.TWIN_FOURTH * km });
+    if (B) later({ in: gap * (knocks.length - (A ? 0 : 1)), kind: 'spin', half: Math.PI, knock: R.TWIN_SPIN * km });
+  } else if (w === 'pan') {
+    if (B) first = { ...base, lift: R.PAN_FLIP_LIFT };
+    if (A) strike({ ...base, kind: 'back', dmg: 0, extra: true, yaw: yaw + Math.PI, half: R.PAN_BACK.arc / 2, knock: knocks[0] * R.PAN_BACK.knock }); // 앞면보다 먼저: 마지막 휘두름 모양은 앞면
+  } else if (w === 'bat') {
+    if (A && n % R.BAT_FULL.every === 0) { first = { ...base, kind: 'full', knock: knocks[0] * R.BAT_FULL.knock }; g.shake = Math.max(g.shake, R.BAT_FULL.shake); }
+    if (B) later({ in: R.BAT_BACK.delay, kind: 'back', yaw: yaw + Math.PI, knock: knocks[0] * R.BAT_BACK.knock });
+  } else if (w === 'pole') {
+    if (A) later({ in: 0.05, kind: 'ring', shape: 'circle', cx: g.px + Math.sin(yaw) * rad, cz: g.pz + Math.cos(yaw) * rad, rad: R.POLE_RING.r, core: 0, knock: R.POLE_RING.knock * km });
+    if (B && n % R.POLE_FORK.every === 0)
+      for (const sd of [-1, 1]) later({ in: 0.02, kind: 'fork', yaw: yaw + sd * R.POLE_FORK.spread });
+  } else {
+    if (B) first = { ...base, lift: R.LIFT };
+    if (A) g.gusts.push({ x: g.px + Math.sin(yaw) * rad, z: g.pz + Math.cos(yaw) * rad, t: R.FAN_GUST.t });
+  }
+  const hits = strike(first);
+  if (stage().gadget === 'barrel')
+    for (const b of g.gadgets) { // 휘두른 자리의 통은 굴러간다
+      const dx = b.x - g.px, dz = b.z - g.pz, d = Math.hypot(dx, dz) || 1;
       let da = Math.atan2(dx, dz) - yaw;
       da = Math.atan2(Math.sin(da), Math.cos(da));
-      if (e.out || d > rad + eRadius(e) || Math.abs(da) > half) continue;
-      hit(i, gold ? 24 : 14, (dx / d) * (gold ? 12 : 9), (dz / d) * (gold ? 12 : 9), true);
-      hits++;
+      if (b.gone > 0 || b.left > 0 || d > at + rad + 0.5 || Math.abs(da) > Math.max(first.half, 0.6)) continue;
+      b.vx = (dx / d) * R.BARREL_SPEED;
+      b.vz = (dz / d) * R.BARREL_SPEED;
+      b.left = R.BARREL_RANGE;
+      sfx.whack();
     }
-    g.swingT = 0;
-    g.swingYaw = yaw;
-    if (stage().gadget === 'barrel')
-      for (const b of g.gadgets) { // 휘두른 부채꼴 안의 통은 굴러간다
-        const dx = b.x - g.px, dz = b.z - g.pz, d = Math.hypot(dx, dz) || 1;
-        let da = Math.atan2(dx, dz) - yaw;
-        da = Math.atan2(Math.sin(da), Math.cos(da));
-        if (b.gone > 0 || b.left > 0 || d > rad + 0.5 || Math.abs(da) > half) continue;
-        b.vx = (dx / d) * R.BARREL_SPEED;
-        b.vz = (dz / d) * R.BARREL_SPEED;
-        b.left = R.BARREL_RANGE;
-        sfx.whack();
-      }
-    g.face = yaw;
-    g.swings++;
-    if (!hits) { g.misses++; g.hammerCd = 0.2; } // 헛치면 금방 다시 휘두른다
-    hits ? sfx.whack() : sfx.swish();
+  g.swings++;
+  if (!hits) { g.misses++; g.hammerCd = Math.min(g.hammerCd, 0.2); } // 헛치면 금방 다시 휘두른다(후딜은 그대로)
+  hits ? sfx.whack() : sfx.swish();
+}
+/** 지금 휘두르기 단계의 이동 속도 배율(준비·후딜 중 느려짐) */
+const swingMove = () => { const ws = R.WEAPON_STATS[g.weapon]; return g.wPhase === 'windup' ? ws.windMove : g.wPhase === 'recovery' ? ws.recMove : 1; };
+/** 무기 사거리(원 무기는 앞자리 거리 + 반지름) */
+function weaponReach() {
+  const w = g.weapon, ws = R.WEAPON_STATS[w], big = MT.hammerMul(meta);
+  return R.weaponRadius(w, g.lv.hammer, g.wMods) * big + (g.golden > 0 ? 1.2 : 0) + (ws.at ?? 0) * big;
+}
+/** 준비가 끝나면 친다: 타격(타 간격 포함)·후딜 동안 recovery, 그 뒤 쉼 */
+function swingStrike() {
+  const w = g.weapon, ws = R.WEAPON_STATS[w], lv = g.lv.hammer;
+  if (ws.aim) { const t = nearest(weaponReach() + 0.7); if (t) g.wYaw = g.face = Math.atan2(t.x - g.px, t.z - g.pz); } // 연타 무기는 방향을 고정하지 않는다
+  g.wPhase = 'recovery';
+  g.wT = R.weaponGap(w, lv) * (ws.knocks.length - 1) + R.weaponRec(w, lv, g.wMods);
+  g.hammerCd = g.wT + R.weaponRest(w, lv, g.wMods) * (g.golden > 0 ? 0.35 : 1); // 번개 보급은 쉼만 줄인다
+  swingNow(g.wYaw);
+}
+function weapons(dt: number) {
+  const es = g.enemies, w = g.weapon, ws = R.WEAPON_STATS[w], lv = g.lv.hammer;
+  // 주무기(결정 083·086): 무기 표대로 준비(wind) → 타격 → 후딜(rec) → 쉼(rest). 다음 타·Lv3·Lv5 덧붙는 타격은 예약해 뒀다 친다
+  for (let k = g.queue.length - 1; k >= 0; k--) {
+    const q = g.queue[k];
+    if ((q.in -= dt) > 0) continue;
+    g.queue.splice(k, 1);
+    if (strike(q)) sfx.whack();
+  }
+  for (let k = g.gusts.length - 1; k >= 0; k--) { // 부채 Lv3 작은 회오리: 지나는 적을 바깥으로
+    const u = g.gusts[k];
+    if ((u.t -= dt) <= 0) { g.gusts.splice(k, 1); continue; }
+    for (let i = es.length - 1; i >= 0; i--) {
+      const e = es[i], dx = e.x - u.x, dz = e.z - u.z, d = Math.hypot(dx, dz) || 1, o = Math.hypot(e.x, e.z) || 1;
+      if (e.out || e.bladeCd > 0 || d > R.FAN_GUST.r + eRadius(e)) continue;
+      e.bladeCd = 0.4;
+      hit(i, 0, (e.x / o) * R.FAN_GUST.knock, (e.z / o) * R.FAN_GUST.knock, 'main', true);
+    }
+  }
+  g.hammerCd -= dt;
+  if (g.wPhase !== 'idle' && (g.wT -= dt) <= 0) {
+    if (g.wPhase === 'windup') swingStrike();
+    else g.wPhase = 'idle';
+  }
+  // 실제로 맞는 거리(무기 길이 + 적 몸)에 들어왔을 때만 준비를 시작한다. 준비가 긴 무기는 0.5칸 앞에서(걸어오는 적을 미리 노림)
+  const wind = R.weaponWind(w, lv, g.wMods), reach = weaponReach() + (ws.wind >= R.WIND_REACH ? 0.5 : 0);
+  const near = g.hammerCd <= 0 && g.wPhase === 'idle' ? nearest(reach + 0.7) : null;
+  if (near && Math.hypot(near.x - g.px, near.z - g.pz) <= reach + eRadius(near)) {
+    g.wYaw = g.face = Math.atan2(near.x - g.px, near.z - g.pz); // 방향은 준비 시작 때 고정
+    g.wPhase = 'windup';
+    g.wT = wind; // 준비 중 맞아도 취소되지 않는다
+    if (wind <= 0) swingStrike();
   }
   // 통나무: 주인공 근처를 지나가게 섬 끝에서 굴려 보낸다
   if (g.lv.log) {
@@ -860,13 +1011,14 @@ function weapons(dt: number) {
       for (let k = 0; k < R.logCount(g.lv.log); k++) {
         const a = rnd(0, Math.PI * 2), dx = Math.sin(a), dz = Math.cos(a), off = rnd(-1.5, 1.5) + k * 3;
         const sx = g.px - dx * (g.isl + 2) + dz * off, sz = g.pz - dz * (g.isl + 2) - dx * off;
-        g.logs.push({ x: sx, z: sz, dx, dz, left: (g.isl + 2) * 2 + 4, roll: 0 });
+        g.logs.push({ x: sx, z: sz, dx, dz, left: (g.isl + 2) * 2 + 4, roll: 0, warn: R.LOG_WARN });
       }
       sfx.creak();
     }
   }
   for (let k = g.logs.length - 1; k >= 0; k--) {
     const L1 = g.logs[k], step = 10 * dt;
+    if (L1.warn > 0) { L1.warn -= dt; continue; } // 예고 중(디자인이 지나갈 줄을 그린다)
     L1.x += L1.dx * step;
     L1.z += L1.dz * step;
     L1.roll += step / 0.36;
@@ -876,7 +1028,7 @@ function weapons(dt: number) {
       const along = rx * L1.dx + rz * L1.dz, side = rx * L1.dz - rz * L1.dx;
       if (e.out || e.bladeCd > 0 || Math.abs(along) > 0.4 + eRadius(e) || Math.abs(side) > 1.7) continue;
       e.bladeCd = 0.4;
-      hit(i, 8, L1.dx * 13, L1.dz * 13);
+      hit(i, 8, L1.dx * 13, L1.dz * 13, 'log');
     }
   }
   // 호박 폭탄: 조금 떨어진 적에게 던진다
@@ -903,7 +1055,7 @@ function weapons(dt: number) {
       const e = es[i], dx = e.x - pk.x, dz = e.z - pk.z, d = Math.hypot(dx, dz) || 1;
       if (e.out || d > rad) continue;
       const kk = 11 * (1 - (d / rad) * 0.5);
-      hit(i, 12, (dx / d) * kk, (dz / d) * kk);
+      hit(i, 12, (dx / d) * kk, (dz / d) * kk, 'pumpkin');
     }
     burst(pk.x, pk.z, C_PUMPKIN, 10);
     g.ringT = 0.35;
@@ -916,7 +1068,7 @@ function weapons(dt: number) {
 }
 
 const DROP_NAME: Record<R.DropId, string> = {
-  heart: L('회복!', 'Heal!'), charge: L('쾅! 충전!', 'Slam charged!'), golden: L('황금 망치!', 'Golden mallet!'), helper: L('묘지기가 도와줍니다!', 'The keeper joins you!'),
+  heart: L('회복!', 'Heal!'), charge: L('쾅! 충전!', 'Slam charged!'), golden: L('번개 무기!', 'Lightning weapon!'), helper: L('묘지기가 도와줍니다!', 'The keeper joins you!'),
 };
 function openDrop(d: Drop) {
   g.opened++;
@@ -1123,7 +1275,7 @@ function update(dt: number) {
   }
   if (!bonus) g.moving = Math.hypot(mx, mz) > 0.05;
   if (!bonus && g.moving) {
-    const sp = R.moveSpeed(g.lv.speed) * MT.speedMul(meta);
+    const sp = R.moveSpeed(g.lv.speed) * MT.speedMul(meta) * swingMove();
     g.px += mx * sp * dt;
     g.pz += mz * sp * dt;
     g.face = Math.atan2(mx, mz);
@@ -1134,8 +1286,9 @@ function update(dt: number) {
   // 적이 올라온다
   g.spawnCd -= dt;
   if (!bonus && g.spawnCd <= 0) {
-    g.spawnCd = R.spawnInterval(g.t) / stage().spawn / R.calmSpawn(g.calm);
-    for (let i = Math.round(R.spawnBatch(g.t) * stage().spawn); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn();
+    const pk = tfx().pack, at = pk > 1 ? spawnAngle() : undefined; // 덩어리 성질: 한 번에 pk배, 간격도 pk배(총 수는 같음)
+    g.spawnCd = (R.spawnInterval(g.t) / stage().spawn / R.calmSpawn(g.calm)) * pk;
+    for (let i = Math.round(R.spawnBatch(g.t) * stage().spawn * pk); i > 0 && g.enemies.length < R.MAX_ENEMIES; i--) spawn(at);
   }
 
   // 적 이동·낙하·접촉
@@ -1160,7 +1313,7 @@ function update(dt: number) {
     }
     const dx = g.px - e.x, dz = g.pz - e.z, d = Math.hypot(dx, dz) || 1;
     if (e.stag && e.stag > 0) e.stag -= dt;
-    const sp = bonus || (e.stag ?? 0) > 0 ? 0 : (e.kind === 'boss' ? 0.9 : R.enemySpeed(g.t, e.big) * (e.kind === 'balloon' ? 1.15 : 1)) * stage().speed;
+    const sp = bonus || (e.stag ?? 0) > 0 ? 0 : (e.kind === 'boss' ? 0.9 : R.enemySpeed(g.t, e.big) * (e.kind === 'balloon' ? tfx().balloonSpeed : e.big ? 1 : tfx().smallSpeed)) * stage().speed;
     e.x += ((dx / d) * sp + e.kx) * dt;
     e.z += ((dz / d) * sp + e.kz) * dt;
     e.kx *= decay;
@@ -1198,8 +1351,8 @@ function update(dt: number) {
       if (d >= min) continue;
       const push = ((min - d) / d) * 0.5;
       const ka = Math.hypot(a.kx, a.kz), kb = Math.hypot(b.kx, b.kz);
-      if (ka > 3 && ka > kb * 1.5) { const t = 0.7 * knockOf(b); b.kx += a.kx * t; b.kz += a.kz * t; a.kx *= 0.55; a.kz *= 0.55; b.flash = 0.1; }
-      else if (kb > 3 && kb > ka * 1.5) { const t = 0.7 * knockOf(a); a.kx += b.kx * t; a.kz += b.kz * t; b.kx *= 0.55; b.kz *= 0.55; a.flash = 0.1; }
+      if (ka > 3 && ka > kb * 1.5) { const t = 0.7 * knockOf(b); b.kx += a.kx * t; b.kz += a.kz * t; b.by = a.by; b.byT = a.byT; a.kx *= 0.55; a.kz *= 0.55; b.flash = 0.1; }
+      else if (kb > 3 && kb > ka * 1.5) { const t = 0.7 * knockOf(a); a.kx += b.kx * t; a.kz += b.kz * t; a.by = b.by; a.byT = b.byT; b.kx *= 0.55; b.kz *= 0.55; a.flash = 0.1; }
       a.x -= dx * push;
       a.z -= dz * push;
       b.x += dx * push;
@@ -1296,7 +1449,7 @@ function draw(dt: number, now: number) {
   (swing.material as THREE.MeshBasicMaterial).color.setHex(g.golden > 0 ? 0xffd23f : 0xfff3c4);
   hammerMat.color.setHex(g.golden > 0 ? 0xffd23f : 0x9aa3b0);
   const sw = Math.min(1, g.swingT * 1.6), swinging = sw < 1;
-  const half = R.hammerArc(g.lv.hammer) / 2 + 0.3;
+  const half = Math.min(g.swingArc, Math.PI) / 2 + 0.3; // 회오리(360°)도 망치 모양은 반 바퀴만
   const ha = swinging ? g.swingYaw + half - 2 * half * (1 - (1 - sw) ** 2) : g.face + 2.4; // 처음 빠르게, 끝에 느리게
   hammer.visible = mode !== 'bonus';
   hammer.position.set(g.px + Math.sin(ha) * 0.25, swinging ? 0.55 : 0.75, g.pz + Math.cos(ha) * 0.25);
@@ -1343,7 +1496,7 @@ function draw(dt: number, now: number) {
   g.swingT = Math.min(1, g.swingT + dt * 6);
   swing.visible = g.swingT < 1;
   if (swing.visible) {
-    const arc = R.hammerArc(g.lv.hammer);
+    const arc = g.swingArc;
     if (arc !== swingArc) { // 부채꼴은 +z(주인공이 보는 쪽) 가운데로 만든다. 눕히면 xy평면의 -90°가 +z가 된다
       swing.geometry.dispose();
       swing.geometry = new THREE.RingGeometry(0.4, 1, 24, 1, -Math.PI / 2 - arc / 2, arc).rotateX(-Math.PI / 2);
@@ -1351,7 +1504,7 @@ function draw(dt: number, now: number) {
     }
     swing.position.set(g.px, 0.08, g.pz);
     swing.rotation.y = g.swingYaw;
-    swing.scale.setScalar(R.hammerRadius(g.lv.hammer) * MT.hammerMul(meta) * (0.7 + g.swingT * 0.3));
+    swing.scale.setScalar(g.swingRad * (0.7 + g.swingT * 0.3));
     (swing.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - g.swingT);
   }
   g.bits.forEach((b, i) => {
@@ -1805,6 +1958,11 @@ const bestLine = () => {
   const b = loadBest();
   return b.kills ? `<p class="best">${L('최고 기록', 'Best')} · ${clock(b.time)} · ${L('처치', 'KOs')} ${b.kills}</p>` : '';
 };
+/** 이번 판 숙련 점수(rules.ts masteryGain) */
+function masteryEarned() {
+  const lvOf = (w: MT.WeaponId) => R.masteryLevel(meta.mastery[w]);
+  return R.masteryGain(g.falls, curDef.chapter, lvOf(g.weapon), Math.max(...MT.WEAPONS.map(lvOf)));
+}
 function end(win: boolean) {
   mode = 'over';
   win ? sfx.finale() : sfx.fail();
@@ -1832,6 +1990,7 @@ function end(win: boolean) {
     ...meta, coins: meta.coins + coins, cleared: unlocked ? stageIdx + 1 : meta.cleared,
     missionsDone: meta.missionsDone + g.done.length, bossDowns: meta.bossDowns + (g.bossDown ? 1 : 0),
     missions: MS.fillMissions(meta.missions.filter((id) => !g.done.includes(id))), // 달성한 미션은 새 것으로
+    mastery: { ...meta.mastery, [g.weapon]: meta.mastery[g.weapon] + masteryEarned() }, // 숙련(결정 085): 이기든 지든 떨어뜨린 수
   };
   saveMeta();
   const hasNext = win && !dailyNote && stageIdx + 1 < CH.STAGE_COUNT;
@@ -2032,15 +2191,18 @@ if (DEV)
        *  sloppy(0~1)가 클수록 반응이 늦고 가끔 멈칫한다(사람형 0.6). 강화는 지금 저장된 그대로 쓴다 */
       /** chaseBoss: 왕좀비가 나오면 사람처럼 노린다(왕좀비와 섬 중심 사이에서 바깥으로 치기, 근처에서 쾅!) */
       bot: async (runs = 10, sloppy = 0.6, stageNo = 0, chaseBoss = false) => {
-        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number; bossSecs: number; bossPct: number; diedVsBoss: boolean; lvT: number[]; xpAt: number[] }[] = [];
+        const out: { win: boolean; t: number; falls: number; kills: number; swings: number; misses: number; lv: number; boss: boolean; strikes: number; bossSecs: number; bossPct: number; diedVsBoss: boolean; lvT: number[]; xpAt: number[]; juggles: number; fallBy: Record<Src, number>; subAt2: boolean; hurts: number; hurtsInWind: number; weapon: MT.WeaponId }[] = [];
+        const mastery0 = meta.mastery; // 측정 중 숙련이 쌓여 값이 바뀌지 않게 판마다 되돌린다(campaign은 bot(1)이라 쌓인다)
         for (let r = 0; r < runs; r++) {
-          let lastBossPct = 0;
+          if (r) meta = { ...meta, mastery: mastery0 };
+          let lastBossPct = 0, subAt2 = false; // subAt2: 둘째 카드까지 보조 무기를 얻었나(결정 083)
           const lvT: number[] = [], xpAt: number[] = []; // 레벨 업 시각, 10초마다 모은 경험치 합(카드 간격 측정)
           await enterStage(stageNo);
           startRun();
           let lag = [0, 0];
           for (;;) {
             while (lvT.length < g.level) lvT.push(g.t);
+            if (g.level <= 2 && (g.lv.log || g.lv.pumpkin)) subAt2 = true;
             if (g.t >= (xpAt.length + 1) * 10) xpAt.push(g.xpTot);
             if (mode === 'pick') {
               const picks = [...overlay.querySelectorAll<HTMLButtonElement>('.card')];
@@ -2085,7 +2247,7 @@ if (DEV)
             resetInput();
           }
           const win = g.t >= R.RUN_SECONDS - 0.1 || g.bossDown;
-          out.push({ win, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes, bossSecs: g.bossDown ? g.t - R.BOSS_AT : 0, bossPct: g.bossDown ? lastBossPct : 0, diedVsBoss: !win && g.t >= R.BOSS_AT, lvT, xpAt });
+          out.push({ win, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes, bossSecs: g.bossDown ? g.t - R.BOSS_AT : 0, bossPct: g.bossDown ? lastBossPct : 0, diedVsBoss: !win && g.t >= R.BOSS_AT, lvT, xpAt, juggles: g.juggles, fallBy: { ...g.fallBy }, subAt2, hurts: g.hurts, hurtsInWind: g.hurtsInWind, weapon: g.weapon });
           await new Promise((res) => setTimeout(res, 0));
         }
         const avg = (f: (x: (typeof out)[number]) => number) => +(out.reduce((a, x) => a + f(x), 0) / runs).toFixed(2);
@@ -2097,14 +2259,22 @@ if (DEV)
           // 카드 수(레벨 업 횟수)·첫 세 장 받은 시각·보너스 직후(65~80초) 쓰러진 판 수(결정 078)
           cards: avg((x) => x.lv - 1), cardT: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((k) => { const ts = out.filter((x) => x.lvT[k] !== undefined).map((x) => x.lvT[k]); return ts.length ? Math.round(ts.reduce((a, b) => a + b, 0) / ts.length) : null; }),
           xpAt: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((k) => { const v = out.filter((x) => x.xpAt[k] !== undefined).map((x) => x.xpAt[k]); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; }),
-          diedAfterBonus: out.filter((x) => !x.win && x.t >= R.BONUS_AT && x.t < R.BONUS_AT + 15).length };
+          diedAfterBonus: out.filter((x) => !x.win && x.t >= R.BONUS_AT && x.t < R.BONUS_AT + 15).length,
+          // 무기 측정(결정 083): 판당 공중 콤보, 원인별 떨어뜨림 합, 보조 무기(통나무+호박) 비율, 둘째 카드까지 보조 무기를 가진 판
+          juggles: avg((x) => x.juggles), fallBy: Object.fromEntries((['main', 'log', 'pumpkin', 'sweep', 'other'] as Src[]).map((k) => [k, out.reduce((a, x) => a + x.fallBy[k], 0)])),
+          subShare: +(out.reduce((a, x) => a + x.fallBy.log + x.fallBy.pumpkin, 0) / Math.max(1, out.reduce((a, x) => a + x.falls, 0))).toFixed(2),
+          subAt2: out.filter((x) => x.subAt2).length,
+          // 박자(결정 086): 판당 떨어뜨림(숙련 계수), 맞은 횟수 중 준비 동작 중에 맞은 비율, 쓴 무기
+          falls: avg((x) => x.falls), hurts: avg((x) => x.hurts), windHurt: +(out.reduce((a, x) => a + x.hurtsInWind, 0) / Math.max(1, out.reduce((a, x) => a + x.hurts, 0))).toFixed(2),
+          weapon: [...new Set(out.map((x) => x.weapon))].join(',') };
       },
       /** 처음부터 끝까지(결정 068): 늘 다음 스테이지를 하고, 판마다 가장 싼 강화를 살 수 있는 만큼 산다. 다 사는 판·도달 스테이지를 잰다 */
       /** doubles: 6판마다 앞 몇 판에 결과 화면 코인 2배 광고를 본다(하루 6판 중 3판이면 3, 버튼 조건과 같이 두 섬을 깬 뒤부터) */
-      campaign: async (runs = 200, sloppy = 0.85, doubles = 0) => {
+      campaign: async (runs = 200, sloppy = 0.85, doubles = 0) => { // 무기는 새 사용자 기본값(추천 무기 자동, 결정 083)
         meta = MT.freshMeta(); saveMeta();
         const log: string[] = [];
         let maxedAt = 0;
+        const used: Record<string, number> = {}, tenAt: Record<string, string> = {}; // 무기별 쓴 판 수, 숙련 10단계가 된 때
         for (let r = 1; r <= runs; r++) {
           const no = Math.min(meta.cleared, CH.STAGE_COUNT - 1);
           await (window as unknown as { __demo: { bot: (n: number, s: number, no: number, c: boolean) => Promise<unknown> } }).__demo.bot(1, sloppy, no, true);
@@ -2117,12 +2287,20 @@ if (DEV)
           }
           saveMeta();
           if (!maxedAt && MT.PERKS.every((p) => meta.perks[p] >= MT.PERK_MAX[p])) maxedAt = r;
-          if (r % 10 === 0) log.push(`${r}판: ${meta.cleared}스테이지 깸, 코인 ${meta.coins}, 강화 ${MT.PERKS.map((p) => meta.perks[p]).join('/')}`);
+          if (r % 10 === 0) log.push(`${r}판: ${meta.cleared}스테이지 깸, 코인 ${meta.coins}, 강화 ${MT.PERKS.map((p) => meta.perks[p]).join('/')}, 숙련 ${MT.WEAPONS.map((w) => R.masteryLevel(meta.mastery[w])).join('/')}`);
+          used[g.weapon] = (used[g.weapon] ?? 0) + 1;
+          for (const w of MT.WEAPONS) if (!tenAt[w] && R.masteryLevel(meta.mastery[w]) >= R.MASTERY_MAX) tenAt[w] = `${r}판(${used[w]}번째)`;
         }
-        return { maxedAt, cleared: meta.cleared, log };
+        return { maxedAt, cleared: meta.cleared, used, tenAt, log };
       },
       /** 강화 단계를 바로 정한다(강화별 효과를 봇으로 비교할 때) */
       setPerks: (p: Partial<Record<MT.Perk, number>>) => { meta = { ...meta, perks: { ...MT.freshMeta().perks, ...p } }; },
+      /** 주무기를 바로 바꾼다(열림 조건 무시, 다음 판부터). 무기별 봇 비교용 */
+      /** 무기 숙련 단계를 바로 정한다(0~10) */
+      setMastery: (id: MT.WeaponId, n: number) => { meta = { ...meta, mastery: { ...meta.mastery, [id]: R.MASTERY_K * n * n } }; },
+      setWeapon: (id: MT.WeaponId) => { meta = { ...meta, weapon: id, autoWeapon: false }; g.weapon = id; },
+      /** 스테이지 특징을 바꿔 비교: '' 끔, undefined 스테이지 그대로(다음 enterStage부터) */
+      setTrait: (t?: R.Trait | '') => { traitOverride = t; },
       /** 장 규칙을 바꿔 비교: '' 끔, undefined 장 그대로 */
       setRule: (r?: R.Rule | '') => { ruleOverride = r; },
       sweep,

@@ -1,6 +1,7 @@
 // 장(챕터)과 스테이지(결정 067). 장마다 배경·소품·적·장치가 다르고, 장 안 스테이지는 번호로 정해진 무작위로
 // 섬 크기·소품 배치·시간대·무너짐·난이도가 달라진다. 모델은 모두 Kenney CC0(public/models/<팩>/).
-import type { Gadget, Crumble, Rule } from './rules';
+import { seeded, TRAIT_WEAPON, WEAPON_STATS, type Gadget, type Crumble, type Rule, type Trait } from './rules';
+import { WEAPONS, WEAPON_OPEN, type WeaponId } from './meta';
 
 export type PropSpec = { m: string; h: number; n: readonly [number, number]; edge?: boolean };
 export type Chapter = {
@@ -126,10 +127,22 @@ export type TimeOfDay = 'day' | 'dusk' | 'night';
 export type StageDef = {
   no: number; chapter: number; inChapter: number; seed: number; r: number; crumbles: Crumble[];
   spawn: number; big: number; hp: number; speed: number; dmg: number; time: TimeOfDay; finale: boolean;
+  trait?: Trait; // 스테이지 특징(결정 083): 1-5부터. 효과는 rules.ts TRAIT_FX(적 구성)로, 여기 수치에는 곱하지 않는다
 };
 
 /** 장 규칙이 봇 승률을 올린 만큼 그 장을 단단하게(봇 측정, 결정 078). 강풍·스프링은 승률 변화가 작아 그대로 */
 export const RULE_TOUGH: Record<string, number> = { ice: 1.35, lowGrav: 1.15 };
+
+/** 스테이지 성질(결정 085 5장): 1-5부터, 그 장이 끝날 때까지 열리는 무기의 성질만 후보, 바로 앞 스테이지와 같은 성질은 빼고 번호로 고정된 무작위 */
+export const TRAIT_FROM = 4;
+const traitMemo: (Trait | undefined)[] = [];
+export function traitOf(no: number): Trait | undefined {
+  if (no < TRAIT_FROM) return undefined;
+  if (no in traitMemo) return traitMemo[no];
+  const end = (Math.floor(no / STAGES_PER_CHAPTER) + 1) * STAGES_PER_CHAPTER, prev = traitOf(no - 1);
+  const pool = WEAPONS.filter((w) => WEAPON_OPEN[w] <= end).map((w) => WEAPON_STATS[w].good).filter((t) => t !== prev);
+  return (traitMemo[no] = pool[Math.floor(seeded(no * 7919 + 101)() * pool.length)]);
+}
 
 /** 스테이지 번호(0부터) → 그 스테이지의 규칙. 같은 번호면 늘 같다 */
 export function stageDef(no: number, rand: () => number): StageDef {
@@ -147,9 +160,10 @@ export function stageDef(no: number, rand: () => number): StageDef {
   }
   const time: TimeOfDay = ch.night ? 'night' : rand() < 0.2 ? 'dusk' : 'day';
   const tough = RULE_TOUGH[ch.rule ?? ''] ?? 1; // 쉬워지는 장 규칙만큼 적 수·피해를 올린다(결정 078)
+  const trait = traitOf(no);
   const easy = [0.6, 0.75, 0.88][no] ?? 1; // 맨 앞 세 스테이지는 서툴게 해도 깨지게: 적 수는 그대로(줄이면 첫 레벨 업이 41초로 늘어 지루), 피해·큰 적만 줄임(결정 074)
   return {
-    no, chapter, inChapter: s, seed: no * 9973 + 17, r, crumbles, time, finale: s === STAGES_PER_CHAPTER - 1,
+    no, chapter, inChapter: s, seed: no * 9973 + 17, r, crumbles, time, finale: s === STAGES_PER_CHAPTER - 1, trait,
     // 뒤 장을 가파르게(결정 072): 강화가 체감되게 세진 만큼 1장은 그대로 두고 뒤로 갈수록 더 단단하게
     spawn: (0.55 + p * 1.4 + inCh * 0.15) * tough, big: (0.45 + p * 1.4) * easy, hp: 0.6 + p * 3.2 + inCh * 0.3,
     speed: 0.85 + p * 0.3, dmg: (0.45 + p * 0.5) * easy * tough, // p * 1.0 → 0.5(결정 078): 카드가 줄어 뒤 장에서 체력·회복 카드가 덜 쌓인다(적 체력을 낮춰도 승률이 그대로였다)
@@ -159,3 +173,18 @@ export function stageDef(no: number, rand: () => number): StageDef {
 /** 이 장에서 쓰는 모델 경로(불러오기용) */
 export const chapterModels = (c: Chapter) => [...new Set([...c.small, c.big, ...c.props.map((p) => p.m)])];
 export const allModels = () => [...new Set(CHAPTERS.flatMap(chapterModels))];
+
+/** 그 스테이지 성질에 맞는 추천 무기(성질이 없으면 망치). 잠겼는지는 부르는 쪽이 본다(잠겼으면 망치, 결정 085 2-4) */
+export const recommendedWeapon = (d: StageDef): WeaponId => (d.trait ? TRAIT_WEAPON[d.trait] : 'hammer');
+/** 특징 안내 한 줄(화면에 보일 문구) */
+export const TRAIT_TEXT: Record<Trait, readonly [string, string]> = {
+  swarm: ['작은 적이 떼로 몰려오는 섬 · 추천: 망치(쾅!이 자주)', 'Swarming isle · Pick: Mallet (more SLAMs)'],
+  air: ['풍선·폭탄 해골이 많은 섬 · 추천: 뿅망치(빠른 연타)', 'Balloons & bombs · Pick: Squeaky Hammer (rapid taps)'],
+  pack: ['적이 덩어리로 오는 섬 · 추천: 대형 해머(가운데 쿵)', 'Packs of foes · Pick: Sledgehammer (slam the middle)'],
+  rush: ['빠른 적이 달려드는 섬 · 추천: 스펀지 쌍검(준비 없이 다다닥)', 'Rushers · Pick: Twin Foam Swords (no wind-up)'],
+  shield: ['방패 좀비가 많은 섬 · 추천: 프라이팬(방패 무시)', 'Shield zombies · Pick: Frying Pan (ignores shields)'],
+  heavy: ['버티는 큰 적이 많은 섬 · 추천: 야구방망이(멀리 한 방)', 'Heavy brutes · Pick: Bat (big knockback)'],
+  line: ['두 방향에서 줄지어 오는 섬 · 추천: 펀치 막대(일직선 관통)', 'Marching lines · Pick: Punch Pole (pierces a line)'],
+  tough: ['단단한 적이 많은 섬 · 추천: 큰 부채(밀어서 떨어뜨리기)', 'Tough foes · Pick: Giant Fan (blow them off)'],
+};
+export const traitText = (d: StageDef) => (d.trait ? TRAIT_TEXT[d.trait] : undefined);

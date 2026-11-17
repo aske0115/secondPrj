@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { CAPSULE_COST, CAPSULE_REFUND, PERK_MAX, buy, coinsFor, freshMeta, loadMeta, perkCost, rollCapsule } from './meta';
+import { CAPSULE_COST, CAPSULE_REFUND, PERK_MAX, buy, coinsFor, freshMeta, loadMeta, perkCost, rollCapsule, weaponOpen } from './meta';
 
 test('사면 코인이 줄고 레벨이 오르며, 돈이 모자라거나 최대면 못 산다', () => {
   const m = { ...freshMeta(), coins: perkCost('shove', 0) };
@@ -53,4 +53,22 @@ test('저장값의 캐릭터·미션은 모르는 값을 버리고 기본 캐릭
   expect(m.chars).toEqual(['human', 'orc']);
   expect(m.hero).toBe('human');
   expect(m.missions).toEqual(['falls15']);
+});
+
+test('주무기: 깨진 값·안 열린 무기는 망치, 열린 무기는 그대로, 열림은 cleared 경계에서', () => {
+  const load = (weapon: unknown, cleared: number) => loadMeta(JSON.stringify({ weapon, cleared }), 150).weapon;
+  expect(load('sword', 99)).toBe('hammer');
+  expect(load(3, 99)).toBe('hammer');
+  expect(load('bat', 74)).toBe('hammer');
+  expect(load('bat', 75)).toBe('bat');
+  expect(load('squeaky', 8)).toBe('squeaky');
+  expect(weaponOpen('hammer', 0)).toBe(true);
+  expect(weaponOpen('squeaky', 7)).toBe(false);
+  expect(weaponOpen('fan', 120)).toBe(true);
+});
+
+test('숙련 저장: 깨진 값·음수는 0, 없는 무기는 0, 안 열린 무기 값도 보존, 상한으로 자름', () => {
+  const m = loadMeta(JSON.stringify({ cleared: 0, mastery: { hammer: 55.7, squeaky: -3, fan: 'x', sledge: 1e9, sword: 4 } }), 150).mastery;
+  expect(m).toEqual({ hammer: 55, squeaky: 0, sledge: 1e6, twin: 0, pan: 0, bat: 0, pole: 0, fan: 0 });
+  expect(loadMeta(null, 150).mastery.bat).toBe(0);
 });

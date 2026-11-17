@@ -1,4 +1,4 @@
-// 미니어처 섬 지키기 프로토타입(결정 032). 드래그로 이동, 공격은 자동, 게이지가 차면 쓸어내기로 적을 섬 밖으로 민다.
+// 망치섬 / Tumble Isle(결정 032·054). 드래그로 이동, 공격은 자동, 게이지가 차면 쓸어내기로 적을 섬 밖으로 민다.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -1036,7 +1036,7 @@ function showTitle() {
   resetIsland();
   const locked = stageIdx > meta.cleared;
   show(
-    `<div class="top">${coinPill()}<h1 class="big-title">${L('섬 지키기', 'Hold<br>the Isle')}</h1><p class="tag">${L('몰려오는 적을 섬 밖으로 쓸어버리세요', 'Sweep the horde off your tiny island')}</p></div>` +
+    `<div class="top">${coinPill()}<h1 class="big-title">${L('망치섬', 'Tumble<br>Isle')}</h1><p class="tag">${L('망치로 쳐서 섬 밖으로 날려 버리세요', 'Bonk the horde off your tiny island')}</p></div>` +
       `<div style="display:grid;gap:12px;justify-items:center;width:100%">` +
       `<div class="stage"><button data-act="prev" ${stageIdx ? '' : 'disabled'} aria-label="${L('이전 섬', 'Previous isle')}">‹</button>` +
       `<div><small>${L('섬', 'Isle')} ${stageIdx + 1} / ${R.STAGES.length}</small><b>${locked ? '🔒 ' : ''}${stageName(stageIdx)}</b></div>` +

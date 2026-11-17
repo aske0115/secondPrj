@@ -5,8 +5,8 @@
 ## 정보
 | 항목 | 값 |
 |---|---|
-| 번들 ID | `kr.co.daeun.secondprj` (**게임 이름이 정해지면 App Store Connect 등록 전에 바꿉니다.** 등록 뒤에는 못 바꿈) |
-| 앱 표시 이름 | `secondPrj`(가칭) — `ios/App/App/Info.plist`의 `CFBundleDisplayName` |
+| 번들 ID | `kr.co.daeun.tumbleisle` (결정 054에서 `secondprj`에서 바꿈. App Store Connect 등록 뒤에는 못 바꿈) |
+| 앱 표시 이름 | 한국어 기기 **망치섬**, 그 밖 **Tumble Isle** — `ios/App/App/ko.lproj`·`en.lproj`의 `InfoPlist.strings`(기본값은 `Info.plist`의 Tumble Isle) |
 | 버전 | 1.0 (`MARKETING_VERSION`), 빌드 1 |
 | 최소 iOS | 15.0 |
 | 방향 | iPhone 세로 고정, iPad 전체 방향·전체 화면(`UIRequiresFullScreen`) |

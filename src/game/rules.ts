@@ -2,7 +2,11 @@
 export const ISLAND_R = 13; // 가장 큰 섬의 반지름(섬 모양은 이걸로 만들고 섬마다 줄여 쓴다)
 export const RUN_SECONDS = 120;
 export const MAX_ENEMIES = 300;
-export const MAX_HP = 4;
+export const MAX_HP = 100;
+// 적마다 피해가 다르다: 큰 좀비는 피해야 할 상대(결정 049). 숫자는 봇으로 맞춘다
+export const enemyDamage = (big: boolean) => (big ? 34 : 18);
+export const HEAL = 30; // 회복 상자·레벨업 회복
+export const HURT_INV = 0.9; // 맞은 뒤 무적 시간
 export const MAX_LEVEL = 5;
 
 // 시간이 갈수록 더 자주, 더 많이, 더 큰 적이 올라온다

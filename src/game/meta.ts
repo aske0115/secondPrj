@@ -11,7 +11,7 @@ export type Meta = { coins: number; perks: Record<Perk, number>; cleared: number
 export const freshMeta = (): Meta => ({ coins: 0, perks: { vigor: 0, shove: 0, charge: 0, wisdom: 0 }, cleared: 0 });
 
 // 효과
-export const maxHp = (m: Meta) => MAX_HP + m.perks.vigor;
+export const maxHp = (m: Meta) => MAX_HP + 20 * m.perks.vigor;
 export const shoveMul = (m: Meta) => 1 + 0.12 * m.perks.shove;
 export const startChargeFrac = (m: Meta) => 0.15 * m.perks.charge;
 export const xpMul = (m: Meta) => 1 + 0.1 * m.perks.wisdom;

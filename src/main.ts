@@ -455,9 +455,9 @@ function gainXp(n: number) {
   if (g.picks && mode === 'play') showPick();
 }
 
-function hurt() {
-  g.hp--;
-  g.inv = 1.2;
+function hurt(dmg: number) {
+  g.hp = Math.max(0, g.hp - dmg);
+  g.inv = R.HURT_INV;
   g.shake = 0.6;
   sfx.clang();
   sfx.buzz(30);
@@ -647,7 +647,7 @@ const DROP_NAME: Record<R.DropId, string> = {
   heart: L('회복!', 'Heal!'), charge: L('쓸어! 충전!', 'Sweep charged!'), golden: L('황금 망치!', 'Golden mallet!'), helper: L('묘지기가 도와줍니다!', 'The keeper joins you!'),
 };
 function openDrop(d: Drop) {
-  if (d.type === 'heart') g.hp = Math.min(g.maxHp, g.hp + 1);
+  if (d.type === 'heart') g.hp = Math.min(g.maxHp, g.hp + R.HEAL);
   else if (d.type === 'charge') g.charge = R.sweepCost(g.lv.sweep);
   else if (d.type === 'golden') g.golden = R.GOLDEN_SECONDS;
   else g.helper = { x: g.px + 1.2, z: g.pz, t: R.HELPER_SECONDS, cd: 0.4, face: 0, hop: 0 };
@@ -807,7 +807,7 @@ function update(dt: number) {
         g.vz *= 0.75;
         sfx.bonk();
       }
-    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt();
+    } else if (d < 0.35 + eRadius(e) && g.inv <= 0) hurt(R.enemyDamage(e.big));
   }
   // 서로 겹치지 않게 밀어낸다
   // shortcut: 모든 쌍을 비교한다(300마리면 4.5만 쌍), 적 상한을 올리면 격자 나누기로 바꾼다
@@ -980,7 +980,7 @@ const UPS: Record<R.UpgradeId | 'heart', [string, string, string]> = {
   sweep: [L('쓸어내기', 'Sweep'), L('더 넓게 쓸고 더 빨리 찹니다', 'Wider sweep, charges faster'), '#ff8a4c'],
   knock: [L('밀치기', 'Shove'), L('모든 공격이 적을 더 멀리 밀어냅니다', 'Every hit knocks enemies farther'), '#b06ee8'],
   speed: [L('가벼운 신발', 'Light boots'), L('더 빨리 움직입니다', 'Move faster'), '#3fc1a5'],
-  heart: [L('회복', 'Heal'), L('체력을 하나 채웁니다', 'Restore one heart'), '#ff5a6e'],
+  heart: [L('회복', 'Heal'), L(`체력을 ${R.HEAL} 채웁니다`, `Restore ${R.HEAL} HP`), '#ff5a6e'],
 };
 const svg = (body: string, cls = '') => `<svg viewBox="0 0 24 24" class="${cls}">${body}</svg>`;
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
@@ -1010,7 +1010,7 @@ function showPick() {
   show(`<h2 class="big-title" style="font-size:34px">${L('레벨 업!', 'Level up!')}</h2><p class="tag">${L('하나를 고르세요', 'Pick one')}</p><div class="cards">${cards.join('')}</div>`);
 }
 const PERK_UI: Record<MT.Perk, [string, string, string, string]> = {
-  vigor: [L('튼튼한 몸', 'Sturdy'), L('시작 체력 +1', 'Start with +1 heart'), '#ff5a6e', ICON.heart],
+  vigor: [L('튼튼한 몸', 'Sturdy'), L('최대 체력 +20', 'Max HP +20'), '#ff5a6e', ICON.heart],
   shove: [L('묵직한 손', 'Heavy hands'), L('모든 넉백 +12%', 'All knockback +12%'), '#b06ee8', ICON.knock],
   charge: [L('미리 충전', 'Head start'), L('쓸어! 게이지 15%를 채우고 시작', 'Start with 15% Sweep charge'), '#ff8a4c', ICON.sweep],
   wisdom: [L('지혜', 'Wisdom'), L('경험치 +10%', 'XP +10%'), '#35b9ab', '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>'],
@@ -1090,7 +1090,7 @@ overlay.addEventListener('click', (ev) => {
     return showShop();
   }
   if (!id) return;
-  if (id === 'heart') g.hp = Math.min(g.maxHp, g.hp + 1);
+  if (id === 'heart') g.hp = Math.min(g.maxHp, g.hp + R.HEAL);
   else g.lv[id]++;
   overlay.hidden = true;
   mode = 'play';
@@ -1137,11 +1137,20 @@ $('sweep').querySelector('span')!.textContent = L('쓸어!', 'Sweep!');
 // 바뀔 때만 DOM을 고친다(매 프레임 innerHTML을 쓰면 폰에서 느려진다)
 const hud = { hint: $('hint'), toast: $('toast'), warn: $('warn'), hearts: $('hearts'), time: $('time'), lvl: $('lvl'), xp: $('xp').querySelector('i')!, falls: $('falls'), sweep: $('sweep'), dev: $('dev') };
 const shown = { hp: -1, left: -1, level: -1, xp: -1, falls: -1, p: -1, mode: '', warn: -1, hint: '' };
-const HEART = '<path d="M12 21s-8-5-8-11.5A4.5 4.5 0 0 1 12 6.6a4.5 4.5 0 0 1 8 2.9C20 16 12 21 12 21z"/>';
+const hpFill = $('hpFill'), hpLag = $('hpLag'), hpText = $('hpText');
 function drawHud() {
   if (shown.mode !== mode) document.body.dataset.mode = shown.mode = mode;
-  if (shown.hp !== g.hp) {
-    hud.hearts.innerHTML = Array.from({ length: g.maxHp }, (_, i) => svg(HEART, i < g.hp ? '' : i < shown.hp ? 'empty lost' : 'empty')).join('');
+  if (shown.hp !== g.hp) { // 체력 게이지: 줄어든 만큼 흰 잔상이 남았다가 따라 줄어든다
+    const pct = (g.hp / g.maxHp) * 100;
+    hpFill.style.width = `${pct}%`;
+    hpFill.classList.toggle('low', pct <= 30);
+    hpText.textContent = `${Math.ceil(g.hp)}`;
+    if (g.hp < shown.hp) {
+      hud.hearts.classList.remove('hit');
+      void hud.hearts.offsetWidth;
+      hud.hearts.classList.add('hit');
+      setTimeout(() => (hpLag.style.width = hpFill.style.width), 350);
+    } else hpLag.style.width = `${pct}%`;
     shown.hp = g.hp;
   }
   const left = Math.max(0, Math.ceil(mode === 'bonus' ? g.bt : R.RUN_SECONDS - g.t));
@@ -1227,7 +1236,7 @@ if (DEV)
           for (;;) {
             if (mode === 'pick') {
               const picks = [...overlay.querySelectorAll<HTMLButtonElement>('.card')];
-              (picks.find((c) => c.dataset.id === 'heart' && g.hp <= 2) ?? picks.find((c) => R.ATTACKS.includes(c.dataset.id as R.UpgradeId)) ?? picks[0]).click();
+              (picks.find((c) => c.dataset.id === 'heart' && g.hp <= g.maxHp * 0.5) ?? picks.find((c) => R.ATTACKS.includes(c.dataset.id as R.UpgradeId)) ?? picks[0]).click();
               continue;
             }
             if (mode === 'bonusIntro') { overlay.querySelector<HTMLButtonElement>('[data-act="bonusGo"]')!.click(); continue; }

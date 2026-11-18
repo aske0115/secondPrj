@@ -26,7 +26,7 @@ npm exec --yes --package=playwright@1.65.0 -- node marketing/shorts/make-short.m
 | 11.2~13.6 | 큰 부채 바람 | 큰 부채 — 휘이잉~ |
 | 13.6~17.0 | 왕좀비 % 오름 → 망치로 날림(약 15.5초) | 왕좀비도 섬 밖으로! |
 | 17.0~20.2 | 공유 카드(그 판의 베스트 컷 「왕좀비, 퇴장!」) | 제일 멀리 날린 순간을 / 카드로 공유! |
-| 20.2~23.4 | 끝 카드: 아이콘·망치섬·한 줄 소개·Google Play 곧 출시 | — |
+| 20.2~23.4 | 끝 카드: 아이콘·망치섬·한 줄 소개·프로필 링크에서 다운로드 | — |
 
 자막은 위쪽 약 230~420px(1920 기준)에 두어 플랫폼 UI가 덮는 위 10%·아래 20%를 피했습니다. 영어판은 왕좀비가 떨어지는 때가 조금 달라 0.5초쯤 깁니다.
 
@@ -44,7 +44,7 @@ npm exec --yes --package=playwright@1.65.0 -- node marketing/shorts/make-short.m
   하늘에 뜬 작은 섬, 몰려드는 적을 망치로 쳐서 섬 밖으로 날려 보내는 서바이벌 액션.
   대형 해머·야구방망이·스펀지 쌍검·큰 부채… 무기마다 손맛이 달라요.
   왕좀비까지 날려 보내고, 제일 멀리 날린 순간은 카드로 공유하세요.
-  망치섬 — Google Play 곧 출시
+  망치섬 — 프로필 링크에서 다운로드
   #망치섬 #모바일게임 #인디게임 #손맛게임 #서바이벌게임 #로우폴리 #shorts
   ```
 - Title (EN): `Bonk them right off the island!`
@@ -53,13 +53,13 @@ npm exec --yes --package=playwright@1.65.0 -- node marketing/shorts/make-short.m
   A tiny floating island, a horde closing in — bonk them all off the edge.
   Sledgehammer, Bat, Foam Twins, Giant Fan… every weapon feels different.
   Knock off the King Zombie, then share your best knock-off as a card.
-  Tumble Isle — coming soon on Google Play
+  Tumble Isle — download via the link in bio
   #TumbleIsle #mobilegame #indiegame #indiedev #survivalgame #lowpoly #shorts
   ```
 
 ### 인스타그램 릴스
-- 캡션(한): `쳐서 날려라! 하늘섬 망치 서바이벌 🔨 무기마다 손맛이 달라요. 망치섬, Google Play 곧 출시` + 해시태그 `#망치섬 #모바일게임 #인디게임 #게임개발 #손맛게임 #로우폴리 #서바이벌게임`
-- Caption (EN): `Bonk the horde off your tiny island 🔨 Every weapon hits different. Tumble Isle — coming soon on Google Play` + `#TumbleIsle #mobilegame #indiegame #gamedev #indiedev #lowpoly #survivalgame`
+- 캡션(한): `쳐서 날려라! 하늘섬 망치 서바이벌 🔨 무기마다 손맛이 달라요. 망치섬, 프로필 링크에서 다운로드` + 해시태그 `#망치섬 #모바일게임 #인디게임 #게임개발 #손맛게임 #로우폴리 #서바이벌게임`
+- Caption (EN): `Bonk the horde off your tiny island 🔨 Every weapon hits different. Tumble Isle — download via the link in bio` + `#TumbleIsle #mobilegame #indiegame #gamedev #indiedev #lowpoly #survivalgame`
 
 해시태그는 플랫폼마다 5~8개. 경쟁 게임 이름·플레이 시간 숫자·「1위·최고」 같은 과장은 넣지 않습니다.
 

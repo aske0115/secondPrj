@@ -94,13 +94,13 @@ Google Play 먼저(2026-11-17 초안, 기획 담당. 같은 날 무기 8종·언
 맞은 적이 높이 떠오르는 저중력 달 기지.
 
 ■ 져도 남는 성장
-· 판이 끝나면 코인으로 영구 강화 6종: 튼튼한 몸, 큰 망치, 쾅! 충전, 카드 달인, 두 번째 기회, 코인 주머니
+· 판이 끝나면 코인으로 영구 강화 6종: 튼튼한 몸, 큰 무기, 쾅! 충전, 카드 달인, 두 번째 기회, 코인 주머니
 · 캡슐을 돌려 새 캐릭터를 얻으세요. 오크, 묘지기, 흡혈귀, 유령 — 캐릭터마다 특성이 다릅니다
 · 매번 바뀌는 미션 3개, 해낸 만큼 섬에 금 동상과 금 호박 트로피가 쌓입니다
 
 ■ 날마다 오늘의 섬, 그리고 베스트 컷
 · 오늘의 섬은 날마다 바뀌고, 그날 처음 지켜 내면 보너스 코인
-· 한 판에서 가장 많이 이어 떨어뜨린 순간을 사진으로 남겨 바로 공유
+· 한 판에서 가장 멀리 날려 보낸 순간을 놀란 표정까지 클로즈업한 카드로 남겨 바로 공유
 
 ■ 편하게 즐기세요
 · 강제로 뜨는 광고가 없습니다. 광고는 원할 때 직접 눌러 보는 보상형뿐이에요(코인 2배, 이어 하기, 무료 캡슐)
@@ -133,8 +133,8 @@ and when the gauge is full, hit SLAM! to blast everyone around you away.
 · Balloon skeletons, bomb skeletons, shield zombies — each one needs a different trick
 
 ■ 8 weapons, the right one for every stage
-· You start with a mallet. Clear stages to unlock the Squeaky Hammer, Sledgehammer, Twin Foam Swords, Frying Pan, Bat, Punch Pole and Giant Fan, one by one
-· Every weapon feels different: lift the Sledgehammer high and slam it down, rattle off quick hits with the Twin Foam Swords, or crack foes far away with the Bat
+· You start with a mallet. Clear stages to unlock the Squeaky Hammer, Sledgehammer, Foam Twins, Frying Pan, Bat, Punch Pole and Giant Fan, one by one
+· Every weapon feels different: lift the Sledgehammer high and slam it down, rattle off quick hits with the Foam Twins, or crack foes far away with the Bat
 · With the mallet in hand, your SLAM! charges faster and hits wider
 · Every stage has its own twist: floating balloon skeletons, shield zombies, lines marching in from two sides — the matching weapon is equipped for you once it's unlocked, so just swing
 · The more you use a weapon, the more it grows: longer reach, quicker swings, harder hits
@@ -155,13 +155,13 @@ Some chapters even change the rules: double gales on the beach, icy ground where
 and low gravity on the Moon Base that sends them floating high.
 
 ■ Lose a run, still get stronger
-· Spend coins on 6 permanent upgrades: Sturdy, Big Mallet, Slam Charge, Card Master, Second Chance and Coin Pouch
+· Spend coins on 6 permanent upgrades: Sturdy, Big Weapon, Slam Charge, Card Master, Second Chance and Coin Pouch
 · Spin capsules to unlock new heroes — Orc, Keeper, Vampire and Ghost, each with their own perk
 · Three missions that keep changing, and golden statues and pumpkins pile up on your island as trophies
 
 ■ Today's Isle and your Best Shot
 · A new Today's Isle every day, with bonus coins for your first clear
-· Your biggest chain of drops in a run is saved as a photo, ready to share
+· The best knock-off of each run becomes a close-up card, shocked face and all, ready to share
 
 ■ Play your way
 · No forced ads. Ads only play when you choose to watch one for a reward (double coins, continue, free capsule)

@@ -3,7 +3,7 @@
 // 준비: npm run dev (포트 5317)
 // 실행: npm exec --yes --package=playwright@1.65.0 -- node marketing/shorts/make-short.mjs [ko|en ...]
 //   인자 없음 = 한국어·영어 두 벌. 결과: marketing/shorts/tumble-isle-short-{ko,en}.mp4
-// 문구 원칙: 경쟁 게임 이름·플레이 시간 숫자 금지, 출시 전이라 「곧 출시」(AGENTS.md 마케팅 원칙)
+// 문구 원칙: 경쟁 게임 이름·플레이 시간 숫자 금지, 끝 카드는 「프로필 링크에서 다운로드」(사용자 요청)(AGENTS.md 마케팅 원칙)
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
@@ -38,8 +38,8 @@ const SCENES = [
   { id: 'end', sec: 3.2 },
 ];
 const END = {
-  ko: { title: '망치섬', sub: '쳐서 날려라! 하늘섬 망치 서바이벌', store: 'Google Play 곧 출시' },
-  en: { title: 'Tumble Isle', sub: 'Bonk the horde off your tiny island', store: 'Coming soon on Google Play' },
+  ko: { title: '망치섬', sub: '쳐서 날려라! 하늘섬 망치 서바이벌', store: '프로필 링크에서 다운로드' },
+  en: { title: 'Tumble Isle', sub: 'Bonk the horde off your tiny island', store: 'Download via the link in bio' },
 };
 // 보여 줄 게임 안 알림(나머지 — 버티기 시간·미션·코인 알림 등 — 은 숨김: 시간 숫자 문구 금지)
 const TOAST_OK = 'STRIKE|홈런|Home run|떨어뜨렸다|King zombie down|낙하|Drop ×|공중 콤보|Air combo';

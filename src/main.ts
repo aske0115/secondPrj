@@ -695,7 +695,7 @@ function hit(i: number, dmg: number, kx: number, kz: number, src: Src = 'other',
     e.stag = R.BOSS_STAGGER;
   }
   let km = R.knockMul(g.lv.knock) * MT.shoveMul(meta) * knockOf(e) * (e.kind === 'boss' && e.age < 2.5 ? 0 : 1); // 왕좀비는 등장 2.5초 동안 안 밀림
-  if (sub) km *= R.SUB_KNOCK;
+  if (sub) km *= R.SUB_KNOCK * (e.kind === 'boss' ? R.BOSS_SUB_KNOCK : 1);
   if (main && !lift && e.kind !== 'boss') km *= tfx().anchor; // 뭉침 성질: 바닥에 붙은 덩어리는 띄워 치는 타(대형 해머·방망이)에만 제대로 밀린다
   if (main && R.WEAPON_STATS[g.weapon].windPush && e.kind !== 'boss') km /= tfx().weight; // 부채 바람은 무게와 상관없이
   if (main && e.kind === 'boss') km *= R.WEAPON_STATS[g.weapon].boss; // 방망이·대형 해머는 왕좀비에게 덜(결정 072처럼 너무 빨리 떨구지 않게)
@@ -740,7 +740,7 @@ function spawnBoss() {
   g.bossSpawned = true;
   const a = Math.atan2(g.pz, g.px) + Math.PI, d = g.isl * 0.45; // 주인공 반대편, 섬 안쪽에서(가장자리에서 나오면 바로 휩쓸려 떨어졌다)
   g.enemies.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, y: 0, vy: 0, kx: 0, kz: 0, hp: Infinity, big: true, out: false, flash: 0, hop: 0, age: 0, bladeCd: 0, kind: 'boss' });
-  toast(L('왕좀비 등장! 때릴수록 %가 오르고 멀리 날아간다', 'King zombie! Each hit raises % — then knock it off!'));
+  toast(L('왕좀비 등장! 떨어뜨리면 보너스 코인', 'King zombie! Knock it off for bonus coins'));
   sfx.rumble();
   g.shake = 0.8;
 }
@@ -759,13 +759,12 @@ function fall(e: Enemy, byCrumble = false) {
   if (g.chain === R.STRIKE_CHAIN) { g.extra += R.STRIKE_COINS; g.strikes++; sfx.fanfare(); }
   if (e.kind === 'bomb') blast(e.x, e.z);
   if (homer && g.t - g.homerT > 1.5) { g.homerT = g.t; toast(L('홈런!', 'Home run!')); }
-  if (e.kind === 'boss' && !g.bossDown) { // 왕좀비를 떨어뜨리면 그 자리에서 클리어
+  if (e.kind === 'boss' && !g.bossDown) { // 왕좀비를 떨어뜨리면 큰 보상, 판은 끝까지(결정 094)
     g.bossDown = true;
     g.extra += R.bossCoins(curDef.chapter);
-    g.endIn = 1.8;
     g.stop = 0.45;
     g.shake = 1.2;
-    toast(L('왕좀비를 떨어뜨렸다!', 'King zombie down!'));
+    toast(L(`왕좀비를 떨어뜨렸다! +${R.bossCoins(curDef.chapter)} 코인`, `King zombie down! +${R.bossCoins(curDef.chapter)} coins`));
     sfx.fanfare();
     sfx.rumble();
   }
@@ -1316,8 +1315,7 @@ function update(dt: number) {
     if (g.bt <= 0) return endBonus();
   } else {
     g.t += dt;
-    if (g.endIn > 0 && (g.endIn -= dt) <= 0) return end(true);
-    if (g.t >= R.RUN_SECONDS && !g.bossDown) return end(true);
+    if (g.t >= R.RUN_SECONDS) return end(true);
     if (!g.bossSpawned && g.t >= R.BOSS_AT) spawnBoss();
     if (g.t >= R.BONUS_AT && !g.bonusDone) return startBonus();
   }
@@ -1885,6 +1883,7 @@ async function startDaily() {
 // 따로 둔 카메라로 낮고 가까이 한 번만 그린다(점수가 판 최고를 넘을 때만, 판 시간 0.5초에 한 번까지). 카드 글·효과는 판이 끝날 때 얹는다
 let bestShot = '', shotT = -9, shotBest = 0, shotInfo: BS.ShotInfo | null = null;
 let shotPend: { e: Enemy; score: number; kind: BS.Kind; word: BS.KoEn; mesh?: THREE.InstancedMesh; idx?: number } | null = null;
+let shotSeq = Math.floor(Math.random() * 30); // 찍을 때마다 +1 → 앵글·자세·표정(BS.look). 불러올 때 한 번만 무작위라 오늘의 섬 씨앗과 무관
 let shotWord: BS.KoEn = ['', ''], bestCap = ''; // bestCap: 카드에 쓴 캡션(공유 문구·결과 섬네일이 같은 글을 쓰게)
 const shotCam = new THREE.PerspectiveCamera(50, 0.8, 0.2, 140), shotPhoto = document.createElement('canvas');
 const SV = new THREE.Vector3(), SV2 = new THREE.Vector3(), SH = new THREE.Vector3(), SZ = new THREE.Vector2(), SM = new THREE.Matrix4(), SE = new THREE.Euler();
@@ -1902,23 +1901,32 @@ function takeShot() {
   shotT = g.t;
   shotBest = p.score;
   shotWord = p.word;
-  // 적 → 바깥쪽(o)으로 키의 2.3배, 옆(s)으로 1.5배 떨어진 낮은 자리. 옆은 해가 얼굴을 비추는 쪽
+  const lk = BS.look(shotSeq++); // 판마다 다른 앵글·자세·표정(결정 094)
+  // 적 → 바깥쪽(o)·옆(s)·위로 키의 몇 배 떨어진 자리. 옆은 해가 얼굴을 비추는 쪽
   let ox = e.x - g.px, oz = e.z - g.pz;
   const ol = Math.hypot(ox, oz) || 1;
   ox /= ol; oz /= ol;
   const side = oz * 10 - ox * 8 > 0 ? 1 : -1, sx = oz * side, sz = -ox * side; // 해(sun.position)의 가로 방향 (10, 8)
   const cy = e.y + h * 0.5;
-  shotCam.position.set(e.x + (ox * 2.3 + sx * 1.5) * h, cy + h * 0.25, e.z + (oz * 2.3 + sz * 1.5) * h);
-  // 적 쪽으로 기울여 주인공도 뒤에 들어오게
-  SV.set(e.x, cy, e.z).sub(shotCam.position).normalize().multiplyScalar(0.68);
-  SV2.set(g.px, 0.6, g.pz).sub(shotCam.position).normalize().multiplyScalar(0.32);
+  // 앵글: [바깥, 옆, 높이, 시야각, 화면 기울기] — 낮은 옆 / 내려다보기 / 얼굴 꽉 / 올려다보기(하늘 배경) / 멀리(섬·주인공까지)
+  const [co, cs, ch, fov, roll] = ([[2.3, 1.5, 0.25, 50, -0.14], [1.4, 0.9, 2.3, 52, 0.1], [2.0, 0.5, 0.15, 40, -0.22], [2.1, 1.1, -1.5, 56, 0.2], [3.4, 2.0, 0.9, 42, -0.06]] as const)[lk.cam];
+  shotCam.position.set(e.x + (ox * co + sx * cs) * h, cy + h * ch, e.z + (oz * co + sz * cs) * h);
+  if (Math.hypot(shotCam.position.x, shotCam.position.z) < g.isl + 0.5) shotCam.position.y = Math.max(shotCam.position.y, 0.4); // 섬 위면 땅속에 들어가지 않게
+  shotCam.fov = fov;
+  // 적 쪽으로 기울여 주인공도 뒤에 들어오게(얼굴 꽉 앵글은 적만)
+  const hw = lk.cam === 2 ? 0.08 : 0.32;
+  SV.set(e.x, cy, e.z).sub(shotCam.position).normalize().multiplyScalar(1 - hw);
+  SV2.set(g.px, 0.6, g.pz).sub(shotCam.position).normalize().multiplyScalar(hw);
   shotCam.lookAt(SV.add(SV2).add(shotCam.position));
-  shotCam.rotateZ(-0.14 * side); // 살짝 기운 화면(만화 컷 느낌)
+  shotCam.rotateZ(roll * side); // 기운 화면(만화 컷 느낌)
   shotCam.updateMatrixWorld();
-  // 적은 카메라를 보며 뒤로 젖혀진다(얼굴이 보이게). 찍은 뒤 원래 자세로 되돌린다(같은 프레임 본 화면에 보이지 않게)
-  const yaw = Math.atan2(shotCam.position.x - e.x, shotCam.position.z - e.z), lean = -0.5;
+  // 자세: [젖힘, 가로 배율, 세로 배율, 거꾸로] — 뒤로 젖힘 / 앞으로 고꾸라짐 / 거꾸로 / 길쭉 / 납작. 찍은 뒤 원래대로 되돌린다(같은 프레임 본 화면에 보이지 않게)
+  const [lean, wx, wy, flip] = ([[-0.5, 1, 1, 0], [0.65, 1, 1, 0], [2.75, 1, 1, 1], [-0.3, 0.78, 1.4, 0], [-0.2, 1.32, 0.66, 0]] as const)[lk.pose];
+  const yaw = Math.atan2(shotCam.position.x - e.x, shotCam.position.z - e.z) + (flip ? Math.PI : 0), py = e.y + (flip ? h : 0); // 거꾸로면 얼굴이 카메라를 보게 돌리고 발이 위로 가게 올린다
   const inst = e.kind !== 'boss' && p.mesh && p.idx !== undefined ? { m: p.mesh, i: p.idx } : null;
   SE.copy(bossMesh.rotation);
+  SV2.copy(bossMesh.scale);
+  const bossY = bossMesh.position.y;
   if (inst) inst.m.getMatrixAt(inst.i, SM);
   // 사진 크기 4:5, 가로 최대 720px(캔버스 안에 들어가게)
   const cvs = renderer.domElement, pr = renderer.getPixelRatio(), target = renderer.getRenderTarget();
@@ -1929,9 +1937,9 @@ function takeShot() {
   // 카메라와 적 사이를 가리는 나무·바위는 이 한 장에서만 숨긴다
   const hid = props.filter((q) => segDist(q.x, q.z, shotCam.position.x, shotCam.position.z, e.x, e.z) < 0.5 + q.s * 0.6);
   try {
-    if (e.kind === 'boss') bossMesh.rotation.set(lean, yaw, 0, 'YXZ');
+    if (e.kind === 'boss') { bossMesh.rotation.set(lean, yaw, 0, 'YXZ'); bossMesh.scale.set(SV2.x * wx, SV2.y * wy, SV2.z * wx); bossMesh.position.y = py; }
     else if (inst) {
-      put(inst.m, inst.i, e.x, e.y, e.z, yaw, es, es, es, lean);
+      put(inst.m, inst.i, e.x, py, e.z, yaw, es * wx, es * wy, es * wx, lean);
       inst.m.instanceMatrix.needsUpdate = true;
     }
     for (const q of hid) { put(q.m, q.i, q.x, q.y, q.z, 0, 0); q.m.instanceMatrix.needsUpdate = true; }
@@ -1944,17 +1952,19 @@ function takeShot() {
   } finally {
     hid.forEach(place);
     bossMesh.rotation.copy(SE);
+    bossMesh.scale.copy(SV2);
+    bossMesh.position.y = bossY;
     if (inst) { inst.m.setMatrixAt(inst.i, SM); inst.m.instanceMatrix.needsUpdate = true; }
     renderer.setRenderTarget(target);
     renderer.setViewport(0, 0, SZ.x, SZ.y);
   }
   // 얼굴 자리(모델 앞쪽 머리 높이)와 날아온 길을 사진 픽셀로
   const toPx = (v: THREE.Vector3): [number, number] => (v.project(shotCam), [((v.x + 1) / 2) * pw, ((1 - v.y) / 2) * ph]);
-  M.compose(P.set(e.x, e.y, e.z), Q.setFromEuler(EUL.set(lean, yaw, 0)), S.set(es, es, es));
+  M.compose(P.set(e.x, py, e.z), Q.setFromEuler(EUL.set(lean, yaw, 0)), S.set(es * wx, es * wy, es * wx));
   const [fx, fy] = toPx(SH.set(0, FACE[0], FACE[1]).applyMatrix4(M)), [rx, ry] = toPx(SH.set(FACE[2], FACE[0], FACE[1]).applyMatrix4(M));
   const trail: [number, number][] = [];
   for (let k = 8; k >= 0; k--) { const t = k * 0.06; trail.push(toPx(SH.set(e.x - e.kx * t, Math.max(0.3, cy - e.vy * t - 15 * t * t), e.z - e.kz * t))); }
-  shotInfo = { face: { x: fx, y: fy, r: Math.hypot(rx - fx, ry - fy), a: Math.atan2(ry - fy, rx - fx) }, trail, kind: p.kind };
+  shotInfo = { face: { x: fx, y: fy, r: Math.hypot(rx - fx, ry - fy), a: Math.atan2(ry - fy, rx - fx) }, trail, kind: p.kind, mood: lk.mood, cam: lk.cam, pose: lk.pose };
 }
 /** 점 (x, z)에서 선분 a→b까지 거리(가로 평면) */
 function segDist(x: number, z: number, ax: number, az: number, bx: number, bz: number) {
@@ -1967,7 +1977,7 @@ const FACE = [0.72, 0.3, 0.26] as const;
 function makeCard(stageNo: number) {
   bestCap = '';
   if (!shotInfo) return '';
-  bestCap = L(...BS.caption(shotInfo.kind, g.falls));
+  bestCap = L(...BS.caption(shotInfo.kind, shotSeq + g.falls, shotInfo.mood));
   return BS.drawCard(shotPhoto, shotInfo, {
     caption: bestCap, word: L(...shotWord), brand: L('망치섬', 'Tumble Isle'),
     line: `${stageName(stageNo)} · ${L('떨어뜨림', 'Knocked off')} ${g.falls}`,
@@ -2122,7 +2132,7 @@ function resume() {
 }
 // ───── 보상형 광고(결정 073): 직접 누를 때만, 판 밖에서만 ─────
 /** 광고 보고 이어하기: 판당 1번, 60초를 넘겼거나 왕좀비가 나왔을 때만(아까운 순간). 오늘의 섬은 공정하게 뺀다 */
-const canContinue = () => !g.continued && !dailyRun && ads.adReady() && (g.t >= 60 || g.bossSpawned);
+const canContinue = () => !g.continued && !dailyRun && ads.adReady() && (g.t >= 45 || g.bossSpawned);
 function offerContinue(note = '', withAd = true) {
   pausedFrom = 'play';
   mode = 'pause';
@@ -2425,7 +2435,7 @@ function end(win: boolean) {
   const missions = doneMs.length ? missionList(g.done, g.done)
     : `<details class="fold"><summary>${L(`다음 미션 ${meta.missions.length}개`, `${meta.missions.length} next missions`)}</summary>${missionList(meta.missions)}</details>`;
   show(
-    `<h1 class="big-title" style="font-size:32px">${g.bossDown ? L('왕좀비 격파!', 'King zombie down!') : win ? L('섬을 지켰다!', 'Isle defended!') : L('섬을 빼앗겼다', 'The isle fell')}</h1>` +
+    `<h1 class="big-title" style="font-size:32px">${!win ? L('섬을 빼앗겼다', 'The isle fell') : g.bossDown ? L('왕좀비까지 격파!', 'Isle saved, king down!') : L('섬을 지켰다!', 'Isle defended!')}</h1>` +
       `<div class="panel result"><small>${L('떨어뜨림', 'Knocked off')}</small><strong class="falls">${g.falls}</strong>` +
       `<p class="line">${clock(sec)} · ${L('처치', 'KOs')} ${g.kills} · Lv ${g.level + 1}</p>` +
       `<div class="earn"><i></i>+${coins}</div>${doubleBtn()}` +
@@ -2622,7 +2632,7 @@ if (DEV)
         const mastery0 = meta.mastery; // 측정 중 숙련이 쌓여 값이 바뀌지 않게 판마다 되돌린다(campaign은 bot(1)이라 쌓인다)
         for (let r = 0; r < runs; r++) {
           if (r) meta = { ...meta, mastery: mastery0 };
-          let lastBossPct = 0, subAt2 = false; // subAt2: 둘째 카드까지 보조 무기를 얻었나(결정 083)
+          let lastBossPct = 0, bossDownT = 0, subAt2 = false; // subAt2: 둘째 카드까지 보조 무기를 얻었나(결정 083)
           const lvT: number[] = [], xpAt: number[] = []; // 레벨 업 시각, 10초마다 모은 경험치 합(카드 간격 측정)
           await enterStage(stageNo);
           startRun();
@@ -2642,6 +2652,7 @@ if (DEV)
             if (mode !== 'play') break;
             let mx = 0, mz = 0, near: Enemy | null = null, nd = 99;
             const boss = chaseBoss ? g.enemies.find((e) => e.kind === 'boss' && !e.out) : undefined;
+            if (g.bossDown && !bossDownT) bossDownT = g.t;
             if (boss) { // 왕좀비 안쪽 2.3칸 자리로
               lastBossPct = boss.pct ?? 0;
               const bd = Math.hypot(boss.x, boss.z) || 1, tx = boss.x - (boss.x / bd) * 2.3, tz = boss.z - (boss.z / bd) * 2.3;
@@ -2674,8 +2685,8 @@ if (DEV)
             if (shotDue()) { draw(0, performance.now()); takeShot(); } // 봇은 화면을 그리지 않으므로 베스트 컷만 그때 그린다
             resetInput();
           }
-          const win = g.t >= R.RUN_SECONDS - 0.1 || g.bossDown;
-          out.push({ win, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes, bossSecs: g.bossDown ? g.t - R.BOSS_AT : 0, bossPct: g.bossDown ? lastBossPct : 0, diedVsBoss: !win && g.t >= R.BOSS_AT, lvT, xpAt, juggles: g.juggles, fallBy: { ...g.fallBy }, subAt2, hurts: g.hurts, hurtsInWind: g.hurtsInWind, weapon: g.weapon });
+          const win = g.t >= R.RUN_SECONDS - 0.1;
+          out.push({ win, t: g.t, falls: g.falls, kills: g.kills, swings: g.swings, misses: g.misses, lv: g.level + 1, boss: g.bossDown, strikes: g.strikes, bossSecs: g.bossDown ? bossDownT - R.BOSS_AT : 0, bossPct: g.bossDown ? lastBossPct : 0, diedVsBoss: !win && g.t >= R.BOSS_AT, lvT, xpAt, juggles: g.juggles, fallBy: { ...g.fallBy }, subAt2, hurts: g.hurts, hurtsInWind: g.hurtsInWind, weapon: g.weapon });
           await new Promise((res) => setTimeout(res, 0));
         }
         const avg = (f: (x: (typeof out)[number]) => number) => +(out.reduce((a, x) => a + f(x), 0) / runs).toFixed(2);
@@ -2775,6 +2786,8 @@ if (DEV)
       renderOnce: () => { draw(1 / 60, performance.now()); if (shotDue()) takeShot(); composer.render(); drawHud(); return !!shotInfo; },
       /** 베스트 컷 카드(그림 주소). 판이 끝난 뒤에만 있다 */
       card: () => bestShot,
+      /** 마지막 베스트 컷의 종류·표정·앵글·자세(카드 다양성 확인용) */
+      shotLook: () => shotInfo && { kind: shotInfo.kind, mood: shotInfo.mood, cam: shotInfo.cam, pose: shotInfo.pose },
       end,
       // 그리기 한 번(후처리 포함)에 드는 평균 시간(ms). 창이 가려져 fps가 안 맞을 때 쓴다
       bench: (n = 30) => {

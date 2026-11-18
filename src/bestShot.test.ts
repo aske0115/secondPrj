@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { caption, judge, word } from './bestShot';
+import { CAMS, MOODS, POSES, caption, judge, look, word } from './bestShot';
 
 const base = { speed: 12, chain: 1, boss: false, big: false, src: 'main', homer: false, last: false };
 describe('베스트 컷 순간 고르기', () => {
@@ -21,5 +21,25 @@ describe('베스트 컷 순간 고르기', () => {
     expect(caption('last', 5)).toEqual(caption('last', 0));
     expect(word('sweep', 'bat')[0]).toBe('쾅!');
     expect(word('main', 'bat')[0]).toBe('딱!');
+  });
+});
+
+describe('베스트 컷 다양성(결정 094)', () => {
+  it('이웃한 번호끼리 앵글·자세·표정이 모두 다르고, 30장이면 모든 조합 요소가 나온다', () => {
+    for (let n = 0; n < 30; n++) {
+      const a = look(n), b = look(n + 1);
+      expect(a.cam).not.toBe(b.cam);
+      expect(a.pose).not.toBe(b.pose);
+      expect(a.mood).not.toBe(b.mood);
+    }
+    const all = Array.from({ length: 30 }, (_, n) => look(n));
+    expect(new Set(all.map((l) => l.cam)).size).toBe(CAMS);
+    expect(new Set(all.map((l) => l.pose)).size).toBe(POSES);
+    expect(new Set(all.map((l) => l.mood)).size).toBe(MOODS.length);
+  });
+  it('보통 타격은 표정 캡션이 섞이고, 왕좀비 캡션은 표정과 무관', () => {
+    const caps = new Set(Array.from({ length: 12 }, (_, n) => caption('hit', n, 'cry')[0]));
+    expect(caps.has('엄마아아~!')).toBe(true);
+    expect(caption('boss', 0, 'cry')).toEqual(caption('boss', 0));
   });
 });

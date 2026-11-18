@@ -108,14 +108,14 @@ test('왕좀비는 보너스·무너짐 경고와 겹치지 않고, 판이 끝�
   for (const st of STAGES) for (const c of st.crumbles) expect(Math.abs(c.at - BOSS_AT)).toBeGreaterThan(BOSS_WARN);
 });
 
-test('새 적은 정해진 시간 뒤에만 나온다', () => {
+test('새 적은 정해진 시간 뒤에만 나온다(90초 판 시각, 결정 094)', () => {
   for (let i = 0; i < 100; i++) {
-    expect(pickKind(10, false, () => i / 100)).toBe('');
-    expect(pickKind(40, true, () => i / 100)).toBe('');
+    expect(pickKind(7, false, () => i / 100)).toBe('');
+    expect(pickKind(30, true, () => i / 100)).toBe('');
   }
-  const later = new Set(Array.from({ length: 100 }, (_, i) => pickKind(60, false, () => i / 100)));
+  const later = new Set(Array.from({ length: 100 }, (_, i) => pickKind(45, false, () => i / 100)));
   expect(later.has('balloon') && later.has('bomb')).toBe(true);
-  expect(new Set(Array.from({ length: 100 }, (_, i) => pickKind(60, true, () => i / 100))).has('shield')).toBe(true);
+  expect(new Set(Array.from({ length: 100 }, (_, i) => pickKind(45, true, () => i / 100))).has('shield')).toBe(true);
 });
 
 test('날씨는 보너스 판과 겹치지 않고 판 안에서 끝난다', () => {

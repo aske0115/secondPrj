@@ -60,7 +60,7 @@ Google Play 먼저(2026-11-17 초안, 기획 담당. 같은 날 무기 8종·언
 ```
 망치로 쾅! 몰려오는 좀비와 해골을 하늘에 뜬 작은 섬 밖으로 날려 버리세요.
 섬 가장자리는 점점 무너지고, 판 막바지엔 금관을 쓴 왕좀비가 나타납니다.
-끝까지 버티면 승리, 왕좀비를 섬 밖으로 떨어뜨리면 그 자리에서 승리!
+끝까지 버티면 승리, 왕좀비까지 섬 밖으로 떨어뜨리면 보너스 코인이 와르르!
 
 손가락으로 끌어 움직이기만 하세요. 망치는 가까이 온 적을 알아서 휘두릅니다.
 레벨 업마다 카드 세 장 중 하나를 골라 점점 강해지고,
@@ -120,7 +120,7 @@ Google Play 먼저(2026-11-17 초안, 기획 담당. 같은 날 무기 8종·언
 ```
 Grab your hammer and bonk zombies and skeletons right off a tiny floating island!
 The edges keep crumbling, and near the end the crowned King Zombie shows up.
-Hold out to win — or knock him off the island for an instant victory.
+Hold out to win — and knock him off the island for a big coin bonus.
 
 Just drag to move. Your hammer swings on its own when enemies get close.
 Pick one of three cards on every level-up to grow stronger,
@@ -184,7 +184,7 @@ and low gravity on the Moon Base that sends them floating high.
 | 쾅!(SLAM!) 게이지 기술 | 결정 056 |
 | 망치·통나무·호박 폭탄·내려찍기, 연쇄 밀림 | 결정 039·056 |
 | 무너지는 섬·빨간 경고 띠 | 결정 036 |
-| 끝까지 버티면 승리, 왕좀비를 떨어뜨리면 즉시 승리, % 게이지 | 결정 057·064 |
+| 끝까지 버티면 승리, 왕좀비를 떨어뜨리면 보너스 코인(판은 계속), % 게이지 | 결정 057·064·094 |
 | STRIKE(이어서 6마리)·공중 콤보·풍선/폭탄 해골·방패 좀비 | 결정 058 |
 | 낙하산 상자 4종(「번개 무기 / lightning weapon」) | 결정 042·055, 이름은 결정 083(옛 「황금 망치」에서 바뀜, `main.ts` `DROP_NAME`) |
 | 무기 8종 이름·언락 순서(진행으로만 열림) | 결정 085·085 보완·086, `meta.ts` `WEAPON_OPEN`, 이름은 `docs/WEAPONS.md` 2-1 |
@@ -251,7 +251,7 @@ Bonk zombies off the island with your hammer.
 |---|---|---|---|
 | 1 | 망치로 쾅! 섬 밖으로 날려라 | Bonk them off the island! | 쾅!으로 적 여러 마리가 사방으로 날아가는 순간 |
 | 2 | 섬이 무너진다, 버텨라! | The island is crumbling. Hold on! | 빨간 경고 띠와 함께 가장자리 적이 떨어지는 장면 |
-| 3 | 왕좀비를 떨어뜨리면 바로 승리 | Knock the King Zombie off for the win | 금관 왕좀비와 % 게이지, 가장자리 근처 |
+| 3 | 왕좀비를 떨어뜨리면 보너스 코인 | Knock off the King Zombie for bonus coins | 금관 왕좀비와 % 게이지, 가장자리 근처 |
 | 4 | 새 무기를 열고, 손맛을 바꿔라 | Unlock new weapons, each with its own feel | 대형 해머를 들어 올렸다 쿵! 내려찍는 순간(착지 원·흙먼지 고리), 또는 스펀지 쌍검 다다닥 잔상 |
 | 5 | 섬마다 어울리는 무기로 | The right weapon for every island | 시작 화면 스테이지 카드 「추천: ○○」 + 무기 시트(8칸, 일부는 잠김 그림자) |
 | 6 | 장 10개, 스테이지 150개 | 10 chapters, 150 stages | 서로 다른 장(과자 섬·달 기지·눈 마을 등) 섞어 보이기 |

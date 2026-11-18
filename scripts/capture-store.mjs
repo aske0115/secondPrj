@@ -30,7 +30,7 @@ const SLIDES = {
   kr: [
     ['1-strike', '망치로 쾅! 섬 밖으로 날려라', '둘러싼 적을 한 방에 우르르'],
     ['2-crumble', '섬이 무너진다, 버텨라!', '가장자리가 무너지면 그 위의 적도 함께 떨어져요'],
-    ['3-boss', '왕좀비를 떨어뜨리면 바로 승리', '때릴수록 % 가 올라 더 멀리 날아갑니다'],
+    ['3-boss', '왕좀비를 떨어뜨리면 보너스 코인', '때릴수록 % 가 올라 더 멀리 날아갑니다'],
     ['4-weapons', '새 무기를 열고, 손맛을 바꿔라', '대형 해머·스펀지 쌍검·야구방망이·큰 부채'],
     ['5-pick', '섬마다 어울리는 무기로', '추천 무기를 알아서 쥐여 줘요'],
     ['6-isles', '장 10개, 스테이지 150개', '풀밭·해적 해변·눈 마을·과자 섬·달 기지'],
@@ -40,7 +40,7 @@ const SLIDES = {
   en: [
     ['1-strike', 'Bonk them off the island!', 'Send the whole crowd flying'],
     ['2-crumble', 'The island is crumbling. Hold on!', 'Foes on the edge go down with it'],
-    ['3-boss', 'Knock the King Zombie off for the win', 'Every hit raises his % and sends him farther'],
+    ['3-boss', 'Knock off the King Zombie for bonus coins', 'Every hit raises his % and sends him farther'],
     ['4-weapons', 'Unlock new weapons, each with its own feel', 'Sledgehammer, Foam Twins, Bat, Giant Fan'],
     ['5-pick', 'The right weapon for every island', 'The recommended weapon is equipped for you'],
     ['6-isles', '10 chapters, 150 stages', 'Meadows, pirate beaches, snow, candy and the moon'],

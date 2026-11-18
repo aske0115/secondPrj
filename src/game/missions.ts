@@ -12,7 +12,7 @@ export const MISSIONS: readonly Mission[] = [
   { id: 'juggle3', stat: 'juggles', target: 3, coins: 20, ko: '공중 콤보 3번', en: '3 air combos' },
   { id: 'open2', stat: 'opened', target: 2, coins: 15, ko: '보급 상자 2개 열기', en: 'Open 2 supply crates' },
   { id: 'slam3', stat: 'slams', target: 3, coins: 15, ko: '쾅! 3번 쓰기', en: 'Use SLAM! 3 times' },
-  { id: 'time90', stat: 'time', target: 90, coins: 20, ko: '1:30 버티기', en: 'Survive 1:30' },
+  { id: 'time90', stat: 'time', target: 60, coins: 20, ko: '1:00 버티기', en: 'Survive 1:00' } /* id는 저장값이라 그대로, 판이 90초가 되어 60초로(결정 094) */,
   { id: 'level10', stat: 'level', target: 10, coins: 20, ko: '레벨 10 찍기', en: 'Reach level 10' },
   { id: 'boss1', stat: 'boss', target: 1, coins: 60, ko: '왕좀비 떨어뜨리기', en: 'Knock off the king zombie' },
 ];

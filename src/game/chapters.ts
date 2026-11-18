@@ -1,6 +1,6 @@
 // 장(챕터)과 스테이지(결정 067). 장마다 배경·소품·적·장치가 다르고, 장 안 스테이지는 번호로 정해진 무작위로
 // 섬 크기·소품 배치·시간대·무너짐·난이도가 달라진다. 모델은 모두 Kenney CC0(public/models/<팩>/).
-import { seeded, TRAIT_WEAPON, WEAPON_STATS, type Gadget, type Crumble, type Rule, type Trait } from './rules';
+import { seeded, PACE, BONUS_AT, BOSS_AT, WEATHER_AT, TRAIT_WEAPON, WEAPON_STATS, type Gadget, type Crumble, type Rule, type Trait } from './rules';
 import { WEAPONS, WEAPON_OPEN, type WeaponId } from './meta';
 
 export type PropSpec = { m: string; h: number; n: readonly [number, number]; edge?: boolean };
@@ -161,8 +161,8 @@ export function stageDef(no: number, rand: () => number): StageDef {
   const first = 25 + Math.round(rand() * 10), gap = Math.floor((90 - first) / nCr);
   const crumbles: Crumble[] = [];
   for (let k = 0; k < nCr; k++) {
-    const at = first + k * gap;
-    if (Math.abs(at - 65) <= 4 || Math.abs(at - 95) <= 4 || Math.abs(at - 55) <= 2) continue; // 보너스·왕좀비·날씨 경고와 겹치지 않게
+    const at = Math.round((first + k * gap) / PACE); // 120초 판 기준 시각을 90초 판으로(결정 094)
+    if (Math.abs(at - BONUS_AT) <= 4 || Math.abs(at - BOSS_AT) <= 4 || Math.abs(at - WEATHER_AT) <= 2) continue; // 보너스·왕좀비·날씨 경고와 겹치지 않게
     crumbles.push({ at, r: Math.round((r - (k + 1) * (r - 8.4) / nCr) * 10) / 10 });
   }
   const time: TimeOfDay = ch.night ? 'night' : rand() < 0.2 ? 'dusk' : 'day';

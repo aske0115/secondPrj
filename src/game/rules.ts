@@ -1,7 +1,10 @@
 import type { WeaponId } from './meta';
 // 숫자 규칙만 모은 곳. 화면·입력과 떼어 두어 테스트하고, 손맛 조정은 여기 숫자만 고친다.
 export const ISLAND_R = 13; // 가장 큰 섬의 반지름(섬 모양은 이걸로 만들고 섬마다 줄여 쓴다)
-export const RUN_SECONDS = 120;
+export const RUN_SECONDS = 90; // 120 → 90(결정 094, 사용자: 2분은 루즈함)
+/** 난이도 곡선·적 종류 등장·무너짐은 120초 판 기준으로 만든 것을 빨리 감는다. 끝 세기는 옛 판의 105초 자리:
+ *  옛 판은 왕좀비를 떨어뜨려 대개 100초쯤 끝났고, 120초 끝까지 감으면 2-1 봇 승률이 80 → 55%로 떨어졌다(결정 094) */
+export const PACE = 105 / RUN_SECONDS;
 export const MAX_ENEMIES = 300;
 export const MAX_HP = 100;
 // 적마다 피해가 다르다: 큰 좀비는 피해야 할 상대(결정 049). 숫자는 봇으로 맞춘다
@@ -14,11 +17,11 @@ export const MAX_LEVEL = 5;
 // 초반은 부드럽게(사람은 봇보다 늦게 피한다), 뒤로 갈수록 빽빽하게(결정 043)
 // cap: 처음 간격의 상한(결정 091, 스테이지의 gap — 배우는 섬 1-1~1-4만 0.45, 나머지 1 = 상한 없음). 상한이 풀리는 뒤 곡선은 그대로.
 // 모든 스테이지에 걸면(0.45) 2장 승률·스테이지 50이 떨어졌다(봇)
-export const spawnInterval = (t: number, cap = 1) => Math.max(0.12, Math.min(cap, 1.0 - t * 0.0075));
-export const spawnBatch = (t: number) => 1 + Math.floor(t / 30);
-export const bigChance = (t: number) => Math.min(0.3, Math.max(0, (t - 20) / 260));
-export const enemyHp = (t: number, big: boolean) => (big ? 32 + t * 0.5 : 8 + t * 0.12);
-export const enemySpeed = (t: number, big: boolean) => (big ? 1.3 : 1.8 + t * 0.007);
+export const spawnInterval = (t: number, cap = 1) => Math.max(0.12, Math.min(cap, 1.0 - t * PACE * 0.0075));
+export const spawnBatch = (t: number) => 1 + Math.floor((t * PACE) / 30);
+export const bigChance = (t: number) => Math.min(0.3, Math.max(0, (t * PACE - 20) / 260));
+export const enemyHp = (t: number, big: boolean) => (big ? 32 + t * PACE * 0.5 : 8 + t * PACE * 0.12);
+export const enemySpeed = (t: number, big: boolean) => (big ? 1.3 : 1.8 + t * PACE * 0.007);
 
 // 뒤 레벨일수록 가파르게: 무너짐으로 한꺼번에 떨어질 때 모든 스킬이 만렙이 되던 폭주를 막는다
 export const xpNeed = (level: number) => Math.round(4 + level * 3 + level * level * 0.4);
@@ -164,7 +167,7 @@ export const knockMul = (lv: number) => 1 + 0.5 * lv; // 모든 공격의 밀어
 export const moveSpeed = (lv: number) => 5.5 * (1 + 0.12 * lv);
 
 // 박치기 보너스: 판 중간에 한 번, 생존 시계를 멈추고 튕겨서 돌진하는 미니게임
-export const BONUS_AT = 65;
+export const BONUS_AT = 49; // 65 → 49(결정 094, 90초 판의 가운데쯤)
 export const BONUS_SECONDS = 15;
 export const BONUS_COIN = 3; // 보너스 중 떨어뜨린 한 마리당
 /** 손가락을 튕긴 길이(px)로 돌진 속도를 정한다. 너무 짧으면 무시 */
@@ -217,11 +220,11 @@ export type Stage = {
 export const STAGES: readonly Stage[] = [
   // 크기는 노는 방식: 좁을수록 가장자리가 가까워 떨어뜨리기가 늘어난다. 넓히면 오히려 어려워져서(봇 측정) 첫 섬이 가장 넓다(결정 045)
   { name: ['풀밭 섬', 'Meadow Isle'], r: 13, grass: 0x86c46a, cliff: 0xb89468, sky: 0xbfe6f5, sun: 0xfff0d2,
-    crumbles: [{ at: 40, r: 11.5 }, { at: 80, r: 10 }], spawn: 0.55, big: 0.45, hp: 0.6, speed: 0.85, dmg: 0.45, gadget: 'spring' }, // 첫 섬은 배우는 섬: 처음 하는 사람도 몇 판 안에 깨게(결정 050)
+    crumbles: [{ at: 30, r: 11.5 }, { at: 60, r: 10 }], spawn: 0.55, big: 0.45, hp: 0.6, speed: 0.85, dmg: 0.45, gadget: 'spring' }, // 첫 섬은 배우는 섬: 처음 하는 사람도 몇 판 안에 깨게(결정 050)
   { name: ['단풍 섬', 'Maple Isle'], r: 12, grass: 0xd9a24e, cliff: 0x9a6b4a, sky: 0xf6dcc0, sun: 0xffd9a8,
-    crumbles: [{ at: 30, r: 11 }, { at: 60, r: 10 }, { at: 90, r: 9 }], spawn: 0.7, big: 0.8, hp: 0.78, speed: 0.92, dmg: 0.6, gadget: 'barrel' },
+    crumbles: [{ at: 23, r: 11 }, { at: 43, r: 10 }, { at: 62, r: 9 }], spawn: 0.7, big: 0.8, hp: 0.78, speed: 0.92, dmg: 0.6, gadget: 'barrel' },
   { name: ['달빛 묘지 섬', 'Moonlit Isle'], r: 10.5, grass: 0x5f8a7a, cliff: 0x6b6378, sky: 0x2d3555, sun: 0xb9c6ff,
-    crumbles: [{ at: 25, r: 10 }, { at: 50, r: 9.4 }, { at: 75, r: 8.8 }, { at: 100, r: 8.2 }], spawn: 0.95, big: 1, hp: 1, speed: 1, dmg: 0.8, gadget: 'lantern' },
+    crumbles: [{ at: 19, r: 10 }, { at: 33, r: 9.4 }, { at: 56, r: 8.8 }, { at: 82, r: 8.2 }], spawn: 0.95, big: 1, hp: 1, speed: 1, dmg: 0.8, gadget: 'lantern' },
 ];
 export const CRUMBLE_WARN = 3;
 export const islandRadius = (t: number, st: Stage = STAGES[0]) => st.crumbles.reduce((r, c) => (t >= c.at ? c.r : r), st.r);
@@ -231,8 +234,8 @@ export const crumbleWarning = (t: number, st: Stage = STAGES[0]) => st.crumbles.
 // 낙하산 보급: 판 중간중간 하늘에서 상자가 내려온다. 밟으면 열린다(결정 042)
 export const DROPS = ['heart', 'charge', 'golden', 'helper'] as const;
 export type DropId = (typeof DROPS)[number];
-export const FIRST_DROP = 20;
-export const DROP_INTERVAL = 28; // 사용자: 17초는 너무 잦음(결정 055)
+export const FIRST_DROP = 15;
+export const DROP_INTERVAL = 21; // 28 → 21(결정 094): 90초 판에서도 상자 수는 그대로 // 사용자: 17초는 너무 잦음(결정 055)
 export const DROP_FALL = 3; // 내려오는 데 걸리는 초
 export const DROP_LIFE = 12; // 땅에 닿은 뒤 이만큼 지나면 사라진다
 export const GOLDEN_SECONDS = 8;
@@ -245,8 +248,9 @@ export function pickDrop(hpFull: boolean, rand = Math.random, helperUsed = false
   return pool[Math.floor(rand() * pool.length)];
 }
 
-// ───── 왕좀비 피날레(결정 057): 체력으로는 못 쓰러뜨리고 섬 밖으로 밀어야 한다. 떨어뜨리면 그 자리에서 클리어 ─────
-export const BOSS_AT = 95;
+// ───── 왕좀비 피날레(결정 057): 체력으로는 못 쓰러뜨리고 섬 밖으로 밀어야 한다.
+// 떨어뜨리면 큰 보상만 받고 판은 끝까지 간다(결정 094: 클리어는 늘 「버티기」 하나. 예전엔 그 자리에서 클리어) ─────
+export const BOSS_AT = 70; // 마지막 20초(결정 094)
 export const BOSS_WARN = 3;
 export const BOSS_SCALE = 2.6;
 export const BOSS_KNOCK = 0.35; // 무거워서 덜 밀린다(0%일 때)
@@ -255,6 +259,7 @@ export const BOSS_PCT_PER_DMG = 0.8;
 export const bossKnock = (pct: number) => BOSS_KNOCK * (1 + pct / 45);
 export const BOSS_STAGGER = 0.7; // 맞으면 이만큼 멈칫(걷지 않음)
 export const BOSS_DMG = 30;
+export const BOSS_SUB_KNOCK = 0.2; // 통나무·호박은 왕좀비를 거의 못 민다(결정 094: 통나무만 골라도 왕좀비가 밀려 떨어졌다)
 export const bossCoins = (stage: number) => 80 * (stage + 1);
 
 // ───── 손맛 보너스(결정 058) ─────
@@ -267,6 +272,7 @@ export type Kind = '' | 'balloon' | 'shield' | 'bomb' | 'boss';
 /** 시간이 지나며 하나씩 등장: 풍선 해골(15초~), 폭탄 해골(30초~), 방패 좀비(45초~) */
 export function pickKind(t: number, big: boolean, rand = Math.random, trait?: Trait): Kind {
   const r = rand(), fx = trait ? TRAIT_FX[trait] : TRAIT_FX0;
+  t *= PACE;
   if (big) return t >= fx.shieldAt && r < fx.shield ? 'shield' : '';
   if (t >= fx.shieldAt && r > 1 - fx.smallShield) return 'shield';
   if (t >= fx.airAt && r < fx.balloon) return 'balloon';
@@ -329,7 +335,7 @@ export const LANTERN_PULL = 4.5; // 이 거리 안의 적을 끌어당긴다
 export const LANTERN_FORCE = 9;
 
 // ───── 날씨(결정 059): 판마다 한 번, 한쪽으로 모두 미끄러진다 ─────
-export const WEATHER_AT = 55;
+export const WEATHER_AT = 38;
 export const WEATHER_SECONDS = 6;
 export const WEATHER_PUSH = 12; // 넉백으로 더해 가장자리 적은 떨어진다(자기들끼리 밀린 것과 구분되는 기준 2를 넘김)
 export type Weather = 'wind' | 'quake';

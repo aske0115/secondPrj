@@ -127,6 +127,7 @@ export type TimeOfDay = 'day' | 'dusk' | 'night';
 export type StageDef = {
   no: number; chapter: number; inChapter: number; seed: number; r: number; crumbles: Crumble[];
   spawn: number; big: number; hp: number; speed: number; dmg: number; time: TimeOfDay; finale: boolean;
+  gap: number; // 처음 생성 간격 상한(결정 091, 1이면 없음)
   trait?: Trait; // 스테이지 특징(결정 083): 1-5부터. 효과는 rules.ts TRAIT_FX(적 구성)로, 여기 수치에는 곱하지 않는다
 };
 
@@ -143,6 +144,12 @@ export function traitOf(no: number): Trait | undefined {
   const pool = WEAPONS.filter((w) => WEAPON_OPEN[w] <= end).map((w) => WEAPON_STATS[w].good).filter((t) => t !== prev);
   return (traitMemo[no] = pool[Math.floor(seeded(no * 7919 + 101)() * pool.length)]);
 }
+
+/** 성질 없는 1-1~1-4(배우는 섬) 배수(결정 091). 망치가 저절로 쳐서 예전엔(적 수 ×1, 피해 ×0.6~0.88) 가만히 서 있어도 깼다:
+ *  적 수를 늘려 처음 20초 안에 서 있는 주인공에게 닿게 하고, 한 번 피해를 키워 서 있으면 약 70초에 쓰러진다(움직이면 대부분 깸, 봇 측정).
+ *  big은 결정 074의 큰 적 줄임 그대로. 장 첫 스테이지끼리 비교하는 테스트는 이 배수를 빼고 본다(장 규칙 RULE_TOUGH처럼) */
+export const INTRO = { spawn: [1.5, 1.4, 1.3, 1.3], big: [0.6, 0.75, 0.88, 1], dmg: [1.4, 1.3, 1.3, 1.3], gap: [0.45, 0.45, 0.45, 0.45] }; // gap: 처음 생성 간격 상한(rules.ts spawnInterval)
+export const intro = (no: number, k: keyof typeof INTRO) => INTRO[k][no] ?? 1;
 
 /** 스테이지 번호(0부터) → 그 스테이지의 규칙. 같은 번호면 늘 같다 */
 export function stageDef(no: number, rand: () => number): StageDef {
@@ -161,12 +168,11 @@ export function stageDef(no: number, rand: () => number): StageDef {
   const time: TimeOfDay = ch.night ? 'night' : rand() < 0.2 ? 'dusk' : 'day';
   const tough = RULE_TOUGH[ch.rule ?? ''] ?? 1; // 쉬워지는 장 규칙만큼 적 수·피해를 올린다(결정 078)
   const trait = traitOf(no);
-  const easy = [0.6, 0.75, 0.88][no] ?? 1; // 맨 앞 세 스테이지는 서툴게 해도 깨지게: 적 수는 그대로(줄이면 첫 레벨 업이 41초로 늘어 지루), 피해·큰 적만 줄임(결정 074)
   return {
-    no, chapter, inChapter: s, seed: no * 9973 + 17, r, crumbles, time, finale: s === STAGES_PER_CHAPTER - 1, trait,
+    no, chapter, inChapter: s, seed: no * 9973 + 17, r, crumbles, time, finale: s === STAGES_PER_CHAPTER - 1, trait, gap: intro(no, 'gap'),
     // 뒤 장을 가파르게(결정 072): 강화가 체감되게 세진 만큼 1장은 그대로 두고 뒤로 갈수록 더 단단하게
-    spawn: (0.55 + p * 1.4 + inCh * 0.15) * tough, big: (0.45 + p * 1.4) * easy, hp: 0.6 + p * 3.2 + inCh * 0.3,
-    speed: 0.85 + p * 0.3, dmg: (0.45 + p * 0.5) * easy * tough, // p * 1.0 → 0.5(결정 078): 카드가 줄어 뒤 장에서 체력·회복 카드가 덜 쌓인다(적 체력을 낮춰도 승률이 그대로였다)
+    spawn: (0.55 + p * 1.4 + inCh * 0.15) * intro(no, 'spawn') * tough, big: (0.45 + p * 1.4) * intro(no, 'big'), hp: 0.6 + p * 3.2 + inCh * 0.3,
+    speed: 0.85 + p * 0.3, dmg: (0.45 + p * 0.5) * intro(no, 'dmg') * tough, // p * 1.0 → 0.5(결정 078): 카드가 줄어 뒤 장에서 체력·회복 카드가 덜 쌓인다(적 체력을 낮춰도 승률이 그대로였다)
   };
 }
 

@@ -197,3 +197,8 @@ test('숙련: 단계 경계(30·n²), 10단계 상한, 줄은 A→B→C 순서, 
   expect(masteryGain(10, 0, 3, 5)).toBe(10);
   expect(masteryGain(300, 2, 5, 5)).toBe(100); // 뒤 장은 장 번호+1로 나눔
 });
+
+test('처음 간격 상한(결정 091): cap이 있으면 처음엔 그 이하, 상한이 풀린 뒤(약 73초~)엔 cap 없는 값과 같다', () => {
+  for (let t = 0; t < 73; t++) expect(spawnInterval(t, 0.45)).toBeLessThanOrEqual(0.45);
+  for (let t = 74; t <= RUN_SECONDS; t++) expect(spawnInterval(t, 0.45)).toBe(spawnInterval(t));
+});

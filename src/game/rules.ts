@@ -12,7 +12,9 @@ export const MAX_LEVEL = 5;
 
 // 시간이 갈수록 더 자주, 더 많이, 더 큰 적이 올라온다
 // 초반은 부드럽게(사람은 봇보다 늦게 피한다), 뒤로 갈수록 빽빽하게(결정 043)
-export const spawnInterval = (t: number) => Math.max(0.12, 1.0 - t * 0.0075);
+// cap: 처음 간격의 상한(결정 091, 스테이지의 gap — 배우는 섬 1-1~1-4만 0.45, 나머지 1 = 상한 없음). 상한이 풀리는 뒤 곡선은 그대로.
+// 모든 스테이지에 걸면(0.45) 2장 승률·스테이지 50이 떨어졌다(봇)
+export const spawnInterval = (t: number, cap = 1) => Math.max(0.12, Math.min(cap, 1.0 - t * 0.0075));
 export const spawnBatch = (t: number) => 1 + Math.floor(t / 30);
 export const bigChance = (t: number) => Math.min(0.3, Math.max(0, (t - 20) / 260));
 export const enemyHp = (t: number, big: boolean) => (big ? 32 + t * 0.5 : 8 + t * 0.12);

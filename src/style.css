@@ -278,7 +278,7 @@ body:not([data-mode="play"]):not([data-mode="bonus"]) #pause { visibility: hidde
 .result .fold summary { box-shadow: none; background: #f3ead8; text-align: center; font-size: 13px; }
 .result .fold summary::after { float: none; }
 button.bestcut { width: min(100%, 320px); padding: 6px 12px 6px 6px; border: 0; gap: 10px; font: inherit; }
-button.bestcut img { width: 40px; height: 52px; border-radius: 8px; }
+button.bestcut img { width: 56px; height: 70px; border-radius: 8px; }
 button.bestcut span { flex: 1; display: grid; font-size: 13px; font-weight: 800; }
 button.bestcut b { color: var(--gold-deep); }
 .bestcut svg.share { width: 22px; height: 22px; stroke: var(--ink); stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round; }

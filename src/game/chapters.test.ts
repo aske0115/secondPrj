@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { CHAPTERS, RULE_TOUGH, STAGE_COUNT, allModels, stageDef } from './chapters';
+import { CHAPTERS, RULE_TOUGH, STAGE_COUNT, allModels, intro, stageDef } from './chapters';
 import { BONUS_AT, BOSS_AT, seeded } from './rules';
 
 const def = (no: number) => stageDef(no, seeded(no * 9973 + 17));
@@ -26,9 +26,10 @@ test('모든 스테이지: 섬 크기·무너짐이 안전한 범위이고 보�
   }
 });
 
-test('뒤 스테이지일수록 어렵다(장 처음끼리 비교, 장 규칙 보정은 빼고)', () => {
+test('뒤 스테이지일수록 어렵다(장 처음끼리 비교, 장 규칙·배우는 섬 보정은 빼고)', () => {
   const plain = (ch: number, k: 'spawn' | 'big' | 'hp' | 'speed' | 'dmg') =>
-    def(ch * 15)[k] / (k === 'spawn' || k === 'dmg' ? RULE_TOUGH[CHAPTERS[ch].rule ?? ''] ?? 1 : 1);
+    def(ch * 15)[k] / (k === 'spawn' || k === 'dmg' ? RULE_TOUGH[CHAPTERS[ch].rule ?? ''] ?? 1 : 1) /
+    (k === 'spawn' || k === 'dmg' || k === 'big' ? intro(ch * 15, k) : 1);
   for (let ch = 1; ch < CHAPTERS.length; ch++)
     for (const k of ['spawn', 'big', 'hp', 'speed', 'dmg'] as const) expect(plain(ch, k)).toBeGreaterThan(plain(ch - 1, k));
 });
@@ -42,4 +43,9 @@ test('장 규칙 4개: 규칙이 있는 장은 안내 문구가 한국어·영�
 test('장에서 쓰는 모델 파일이 모두 저장소에 있다', () => {
   const files = new Set(Object.keys(import.meta.glob('/public/models/**/*.{glb,obj}')));
   for (const m of allModels()) expect(files.has(`/public/models/${m}.glb`) || files.has(`/public/models/${m}.obj`), m).toBe(true);
+});
+
+test('처음 생성 간격 상한은 배우는 섬 1-1~1-4에만(결정 091)', () => {
+  for (const no of [0, 1, 2, 3]) expect(def(no).gap).toBe(0.45);
+  expect(def(4).gap).toBe(1);
 });

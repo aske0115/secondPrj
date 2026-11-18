@@ -479,7 +479,7 @@ type Strike = {
 type Drop = { x: number; z: number; y: number; type: R.DropId; life: number };
 type Helper = { x: number; z: number; t: number; cd: number; face: number; hop: number };
 type Gadget = { x: number; z: number; hx: number; hz: number; cd: number; squash: number; vx: number; vz: number; left: number; gone: number; on: number };
-type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number; warn: number }; // warn: 남은 예고 시간(0보다 크면 아직 출발 전, 결정 083)
+type Log = { x: number; z: number; dx: number; dz: number; left: number; roll: number; warn: number; hit: Set<Enemy> }; // warn: 남은 예고 시간(0보다 크면 아직 출발 전, 결정 083)
 type Pumpkin = { x0: number; z0: number; x: number; z: number; tx: number; tz: number; t: number; y: number };
 type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: THREE.Color };
 /** 이번 판 주무기: 「추천 무기 자동」(meta.autoWeapon)이 켜져 있으면 추천 무기(잠겼으면 망치), 꺼져 있으면 고른 무기(결정 083·085) */
@@ -1096,7 +1096,7 @@ function weapons(dt: number) {
       for (let k = 0; k < R.logCount(g.lv.log); k++) {
         const a = rnd(0, Math.PI * 2), dx = Math.sin(a), dz = Math.cos(a), off = rnd(-1.5, 1.5) + k * 3;
         const sx = g.px - dx * (g.isl + 2) + dz * off, sz = g.pz - dz * (g.isl + 2) - dx * off;
-        g.logs.push({ x: sx, z: sz, dx, dz, left: (g.isl + 2) * 2 + 4, roll: 0, warn: R.LOG_WARN });
+        g.logs.push({ x: sx, z: sz, dx, dz, left: (g.isl + 2) * 2 + 4, roll: 0, warn: R.LOG_WARN, hit: new Set() });
       }
       sfx.creak();
     }
@@ -1111,8 +1111,8 @@ function weapons(dt: number) {
     for (let i = es.length - 1; i >= 0; i--) {
       const e = es[i], rx = e.x - L1.x, rz = e.z - L1.z;
       const along = rx * L1.dx + rz * L1.dz, side = rx * L1.dz - rz * L1.dx;
-      if (e.out || e.bladeCd > 0 || Math.abs(along) > 0.4 + eRadius(e) || Math.abs(side) > 1.7) continue;
-      e.bladeCd = 0.4;
+      if (e.out || L1.hit.has(e) || Math.abs(along) > 0.4 + eRadius(e) || Math.abs(side) > 1.7) continue;
+      L1.hit.add(e);
       hit(i, 8, L1.dx * 13, L1.dz * 13, 'log');
     }
   }

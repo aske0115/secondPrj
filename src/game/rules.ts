@@ -237,9 +237,10 @@ export const DROP_FALL = 3; // 내려오는 데 걸리는 초
 export const DROP_LIFE = 12; // 땅에 닿은 뒤 이만큼 지나면 사라진다
 export const GOLDEN_SECONDS = 8;
 export const HELPER_SECONDS = 7; // 사용자: 12초는 너무 오래 잡음(결정 055)
-/** 체력이 가득이면 회복은 빼고 고른다 */
-/** 체력이 가득이면 회복은, 이번 판에 도우미가 이미 왔으면 도우미는 빼고 고른다(도우미는 판당 1번) */
-export function pickDrop(hpFull: boolean, rand = Math.random, helperUsed = false): DropId {
+/** 체력이 가득이면 회복은, 이번 판에 도우미가 이미 왔으면 도우미는 빼고 고른다(도우미는 판당 1번).
+ *  체력이 절반 아래(low)면 반드시 회복(결정 092: 사용자 "1-4 회복 없어서 깨기 어려웠을 것") */
+export function pickDrop(hpFull: boolean, rand = Math.random, helperUsed = false, low = false): DropId {
+  if (low) return 'heart';
   const pool = DROPS.filter((d) => !(hpFull && d === 'heart') && !(helperUsed && d === 'helper'));
   return pool[Math.floor(rand() * pool.length)];
 }

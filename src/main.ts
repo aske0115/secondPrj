@@ -1172,7 +1172,7 @@ function supplies(dt: number) {
   if (g.dropCd <= 0 && g.drops.length < dropViews.length) {
     g.dropCd = R.DROP_INTERVAL;
     const a = rnd(0, Math.PI * 2), r = rnd(0.15, 0.65) * g.isl;
-    g.drops.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: 12, type: R.pickDrop(g.hp >= g.maxHp, Math.random, g.helperUsed), life: R.DROP_LIFE });
+    g.drops.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, y: 12, type: R.pickDrop(g.hp >= g.maxHp, Math.random, g.helperUsed, g.hp < g.maxHp / 2), life: R.DROP_LIFE });
     if (g.drops[g.drops.length - 1].type === 'helper') g.helperUsed = true;
   }
   for (let k = g.drops.length - 1; k >= 0; k--) {

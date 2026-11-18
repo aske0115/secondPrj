@@ -7,7 +7,7 @@ Google Play 먼저, iOS는 개발자 계정 문제로 나중. 패키지 `kr.co.d
 
 ## 0. 사용자가 할 일 — 순서대로
 
-1. 업로드 키 준비(§1): 쓸어킬 키를 링크로 연결(이 PC는 완료). 다른 PC는 §1-2로 받아서 연결.
+1. 업로드 키 준비(§1): 쓸어킬 키를 링크로 연결(이 PC는 완료). 다른 PC는 §1-2(비공개 저장소 `aske0115/app-signing-keys`)로 받기.
 2. 서명된 출시 AAB 만들기(§2) → `~/keys/release/tumble-isle-1.0.0-1.aab`로 복사.
 3. 개인정보 처리방침을 daeun.dev에 올리기(§4) → `https://daeun.dev/privacy/tumble-isle/` 열리는지 확인.
 4. Play Console 앱 만들기 → 앱 콘텐츠 선언(§3) → 스토어 등록정보(§5).
@@ -35,18 +35,16 @@ ls -l ~/keys/tumble-isle-signing.properties   # → … -> …/neon-rush-signing
 
 키·비밀번호 파일은 **공개 저장소(secondPrj·neon-rush 등)에 절대 올리지 않는다.** 백업해 둔 비공개 보관 위치에서 받아 같은 자리에 둔 뒤 1-1을 한다.
 
-1. 보관소에서 두 파일을 받는다: `neon-rush-upload.jks`, `neon-rush-signing.properties`
-   - 비공개 git 보관소에서 받을 때:
-     ```bash
-     git clone <키 보관 비공개 저장소 주소> ~/keys-src   # 사용자 확인 필요: 보관소 이름
-     mkdir -p ~/keys && chmod 700 ~/keys
-     cp ~/keys-src/neon-rush-upload.jks ~/keys-src/neon-rush-signing.properties ~/keys/
-     rm -rf ~/keys-src                                  # 사본을 남기지 않는다
-     ```
-2. 권한을 막는다: `chmod 600 ~/keys/neon-rush-upload.jks ~/keys/neon-rush-signing.properties`
-3. 설정 파일 안의 `storeFile=` 경로가 **이 컴퓨터의 경로**인지 본다(예: `/Users/<이 PC 사용자>/keys/neon-rush-upload.jks`). 다르면 그 한 줄만 고친다.
-4. 1-1의 링크를 만든다.
-5. 확인: `cd android && ./gradlew bundleRelease` 뒤 `jarsigner -verify app/build/outputs/bundle/release/app-release.aab` → `jar verified.` (실제 광고가 들어가지 않은 빌드로 확인해도 서명 확인은 된다. 확인 뒤 AAB는 지운다.)
+1. 비공개 저장소 **`aske0115/app-signing-keys`**(2026-11-18 만듦, `~/keys` 폴더 그대로)를 `~/keys`에 받는다. 키·서명 설정·망치섬 링크(`tumble-isle-signing.properties`)가 함께 들어 있어 1-1의 링크를 따로 만들 필요가 없다.
+   ```bash
+   gh repo clone aske0115/app-signing-keys ~/keys   # 개인 계정(aske0115)으로 gh 로그인 필요
+   chmod 700 ~/keys && chmod 600 ~/keys/neon-rush-upload.jks ~/keys/neon-rush-signing.properties
+   ```
+   - 이미 `~/keys`가 있으면 그 폴더에서 `git pull`.
+   - 이 저장소는 **비공개를 유지**한다. 공개로 바꾸거나 다른 저장소에 파일을 복사하지 않는다.
+2. 설정 파일 안의 `storeFile=` 경로가 **이 컴퓨터의 경로**인지 본다(지금 값 `/Users/a1101249/keys/neon-rush-upload.jks`). 사용자 이름이 다르면 그 한 줄만 고치고, 그 수정은 커밋하지 않는다.
+3. `ls -l ~/keys/tumble-isle-signing.properties`로 링크가 살아 있는지 본다.
+4. 확인: `cd android && ./gradlew bundleRelease` 뒤 `jarsigner -verify app/build/outputs/bundle/release/app-release.aab` → `jar verified.` (실제 광고가 들어가지 않은 빌드로 확인해도 서명 확인은 된다. 확인 뒤 AAB는 지운다.)
 
 - 키를 아예 잃어버렸다면: 새 키를 만들고(`keytool -genkeypair -v -keystore ~/keys/upload-new.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000`) Play Console → 앱 무결성 → **업로드 키 재설정 요청**(두 앱 모두). 승인까지 며칠 걸린다.
 - 역할(에이전트)은 키·비밀번호 파일을 열거나 복사하지 않는다. 받기·두기는 사용자가 하고, 역할은 링크·경로 확인과 서명 확인(`jarsigner -verify`)만 한다.

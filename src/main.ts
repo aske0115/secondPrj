@@ -2114,7 +2114,8 @@ const toggleRow = (act: string, label: string, on: boolean) =>
 const settingsRows = (withLang: boolean) =>
   `<div class="settings">${toggleRow('music', L('음악', 'Music'), sfx.isMusicOn())}${toggleRow('sound', L('효과음', 'Sound effects'), sfx.isSfxOn())}${toggleRow('haptic', L('진동', 'Vibration'), sfx.isHapticOn())}` +
   (withLang && ads.privacyRequired() ? `<button class="set" data-act="privacy"><span>${L('개인정보 설정', 'Privacy settings')}</span><b>›</b></button>` : '') +
-  (withLang ? `<button class="set" data-act="lang"><span>${L('언어', 'Language')}</span><b>${lang === 'ko' ? '한국어' : 'English'}</b></button>` : '') + `</div>`;
+  (withLang ? `<button class="set" data-act="lang"><span>${L('언어', 'Language')}</span><b>${lang === 'ko' ? '한국어' : 'English'}</b></button>` : '') +
+  (withLang && MT.DEV_MODE ? toggleRow('devAll', L('개발자: 모든 무기 열기', 'Dev: unlock all weapons'), MT.devAllWeapons()) : '') + `</div>`;
 function showPause() {
   show(
     `<h2 class="big-title" style="font-size:30px">${L('일시정지', 'Paused')}</h2>${settingsRows(false)}` +
@@ -2199,6 +2200,7 @@ overlay.addEventListener('click', (ev) => {
   }
   if (act === 'privacy') return void ads.openPrivacy().then(showSettings);
   if (act === 'lang') return setLang(lang === 'ko' ? 'en' : 'ko');
+  if (act === 'devAll') { MT.setDevAllWeapons(!MT.devAllWeapons()); return location.reload(); } // 다시 불러와 잠긴 무기 저장값까지 정리
   if (act === 'resume') return resume();
   if (act === 'adContinue' || act === 'adDouble' || act === 'adCapsule') return void onAd(act, btn);
   if (act === 'reroll') {

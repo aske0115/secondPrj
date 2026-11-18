@@ -20,7 +20,13 @@ export const WEAPONS = ['hammer', 'squeaky', 'sledge', 'twin', 'pan', 'bat', 'po
 export type WeaponId = (typeof WEAPONS)[number];
 // 언락 순서(결정 085): 1장엔 뿅망치 하나, 그 뒤 장 끝마다, 7·9·10장은 숙련 ★이 목표
 export const WEAPON_OPEN: Record<WeaponId, number> = { hammer: 0, squeaky: 8, sledge: 30, twin: 45, pan: 60, bat: 75, pole: 90, fan: 120 };
-export const weaponOpen = (id: WeaponId, cleared: number) => cleared >= WEAPON_OPEN[id];
+// 개발자 모드(실기기 시험용): 모든 무기 열기. 스토어용 출시 빌드(--mode release)에선 늘 꺼져 있고 설정 줄도 없다
+export const DEV_MODE = import.meta.env.MODE !== 'release';
+let devAll = false;
+try { devAll = DEV_MODE && localStorage.getItem('devAllWeapons') === '1'; } catch { /* 저장소를 못 쓰면 끔 */ }
+export const devAllWeapons = () => devAll;
+export const setDevAllWeapons = (on: boolean) => { try { localStorage.setItem('devAllWeapons', on ? '1' : '0'); } catch { /* 무시 */ } };
+export const weaponOpen = (id: WeaponId, cleared: number) => devAll || cleared >= WEAPON_OPEN[id];
 
 export type Meta = {
   coins: number; perks: Record<Perk, number>; cleared: number;

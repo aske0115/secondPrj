@@ -101,18 +101,19 @@ export async function showAd(): Promise<AdResult> {
   return earned ? 'earned' : failed ? 'failed' : 'closed';
 }
 
-// 하루 상한(결정 073): 코인 2배 3번, 무료 캡슐 1번. 날짜가 바뀌면 다시 센다
-type Daily = { day: number; doubles: number; capsule: number };
+// 하루 상한(결정 073): 코인 2배 3번, 무료 캡슐 1번, 잠긴 무기 체험 2번(결정 093). 날짜가 바뀌면 다시 센다
+type Daily = { day: number; doubles: number; capsule: number; trials: number };
 const DAY = () => dayNumber(Date.now());
 export const DOUBLES_PER_DAY = 3;
+export const TRIALS_PER_DAY = 2;
 export function adDaily(): Daily {
   try {
     const d = JSON.parse(localStorage.getItem('ads') ?? '{}') as Partial<Daily>;
-    if (d.day === DAY()) return { day: d.day, doubles: d.doubles ?? 0, capsule: d.capsule ?? 0 };
+    if (d.day === DAY()) return { day: d.day, doubles: d.doubles ?? 0, capsule: d.capsule ?? 0, trials: d.trials ?? 0 };
   } catch { /* 처음부터 */ }
-  return { day: DAY(), doubles: 0, capsule: 0 };
+  return { day: DAY(), doubles: 0, capsule: 0, trials: 0 };
 }
-export function useAdDaily(key: 'doubles' | 'capsule') {
+export function useAdDaily(key: 'doubles' | 'capsule' | 'trials') {
   const d = adDaily();
   d[key]++;
   try { localStorage.setItem('ads', JSON.stringify(d)); } catch { /* 이번 실행에서만 */ }

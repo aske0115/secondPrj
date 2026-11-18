@@ -485,10 +485,11 @@ type Bit = { x: number; y: number; z: number; vx: number; vy: number; vz: number
 /** 이번 판 주무기: 「추천 무기 자동」(meta.autoWeapon)이 켜져 있으면 추천 무기(잠겼으면 망치), 꺼져 있으면 고른 무기(결정 083·085) */
 // 무기 시트·「바로 쓰기」로 직접 고른 무기: 화살표로 스테이지를 바꾸거나 다시 고르기 전까지 유지(한 번 더·처음으로·다음 섬에도), 앱을 다시 켜면 잊음(결정 088 보완)
 let manualPick: MT.WeaponId | null = null;
-const runWeapon = (): MT.WeaponId => WL.pickRunWeapon(manualPick, meta.autoWeapon, CH.recommendedWeapon(curDef), meta.weapon, meta.cleared);
+let trialWeapon: MT.WeaponId | null = null; // 광고로 이번 판만 빌린 잠긴 추천 무기(결정 093), 판이 시작되면 비운다
+const runWeapon = (): MT.WeaponId => trialWeapon ?? WL.pickRunWeapon(manualPick, meta.autoWeapon, CH.recommendedWeapon(curDef), meta.weapon, meta.cleared);
 const newGame = (w = runWeapon()) => ({
   t: 0, px: 0, pz: 0, face: 0, hp: MT.maxHp(meta), maxHp: MT.maxHp(meta), inv: 0, level: 0, xp: 0, picks: MT.startPicks(meta.perks.cards),
-  charge: 0, kills: 0, falls: 0, rerolls: MT.rerolls(meta.perks.cards), revived: false, continued: false,
+  charge: 0, kills: 0, falls: 0, rerolls: MT.rerolls(meta.perks.cards), revived: false, continued: false, adRerolled: false,
   lv: R.startLevels(), enemies: [] as Enemy[], logs: [] as Log[], pumpkins: [] as Pumpkin[], bits: [] as Bit[],
   hammerCd: 0.5, logCd: 2, pumpkinCd: 1.5, swingT: 1, swingYaw: 0, spawnCd: 0.6, shake: 0, stop: 0, ringT: 1, ringR: 1, moving: false,
   vx: 0, vz: 0, bt: 0, bonusDone: false, bonusFalls: 0, // 박치기 보너스
@@ -1835,7 +1836,8 @@ function showPick() {
     const tag = id === 'heart' ? '' : lv ? `<em>Lv ${lv} → ${lv + 1}</em>` : `<em class="new">NEW</em>`;
     return `<button class="card" data-id="${id}" style="--c:${c}"><div class="ico">${svg(id === 'hammer' ? wu.icon : ICON[id])}</div><b>${name}</b>${tag}<span>${desc}</span></button>`;
   });
-  const again = g.rerolls > 0 ? `<button class="sub" data-act="reroll">${L(`다시 고르기 (${g.rerolls})`, `Reroll (${g.rerolls})`)}</button>` : '';
+  const again = g.rerolls > 0 ? `<button class="sub" data-act="reroll">${L(`다시 고르기 (${g.rerolls})`, `Reroll (${g.rerolls})`)}</button>`
+    : g.t > 0 && !g.adRerolled && adExtras() ? `<button class="ad mini" data-act="adReroll">▶ ${L('광고 보고 다시 뽑기', 'Watch ad: new cards')}</button>` : ''; // 판당 1번(결정 093)
   const head = g.t === 0 ? L('들고 갈 스킬', 'Starting skill') : L('레벨 업!', 'Level up!');
   const count = pickTotal > 1 ? ` <small>×${pickTotal} · ${pickTotal - g.picks + 1}/${pickTotal}</small>` : '';
   show(`<div class="sheet"><h2>${head}${count}</h2><div class="cards">${cards.join('')}</div>${again}</div>`, 'pick');
@@ -1979,6 +1981,7 @@ function startRun() {
   resetInput();
   sfx.setMusicFast(false);
   g = newGame();
+  trialWeapon = null;
   camTarget.set(0, 0, 0);
   resetIsland();
   placeGadgets();
@@ -2030,7 +2033,8 @@ function showTitle(still = false) {
   const tt = CH.traitText(curDef), rec = CH.recommendedWeapon(curDef), recOpen = MT.weaponOpen(rec, meta.cleared), cur = runWeapon();
   const [traitA, traitB] = tt ? L(...tt).split(' · ') : ['', ''];
   const goalRow = tt
-    ? `<div class="goal trait">${wIcon(rec, !recOpen)}<span><b>${traitA}</b><small>${traitB}${recOpen ? '' : ` · ${openText(rec)}`}</small></span></div>`
+    ? `<div class="goal trait">${wIcon(rec, !recOpen)}<span><b>${traitA}</b><small>${traitB}${recOpen ? '' : ` · ${openText(rec)}`}</small></span>` +
+      (!recOpen && !locked && adExtras() && ads.adDaily().trials < ads.TRIALS_PER_DAY ? `<button class="ad mini" data-act="adTrial">▶ ${L('써 보기', 'Try it')}</button>` : '') + `</div>`
     : `<div class="goal"><i></i>${L(`${clock(R.RUN_SECONDS)} 버티면 섬을 지킨다`, `Survive ${clock(R.RUN_SECONDS)} to save the isle`)}</div>`;
   const wBtn = otherWeaponOpen()
     ? `<button class="wbtn" data-act="weapons" aria-label="${L('무기 고르기', 'Choose weapon')}">${wIcon(cur)}<small>${L(...WL.UI[cur].name)}</small>${tt && cur === rec ? `<em>${L('추천', 'Pick')}</em>` : ''}</button>` : '';
@@ -2143,7 +2147,15 @@ async function watchAd(btn: HTMLButtonElement): Promise<ads.AdResult> {
   }
 }
 let lastCoins = 0;
-const doubleAdBtn = () => `<button class="ad" data-act="adDouble">▶ ${L(`광고 보고 코인 2배 (+${lastCoins})`, `Watch ad: double coins (+${lastCoins})`)}</button>`;
+/** 2배를 받으면 새로 살 수 있게 되는 가장 싼 강화(결정 093): 「지금 꼭 필요한」 이유를 버튼에 붙인다 */
+function doubleBuys(): string {
+  const can = MT.PERKS.filter((id) => meta.perks[id] < MT.PERK_MAX[id]).map((id) => ({ id, cost: MT.perkCost(id, meta.perks[id]) }))
+    .filter((p) => p.cost > meta.coins && p.cost <= meta.coins + lastCoins).sort((a, b) => a.cost - b.cost)[0];
+  return can ? `<small>${L(`2배면 「${PERK_UI[can.id][0]}」 Lv ${meta.perks[can.id] + 1}을 살 수 있어요`, `Enough for ${PERK_UI[can.id][0]} Lv ${meta.perks[can.id] + 1}`)}</small>` : '';
+}
+const doubleAdBtn = () => `<button class="ad" data-act="adDouble">▶ ${L(`광고 보고 코인 2배 (+${lastCoins})`, `Watch ad: double coins (+${lastCoins})`)}${doubleBuys()}</button>`;
+/** 덤 광고(무기 체험·카드 다시 뽑기)는 처음 두 섬을 깬 뒤, 광고가 준비됐을 때만 보인다(없어도 손해 없게) */
+const adExtras = () => meta.cleared >= 2 && ads.adReady();
 /** 코인 2배 자리(결정 079): 조건이 맞으면 광고 준비 전에도 같은 높이 칸을 미리 잡아 둔다(준비되어 버튼이 생겨도 아래가 밀리지 않게) */
 const doubleBtn = () =>
   meta.cleared >= 2 && lastCoins > 0 && ads.adDaily().doubles < ads.DOUBLES_PER_DAY // 처음 두 섬을 깨기 전에는 광고를 보여 주지 않는다
@@ -2181,6 +2193,17 @@ async function onAd(act: string, btn: HTMLButtonElement) {
     ads.useAdDaily('doubles');
     sfx.coins();
     btn.outerHTML = `<span class="badge">${L(`+${lastCoins} 코인 더 받음!`, `+${lastCoins} bonus coins!`)}</span>`;
+  } else if (act === 'adTrial') {
+    const rec = CH.recommendedWeapon(curDef);
+    if ((await watchAd(btn)) !== 'earned') return showTitle();
+    ads.useAdDaily('trials');
+    trialWeapon = rec;
+    void stageReady.then(startRun);
+  } else if (act === 'adReroll') {
+    const res = await watchAd(btn);
+    if (mode !== 'pick') return;
+    if (res === 'earned') g.adRerolled = true;
+    showPick(); // 받았으면 새 카드, 아니면 같은 시트를 다시 그려 잠근 버튼을 푼다
   } else if (act === 'adCapsule') {
     if ((await watchAd(btn)) !== 'earned') return showShop(); // 잠갔던 버튼을 다시 그려서 푼다
     const r = MT.rollCapsule({ ...meta, coins: meta.coins + MT.CAPSULE_COST })!;
@@ -2292,7 +2315,7 @@ overlay.addEventListener('click', (ev) => {
   if (act === 'lang') return setLang(lang === 'ko' ? 'en' : 'ko');
   if (act === 'devAll') { MT.setDevAllWeapons(!MT.devAllWeapons()); return location.reload(); } // 다시 불러와 잠긴 무기 저장값까지 정리
   if (act === 'resume') return resume();
-  if (act === 'adContinue' || act === 'adDouble' || act === 'adCapsule') return void onAd(act, btn);
+  if (act === 'adContinue' || act === 'adDouble' || act === 'adCapsule' || act === 'adTrial' || act === 'adReroll') return void onAd(act, btn);
   if (act === 'reroll') {
     g.rerolls--;
     return showPick();

@@ -369,3 +369,7 @@ button.bestcut b { color: var(--gold-deep); }
 .mastline .wico { width: 22px; height: 22px; border-radius: 6px; }
 .mastline > span:not(.wico) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mastline .wico svg { width: 15px; height: 15px; }
+/* 덤 광고 버튼(결정 093): 작고 보조적으로 — 안 눌러도 되는 버튼처럼 보이게 */
+.ad.mini { width: auto; padding: 6px 12px; border-radius: 12px; font-size: 13px; box-shadow: 0 3px 0 #4a3aa8; white-space: nowrap; }
+.goal.trait .ad.mini { flex: none; margin-left: 4px; }
+.ad small { display: block; font-size: 11px; font-weight: 800; opacity: .9; }

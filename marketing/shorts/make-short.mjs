@@ -21,8 +21,9 @@ try {
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.resolve(HERE, '../..');
-const URL_BASE = process.env.DEMO_URL ?? 'http://localhost:5317/';
-const FPS = 30;
+export const URL_BASE = process.env.DEMO_URL ?? 'http://localhost:5317/';
+export const FPS = 30;
+const MAIN = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href; // marketing/store-video가 촬영 도구만 가져다 쓸 때는 굽지 않는다
 const LANGS = process.argv.slice(2).length ? process.argv.slice(2) : ['ko', 'en'];
 
 // ───── 장면 순서·자막(첫 장면부터 손맛, 로고는 맨 끝) ─────
@@ -33,7 +34,7 @@ const SCENES = [
   { id: 'bat', stage: 15, weapon: 'bat', lv: 3, warm: 4, sec: 2.8, cap: { ko: ['무기마다 손맛이 달라요', '야구방망이 — 딱!'], en: ['Every weapon feels different', 'Bat — CRACK!'] } },
   { id: 'twin', stage: 62, weapon: 'twin', lv: 3, warm: 4, sec: 2.4, cap: { ko: ['무기마다 손맛이 달라요', '스펀지 쌍검 — 다다닥!'], en: ['Every weapon feels different', 'Foam Twins — whap-whap!'] } },
   { id: 'fan', stage: 3, weapon: 'fan', lv: 3, warm: 4, sec: 2.4, cap: { ko: ['무기마다 손맛이 달라요', '큰 부채 — 휘이잉~'], en: ['Every weapon feels different', 'Giant Fan — WHOOSH!'] } },
-  { id: 'boss', stage: 45, weapon: 'hammer', lv: 3, warm: 94, sec: 6, cap: { ko: ['', '왕좀비도 섬 밖으로!'], en: ['', 'Even the King Zombie flies!'] } },
+  { id: 'boss', stage: 45, weapon: 'hammer', lv: 3, warm: 66, sec: 6, cap: { ko: ['', '왕좀비도 섬 밖으로!'], en: ['', 'Even the King Zombie flies!'] } },
   { id: 'card', sec: 3.2, cap: { ko: ['제일 멀리 날린 순간을', '카드로 공유!'], en: ['Your best knock-off', 'Share it as a card!'] } },
   { id: 'end', sec: 3.2 },
 ];
@@ -42,15 +43,16 @@ const END = {
   en: { title: 'Tumble Isle', sub: 'Bonk the horde off your tiny island', store: 'Download via the link in bio' },
 };
 // 보여 줄 게임 안 알림(나머지 — 버티기 시간·미션·코인 알림 등 — 은 숨김: 시간 숫자 문구 금지)
-const TOAST_OK = 'STRIKE|홈런|Home run|떨어뜨렸다|King zombie down|낙하|Drop ×|공중 콤보|Air combo';
-const META = { cleared: 150, coins: 3860, perks: { vigor: 4, shove: 6, charge: 3, cards: 2, revive: 1, purse: 2 }, chars: ['human', 'orc', 'keeper', 'vampire', 'ghost'], hero: 'human', missions: [], missionsDone: 0, bossDowns: 0 };
+export const TOAST_OK = 'STRIKE|홈런|Home run|떨어뜨렸다|King zombie down|낙하|Drop ×|공중 콤보|Air combo';
+export const META = { cleared: 150, coins: 3860, perks: { vigor: 4, shove: 6, charge: 3, cards: 2, revive: 1, purse: 2 }, chars: ['human', 'orc', 'keeper', 'vampire', 'ghost'], hero: 'human', missions: [], missionsDone: 0, bossDowns: 0 };
 
-const browser = await playwright.chromium.launch({ channel: 'chrome', headless: true });
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const icon = `data:image/png;base64,${readFileSync(path.join(ROOT, 'docs/art/icon.png')).toString('base64')}`;
+export { playwright };
+let browser;
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+export const icon = `data:image/png;base64,${readFileSync(path.join(ROOT, 'docs/art/icon.png')).toString('base64')}`;
 
 // 브라우저 안 도우미(초기 스크립트): 같은 난수, 가상 시계(performance.now를 프레임마다 1/30초씩)
-const INIT = (seed) => {
+export const INIT = (seed) => {
   let a = seed;
   Math.random = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const real = performance.now.bind(performance);
@@ -59,7 +61,7 @@ const INIT = (seed) => {
 };
 
 // 페이지 안 도우미: 장면 배치·프레임 한 칸·자막
-const HELPERS = ([toastOk, iconUrl, end]) => {
+export const HELPERS = ([toastOk, iconUrl, end]) => {
   const d = window.__demo;
   window.__picking = () => !document.getElementById('overlay').hidden && document.querySelector('#overlay .card');
   window.__run = (sec) => { // capture-store.mjs와 같은 흘리기(체력 채움·카드 자동 고름)
@@ -149,13 +151,13 @@ const HELPERS = ([toastOk, iconUrl, end]) => {
     } else if (id === 'boss') {
       for (let i = 0; i < 200 && !g.bossSpawned; i++) { g.hp = g.maxHp; d.step(1 / 30); }
       const b = g.enemies.find((e) => e.kind === 'boss' && !e.out);
-      toEdge(0.4);
+      toEdge(0.55); // 한 방에 가장자리를 넘게(왕좀비는 덜 밀려서 안쪽이면 가장자리에 오래 머묾)
       g.enemies = [b, ...g.enemies.filter((e) => e !== b && !e.out && Math.hypot(e.x - g.px, e.z - g.pz) > 5).slice(0, 10)];
       b.pct = 140; b.age = 3; const ba = Math.atan2(g.pz, g.px) + 0.35; b.x = g.px + Math.cos(ba) * 2.1; b.z = g.pz + Math.sin(ba) * 2.1; b.kx = b.kz = 0; // 가장자리 쪽 비스듬히(바로 위로 날면 자막에 가림)
       settle();
       const bx = b.x, bz = b.z;
       // 처음 1.3초는 제자리에서 맞으며 %만 오르고(게이지가 보이게), 그 뒤 날린다
-      window.__acts = { boss: (k) => { if (k < 40) { b.x = bx; b.z = bz; b.kx = b.kz = 0; b.out = false; b.pct = 40 + k * 2.5; } if (k === 40) b.pct = 170; /* 망치 한 방으로 날아간다(쾅!을 쓰면 졸개 STRIKE가 베스트 컷을 가져감) */ } };
+      window.__acts = { boss: (k) => { if (k < 40) { b.x = bx; b.z = bz; b.kx = b.kz = 0; b.out = false; b.pct = 40 + k * 2.5; } if (k === 40) { b.pct = 170; g.hammerCd = 0; } /* 망치 한 방으로 날아간다(쾅!을 쓰면 졸개 STRIKE가 베스트 컷을 가져감) */ } };
     } else {
       toEdge(0.62);
       g.enemies = g.enemies.filter((e) => !e.out && Math.hypot(e.x - g.px, e.z - g.pz) > 5).slice(0, 6);
@@ -169,17 +171,20 @@ const HELPERS = ([toastOk, iconUrl, end]) => {
   };
 };
 
+/** __frame이 돌려준 한 프레임의 사건(맞음·헛스윙·낙하·STRIKE·왕좀비)을 효과음 목록에 넣는다 */
+export function pushSounds(events, t, ev) {
+  if (ev.hit) events.push([t, 'whack']);
+  if (ev.miss) events.push([t, 'swish2']);
+  if (ev.fall) events.push([t, 'fall']);
+  if (ev.strike) events.push([t, 'fanfare']);
+  if (ev.boss) events.push([t, 'fanfare'], [t, 'rumble']);
+}
+
 async function shoot(lang, work) {
   const events = []; // [초, 이름]
   let frame = 0;
   const save = (page) => page.screenshot({ path: path.join(work, `${String(frame++).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 93 });
-  const push = (t, ev) => {
-    if (ev.hit) events.push([t, 'whack']);
-    if (ev.miss) events.push([t, 'swish2']);
-    if (ev.fall) events.push([t, 'fall']);
-    if (ev.strike) events.push([t, 'fanfare']);
-    if (ev.boss) events.push([t, 'fanfare'], [t, 'rumble']);
-  };
+  const push = (t, ev) => pushSounds(events, t, ev);
   const game = SCENES.filter((s) => s.stage !== undefined);
   let page, ctx;
   for (const sc of game) {
@@ -212,9 +217,8 @@ async function shoot(lang, work) {
     if (errors.length) console.warn(sc.id, '페이지 오류:', errors);
     if (sc.id !== 'boss') await ctx.close();
   }
-  // 공유 카드: 왕좀비 판이 끝나야 카드가 생긴다(왕좀비가 떨어지고 약 2초 뒤)
-  await page.evaluate(() => { const d = window.__demo; for (let i = 0; i < 300 && !d.card(); i++) { d.g.hp = d.g.maxHp; d.step(1 / 30); d.renderOnce(); } d.renderOnce(); });
-  const url = await page.evaluate(() => window.__demo.card());
+  // 공유 카드: 판이 끝나야 생긴다. 왕좀비는 보너스라 판이 계속되므로(결정 094) 여기서 판을 끝내 그 순간까지의 베스트 컷을 받는다
+  const url = await page.evaluate(() => { const d = window.__demo; if (!d.g.bossDown) return ''; d.end(true); return d.card(); });
   if (!url) throw new Error('공유 카드가 만들어지지 않음(왕좀비를 못 떨어뜨림)');
   for (const kind of ['card', 'end']) {
     const sc = SCENES.find((s) => s.id === kind);
@@ -238,7 +242,7 @@ function decode(name) {
   if (r.status) throw new Error(`효과음 읽기 실패: ${name}`);
   return new Float32Array(r.stdout.buffer, r.stdout.byteOffset, r.stdout.length / 4);
 }
-function mixAudio(seconds, events) {
+export function mixAudio(seconds, events) {
   const out = new Float32Array(Math.ceil(seconds * SR)), cache = {}, last = {};
   const add = (name, t, vol, rate = 1, gap = 0.05) => {
     if (t - (last[name] ?? -9) < gap) return; // 같은 소리가 뭉개지지 않게(게임과 같은 규칙)
@@ -284,7 +288,8 @@ function mixAudio(seconds, events) {
   return Buffer.concat([head, pcm]);
 }
 
-try {
+if (MAIN) try {
+  browser = await playwright.chromium.launch({ channel: 'chrome', headless: true });
   for (const lang of LANGS) {
     const work = mkdtempSync(path.join(os.tmpdir(), `short-${lang}-`));
     const { frames, events } = await shoot(lang, work);

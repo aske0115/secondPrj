@@ -100,10 +100,10 @@ Google Play 먼저(2026-11-17 초안, 기획 담당. 같은 날 무기 8종·언
 
 ■ 날마다 오늘의 섬, 그리고 베스트 컷
 · 오늘의 섬은 날마다 바뀌고, 그날 처음 지켜 내면 보너스 코인
-· 한 판에서 가장 멀리 날려 보낸 순간을 놀란 표정까지 클로즈업한 카드로 남겨 바로 공유
+· 한 판에서 가장 멀리 날려 보낸 순간이 클로즈업 카드로 남아요. 우는 얼굴, 어질어질한 눈, 거꾸로 날아가는 자세까지 판마다 달라 바로 공유하고 싶어집니다
 
 ■ 편하게 즐기세요
-· 강제로 뜨는 광고가 없습니다. 광고는 원할 때 직접 눌러 보는 보상형뿐이에요(코인 2배, 이어 하기, 무료 캡슐)
+· 강제로 뜨는 광고가 없습니다. 광고는 원할 때 직접 눌러 보는 보상형뿐이에요(코인 2배, 이어 하기, 무료 캡슐, 잠긴 무기 한 판 체험, 카드 다시 뽑기)
 · 인터넷 없이도 플레이할 수 있습니다(광고 보상만 연결이 필요해요)
 · 한 손 세로 조작, 언제든 일시정지
 · 한국어·영어 지원
@@ -161,10 +161,10 @@ and low gravity on the Moon Base that sends them floating high.
 
 ■ Today's Isle and your Best Shot
 · A new Today's Isle every day, with bonus coins for your first clear
-· The best knock-off of each run becomes a close-up card, shocked face and all, ready to share
+· The best knock-off of each run becomes a close-up card — crying faces, dizzy eyes, upside-down tumbles and wild camera angles, different every run and ready to share
 
 ■ Play your way
-· No forced ads. Ads only play when you choose to watch one for a reward (double coins, continue, free capsule)
+· No forced ads. Ads only play when you choose to watch one for a reward (double coins, continue, free capsule, try a locked weapon, reroll cards)
 · Play offline (only ad rewards need a connection)
 · One-handed portrait controls, pause anytime
 · Korean and English
@@ -256,7 +256,7 @@ Bonk zombies off the island with your hammer.
 | 5 | 섬마다 어울리는 무기로 | The right weapon for every island | 시작 화면 스테이지 카드 「추천: ○○」 + 무기 시트(8칸, 일부는 잠김 그림자) |
 | 6 | 장 10개, 스테이지 150개 | 10 chapters, 150 stages | 서로 다른 장(과자 섬·달 기지·눈 마을 등) 섞어 보이기 |
 | 7 | 강화하고, 새 캐릭터를 뽑아라 | Upgrade and unlock new heroes | 상점(강화 타일·캡슐 열림 연출) |
-| 8 | 날마다 오늘의 섬, 베스트 컷 공유 | Today's Isle daily. Share your best shot | 결과 화면 베스트 컷 섬네일 또는 시작 화면 오늘의 섬 |
+| 8 | 판마다 다른 베스트 컷, 바로 공유 | A new Best Shot every run. Share it! | 베스트 컷 카드 4장 모음(표정·자세·앵글이 서로 다른 것, 결정 094) |
 
 모두 시간 숫자·경쟁작 이름·순위 표현 없음. 「150」「10」은 콘텐츠 수라 원칙 위반이 아니다.
 - 1~3번은 망치 그대로(망치가 상징 무기, 첫 장면). 다른 무기는 4·5번에서만 보인다.

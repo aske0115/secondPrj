@@ -35,7 +35,7 @@ const SLIDES = {
     ['5-pick', '섬마다 어울리는 무기로', '추천 무기를 알아서 쥐여 줘요'],
     ['6-isles', '장 10개, 스테이지 150개', '풀밭·해적 해변·눈 마을·과자 섬·달 기지'],
     ['7-shop', '강화하고, 새 캐릭터를 뽑아라', '모험가·오크·묘지기·흡혈귀·유령'],
-    ['8-daily', '날마다 오늘의 섬, 베스트 컷 공유', '가장 크게 날려 보낸 순간을 자랑하세요'],
+    ['8-daily', '판마다 다른 베스트 컷, 바로 공유', '표정·자세·앵글이 매번 달라요'],
   ],
   en: [
     ['1-strike', 'Bonk them off the island!', 'Send the whole crowd flying'],
@@ -45,7 +45,7 @@ const SLIDES = {
     ['5-pick', 'The right weapon for every island', 'The recommended weapon is equipped for you'],
     ['6-isles', '10 chapters, 150 stages', 'Meadows, pirate beaches, snow, candy and the moon'],
     ['7-shop', 'Upgrade and unlock new heroes', 'Adventurer, Orc, Keeper, Vampire, Ghost'],
-    ['8-daily', "Today's Isle daily. Share your best shot", 'Show off your biggest knock-off'],
+    ['8-daily', 'A new Best Shot every run. Share it!', 'New faces, poses and angles every time'],
   ],
 };
 // 4번 칸 아래 무기 이름(게임 안 이름과 같게)
@@ -252,7 +252,9 @@ async function compose(lang) {
   for (const [name, title, sub] of SLIDES[lang]) {
     // 휴대폰 1080×1920 = 360×640 × 3. 카드는 405×720 화면을 비율 그대로 줄인 것
     const grid = (cells) => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:322px">${cells.join('')}</div>`;
-    const body = name === '6-isles'
+    const body = name === '8-daily' // 베스트 컷 카드 4장(결정 094: 판마다 앵글·자세·표정이 다름). 원본은 8-card-0~3(촬영: 개발 서버에서 판을 돌려 __demo.card())
+      ? `<div style="margin-top:26px">${grid([0, 1, 2, 3].map((k) => `<div class="card" style="aspect-ratio:4/5;border-radius:20px;transform:rotate(${[-2, 1.5, 1, -1.5][k]}deg)"><img src="${raw(`8-card-${k}`)}"></div>`))}</div>`
+      : name === '6-isles'
       ? grid(['pirate', 'snow', 'sweets', 'moon'].map((k) => `<div class="card" style="height:245px;border-radius:20px"><img src="${raw(`6-isle-${k}`)}" style="object-position:50% 45%"></div>`))
       : name === '4-weapons' // 무기가 잘 보이게 주인공 둘레를 크게 잘라 보여 주고 아래에 이름
         ? grid(WEAPON_CELLS.map(([id, ko, en]) => `<div class="card" style="position:relative;height:245px;border-radius:20px"><img src="${raw(`4-w-${id}`)}" style="transform:scale(1.9);transform-origin:50% 54%">` +

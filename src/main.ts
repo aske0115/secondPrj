@@ -21,6 +21,7 @@ import * as MS from './game/missions';
 import * as WL from './weaponLook';
 import * as BS from './bestShot';
 import { TOSS, ait } from './toss';
+if (TOSS) document.documentElement.classList.add('toss');
 
 const $ = (id: string) => document.getElementById(id)!;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);

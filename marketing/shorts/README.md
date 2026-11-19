@@ -58,6 +58,10 @@ npm exec --yes --package=playwright@1.65.0 -- node marketing/shorts/make-short.m
   #TumbleIsle #mobilegame #indiegame #indiedev #survivalgame #lowpoly #shorts
   ```
 
+- 태그 칸(설명의 #해시태그와 별개, 쉼표로): `망치섬, Tumble Isle, 모바일게임, 인디게임, 액션게임, 서바이벌게임, 캐주얼게임, 로우폴리, 손맛게임, 오프라인게임, mobile game, indie game, survival game, low poly`
+- 업로드 설정: 아동용 아님 · 연령 제한 없음 · 「유료 프로모션 포함」 체크 안 함(내 게임 홍보는 해당 없음) · 변경된 콘텐츠(AI 생성) 아니요 · 카테고리 게임
+- 쇼츠 설명 속 링크는 휴대폰에서 눌리지 않습니다. 「프로필 링크」는 **채널 정보의 링크**(YouTube 스튜디오 → 맞춤설정 → 기본 정보 → 링크)에 Play 주소를 넣어 두는 것. 출시(심사 통과) 뒤 Play 주소: `https://play.google.com/store/apps/details?id=kr.co.daeun.tumbleisle`
+
 ### 인스타그램 릴스
 - 캡션(한): `쳐서 날려라! 하늘섬 망치 서바이벌 🔨 무기마다 손맛이 달라요. 망치섬, 프로필 링크에서 다운로드` + 해시태그 `#망치섬 #모바일게임 #인디게임 #게임개발 #손맛게임 #로우폴리 #서바이벌게임`
 - Caption (EN): `Bonk the horde off your tiny island 🔨 Every weapon hits different. Tumble Isle — download via the link in bio` + `#TumbleIsle #mobilegame #indiegame #gamedev #indiedev #lowpoly #survivalgame`

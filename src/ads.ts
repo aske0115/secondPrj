@@ -4,6 +4,7 @@
 import { AdMob, AdmobConsentStatus, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { Capacitor } from '@capacitor/core';
 import { dayNumber } from './game/rules';
+import { TOSS, ait } from './toss';
 
 const native = Capacitor.isNativePlatform();
 const ios = Capacitor.getPlatform() === 'ios';
@@ -13,22 +14,37 @@ const real = ios ? import.meta.env.VITE_ADMOB_REWARDED_IOS : import.meta.env.VIT
 const unit = real && import.meta.env.MODE === 'release'
   ? { adId: real as string, isTesting: false }
   : { adId: ios ? 'ca-app-pub-3940256099942544/1712485313' : 'ca-app-pub-3940256099942544/5224354917', isTesting: true };
-const fake = !native && import.meta.env.DEV; // 브라우저 개발 서버: 1초짜리 가짜 광고로 흐름만 시험
+// 토스판: 앱인토스 광고 그룹(외부 광고 SDK 금지). 실제 그룹 ID는 toss-release 빌드에서만, 그 밖엔 문서의 테스트 ID
+const tossGroup = import.meta.env.MODE === 'toss-release' && import.meta.env.VITE_TOSS_REWARDED ? String(import.meta.env.VITE_TOSS_REWARDED) : 'ait-ad-test-rewarded-id';
+const fake = !native && !TOSS && import.meta.env.DEV; // 브라우저 개발 서버: 1초짜리 가짜 광고로 흐름만 시험
 
 let ready = fake, loading = false, canRequest = false, loadedAt = 0, privacyReq = false;
 /** 광고가 어디까지 왔는지(개발 빌드 설정 화면에 보여 줌): 실기기에서 「광고 준비 중」이 안 풀릴 때 원인을 바로 보려고 */
-let stage = native ? '시작 전(첫 판 뒤 시작)' : 'web';
+let stage = native || TOSS ? '시작 전(첫 판 뒤 시작)' : 'web';
 const why = (e: unknown) => (e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : String(e)).slice(0, 120);
-export const adStatus = () => `${unit.isTesting ? '테스트' : '실제'} 단위 · ${ready ? '준비됨' : stage}`;
+export const adStatus = () => `${TOSS ? (tossGroup.startsWith('ait-ad-test') ? '토스 테스트' : '토스 실제') : unit.isTesting ? '테스트' : '실제'} 단위 · ${ready ? '준비됨' : stage}`;
 const MAX_AGE = 50 * 60_000; // 불러온 광고는 1시간 뒤 만료되므로 여유 두고 50분에 새로 불러온다
 let onReady = () => {};
 /** 광고가 준비되는 순간 부를 함수(늦게 준비된 광고를 열린 화면에 반영) */
 export const onAdReady = (f: () => void) => { onReady = f; };
 
 function preload() {
-  if (!native || !canRequest || ready || loading) return;
+  if (!(native || TOSS) || !canRequest || ready || loading) return;
   loading = true;
   stage = '불러오는 중';
+  if (TOSS) {
+    let off = () => {}; // SDK 구독은 반환된 함수로 풀어야 쌓이지 않는다
+    const retry = (e: unknown) => { off(); loading = false; stage = `불러오기 실패: ${why(e)}`; setTimeout(preload, 30_000); };
+    ait().then(({ loadFullScreenAd }) => {
+      if (!loadFullScreenAd.isSupported()) { loading = false; stage = '이 토스 앱 버전은 광고 미지원'; return; }
+      off = loadFullScreenAd({
+        options: { adGroupId: tossGroup },
+        onEvent: (e) => { if (e.type === 'loaded') { off(); loading = false; ready = true; loadedAt = Date.now(); stage = '준비됨'; onReady(); } },
+        onError: retry,
+      });
+    }).catch(retry); // 토스 앱 밖에선 SDK가 동기 예외를 던진다
+    return;
+  }
   AdMob.prepareRewardVideoAd(unit)
     .then(() => { ready = true; loadedAt = Date.now(); stage = '준비됨'; onReady(); })
     .catch((e) => { stage = `불러오기 실패: ${why(e)}`; setTimeout(preload, 30_000); }) // 네트워크·광고 재고 부족: 잠시 뒤 다시
@@ -38,6 +54,7 @@ function preload() {
 let started = false;
 /** 광고 준비 시작(결정 074): 새로 깐 사람에게 게임을 보기도 전에 추적 허용 창을 띄우지 않도록 첫 판이 끝난 뒤에 부른다 */
 export function initAds() {
+  if (TOSS && !started) { started = canRequest = true; return preload(); } // 동의·추적 허용은 토스 앱이 맡는다
   if (!native || started) return;
   started = true;
   void (async () => {
@@ -99,6 +116,23 @@ export async function showAd(): Promise<AdResult> {
   }
   let earned = false, failed = false, finish!: () => void;
   const closed = new Promise<void>((r) => (finish = r));
+  if (TOSS) {
+    // 보상은 userEarnedReward에서만(닫힘만으로 주면 안 됨). 끝은 닫힘·보여 주기 실패로 판단
+    const { showFullScreenAd } = await ait();
+    const off = showFullScreenAd({
+      options: { adGroupId: tossGroup },
+      onEvent: (e) => {
+        if (e.type === 'userEarnedReward') earned = true;
+        else if (e.type === 'dismissed') finish();
+        else if (e.type === 'failedToShow') { failed = true; finish(); }
+      },
+      onError: () => { failed = true; finish(); },
+    });
+    await closed;
+    off();
+    preload();
+    return earned ? 'earned' : failed ? 'failed' : 'closed';
+  }
   const handles = await Promise.all([
     AdMob.addListener(RewardAdPluginEvents.Rewarded, () => (earned = true)),
     AdMob.addListener(RewardAdPluginEvents.Dismissed, () => finish()),

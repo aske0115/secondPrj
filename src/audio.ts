@@ -2,6 +2,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { App } from '@capacitor/app';
+import { TOSS, ait } from './toss';
 let ctx: AudioContext | null = null;
 let master: GainNode, musicGain: GainNode, sfxBus: GainNode; // 효과음은 모두 sfxBus를 지나 설정에서 한 번에 끈다
 let noise: AudioBuffer;
@@ -151,6 +152,10 @@ export function finale() {
 /** 짧은 진동. iPhone 웹뷰는 navigator.vibrate를 무시하므로 앱에서는 네이티브 햅틱을 쓴다 */
 export function buzz(ms = 12) {
   if (!hapticOn) return;
+  if (TOSS) {
+    void ait().then(({ Device }) => Device.triggerHaptic({ type: ms >= 20 ? 'tickMedium' : 'tickWeak' })).catch(() => {});
+    return;
+  }
   if (Capacitor.isNativePlatform()) {
     void Haptics.impact({ style: ms >= 20 ? ImpactStyle.Medium : ImpactStyle.Light }).catch(() => {});
     return;

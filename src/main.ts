@@ -20,6 +20,7 @@ import * as MT from './game/meta';
 import * as MS from './game/missions';
 import * as WL from './weaponLook';
 import * as BS from './bestShot';
+import { TOSS, ait } from './toss';
 
 const $ = (id: string) => document.getElementById(id)!;
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -2224,13 +2225,17 @@ async function onAd(act: string, btn: HTMLButtonElement) {
   }
 }
 // 안드로이드 뒤로 가기(결정 071): 판 도중 → 일시정지, 일시정지 → 이어 하기, 상점·설정·결과 → 시작 화면, 시작 화면 → 묻고 종료
-void App.addListener('backButton', () => {
+function onBack() {
   if (mode === 'play' || mode === 'bonus') return pause();
   if (mode === 'pause') return resume();
   if (mode === 'pick' || mode === 'bonusIntro') return; // 고르는 화면은 고른 뒤에 나간다
   if (overlay.className !== 'title') return showTitle();
-  if (window.confirm(L('망치섬을 종료할까요? 진행 기록은 저장되어 있어요.', 'Quit Tumble Isle? Your progress is saved.'))) void App.exitApp();
-});
+  if (!window.confirm(L('망치섬을 종료할까요? 진행 기록은 저장되어 있어요.', 'Quit Tumble Isle? Your progress is saved.'))) return;
+  if (TOSS) void ait().then(({ Screen }) => Screen.close()).catch(() => {});
+  else void App.exitApp();
+}
+if (TOSS) void ait().then(({ graniteEvent }) => graniteEvent.addEventListener('backEvent', { onEvent: onBack })).catch(() => {}); // 토스 앱 밖(브라우저 개발)에선 실패해도 그만
+else void App.addListener('backButton', onBack);
 const toggleRow = (act: string, label: string, on: boolean) =>
   `<button class="set" data-act="${act}" aria-pressed="${on}"><span>${label}</span><b>${on ? L('켬', 'On') : L('끔', 'Off')}</b></button>`;
 /** 언어를 바꾸면 다시 불러오므로 판 도중(일시정지)에는 빼고 보여 준다 */

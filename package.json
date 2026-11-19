@@ -11,9 +11,12 @@
     "ios": "npm run native && npx cap open ios",
     "android": "npm run native && npx cap open android",
     "build:release": "tsc --noEmit && vite build --mode release",
-    "native:release": "npm run build:release && npx cap sync"
+    "native:release": "npm run build:release && npx cap sync",
+    "build:toss": "tsc --noEmit && vite build --mode toss && ait build",
+    "build:toss-release": "tsc --noEmit && vite build --mode toss-release && ait build"
   },
   "dependencies": {
+    "@apps-in-toss/web-framework": "3.10.0",
     "@capacitor-community/admob": "^8.4.1",
     "@capacitor/android": "^8.6.2",
     "@capacitor/app": "^8.1.2",

@@ -7,6 +7,13 @@
 게임 코드는 그대로 두고, **토스판 빌드에서 Capacitor 기능 3곳(광고·진동·앱 상태/뒤로가기)만 앱인토스 SDK로 갈아 끼웁니다.**
 용량(빌드 7MB)은 한도 100MB에 넉넉하고, 사운드 끄기·백그라운드 소리 정지는 이미 있습니다.
 
+## 지금 상태 (2026-11-19)
+- ✅ 콘솔 앱 등록: 망치섬 / `tumble-isle`
+- ✅ SDK `@apps-in-toss/web-framework@3.10.0`, 설정 `apps-in-toss.config.ts`(`ait init`은 기존 `build` 스크립트와 vite 설정을 바꾸므로 쓰지 않고 손으로 만듦)
+- ✅ 토스판 분기 `src/toss.ts`(`TOSS`, `ait()`): 광고·진동·뒤로가기. Play·iOS 빌드엔 토스 SDK가 들어가지 않음(`npm run build` 결과에 흔적 0 확인)
+- ✅ 빌드: `npm run build:toss` → 저장소 루트 `tumble-isle.ait`(테스트 광고 ID, git 제외)
+- 다음: 콘솔 「등록하기」로 `.ait` 업로드 → 토스앱 QR 테스트(광고·뒤로가기·Safe Area·소리) → 광고 그룹 만든 뒤 `.env.toss-release`에 `VITE_TOSS_REWARDED=<그룹 ID>` 넣고 `npm run build:toss-release`
+
 ## 코드에서 바꿀 곳 (점검 결과)
 
 | 지금(Capacitor) | 위치 | 토스판 |

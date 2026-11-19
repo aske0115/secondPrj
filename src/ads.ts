@@ -16,6 +16,10 @@ const unit = real && import.meta.env.MODE === 'release'
 const fake = !native && import.meta.env.DEV; // 브라우저 개발 서버: 1초짜리 가짜 광고로 흐름만 시험
 
 let ready = fake, loading = false, canRequest = false, loadedAt = 0, privacyReq = false;
+/** 광고가 어디까지 왔는지(개발 빌드 설정 화면에 보여 줌): 실기기에서 「광고 준비 중」이 안 풀릴 때 원인을 바로 보려고 */
+let stage = native ? '시작 전(첫 판 뒤 시작)' : 'web';
+const why = (e: unknown) => (e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : String(e)).slice(0, 120);
+export const adStatus = () => `${unit.isTesting ? '테스트' : '실제'} 단위 · ${ready ? '준비됨' : stage}`;
 const MAX_AGE = 50 * 60_000; // 불러온 광고는 1시간 뒤 만료되므로 여유 두고 50분에 새로 불러온다
 let onReady = () => {};
 /** 광고가 준비되는 순간 부를 함수(늦게 준비된 광고를 열린 화면에 반영) */
@@ -24,9 +28,10 @@ export const onAdReady = (f: () => void) => { onReady = f; };
 function preload() {
   if (!native || !canRequest || ready || loading) return;
   loading = true;
+  stage = '불러오는 중';
   AdMob.prepareRewardVideoAd(unit)
-    .then(() => { ready = true; loadedAt = Date.now(); onReady(); })
-    .catch(() => setTimeout(preload, 30_000)) // 네트워크·광고 재고 부족: 잠시 뒤 다시
+    .then(() => { ready = true; loadedAt = Date.now(); stage = '준비됨'; onReady(); })
+    .catch((e) => { stage = `불러오기 실패: ${why(e)}`; setTimeout(preload, 30_000); }) // 네트워크·광고 재고 부족: 잠시 뒤 다시
     .finally(() => { loading = false; });
 }
 
@@ -37,15 +42,20 @@ export function initAds() {
   started = true;
   void (async () => {
     try {
+      stage = '초기화 중';
       await AdMob.initialize({ initializeForTesting: unit.isTesting });
+      stage = '동의 확인 중';
       let consent = await AdMob.requestConsentInfo();
       if (consent.isConsentFormAvailable && consent.status === AdmobConsentStatus.REQUIRED) consent = await AdMob.showConsentForm();
       canRequest = consent.canRequestAds;
+      if (!canRequest) stage = `동의 상태 ${consent.status}: 광고 요청 불가`;
       privacyReq = String(consent.privacyOptionsRequirementStatus) === 'REQUIRED'; // 동의 지역(유럽 등)은 설정에 다시 고르는 입구가 있어야 한다
       if (ios && (await AdMob.trackingAuthorizationStatus()).status === 'notDetermined') await AdMob.requestTrackingAuthorization();
       preload();
-    } catch {
-      /* 광고 없이 진행 */
+    } catch (e) {
+      stage = `초기화 실패: ${why(e)}`; // 광고 없이 진행하되, 잠깐의 네트워크 문제일 수 있어 30초 뒤 다시
+      started = false;
+      setTimeout(initAds, 30_000);
     }
   })();
 }

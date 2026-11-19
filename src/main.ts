@@ -2238,7 +2238,7 @@ const settingsRows = (withLang: boolean) =>
   `<div class="settings">${toggleRow('music', L('음악', 'Music'), sfx.isMusicOn())}${toggleRow('sound', L('효과음', 'Sound effects'), sfx.isSfxOn())}${toggleRow('haptic', L('진동', 'Vibration'), sfx.isHapticOn())}` +
   (withLang && ads.privacyRequired() ? `<button class="set" data-act="privacy"><span>${L('개인정보 설정', 'Privacy settings')}</span><b>›</b></button>` : '') +
   (withLang ? `<button class="set" data-act="lang"><span>${L('언어', 'Language')}</span><b>${lang === 'ko' ? '한국어' : 'English'}</b></button>` : '') +
-  (withLang && MT.DEV_MODE ? toggleRow('devAll', L('개발자: 모든 무기 열기', 'Dev: unlock all weapons'), MT.devAllWeapons()) : '') + `</div>`;
+  (withLang && MT.DEV_MODE ? toggleRow('devAll', L('개발자: 모든 무기 열기', 'Dev: unlock all weapons'), MT.devAllWeapons()) + `<small style="display:block;color:#fffaf0;opacity:.85;font-size:11px;margin-top:6px;word-break:break-all">광고: ${ads.adStatus()}</small>` : '') + `</div>`;
 function showPause() {
   show(
     `<h2 class="big-title" style="font-size:30px">${L('일시정지', 'Paused')}</h2>${settingsRows(false)}` +

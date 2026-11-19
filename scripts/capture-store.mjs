@@ -4,7 +4,7 @@
 //   인자 없음 = 찍기 + 합성(한·영 모두). compose = 찍지 않고 raw로 합성만(문구만 바꿀 때)
 //   장면 이름을 주면 그 장면만 다시 찍는다(예: raw 1-strike)
 // 결과: store/raw/{kr,en}/*.png(405×720 화면 3배 = 1215×2160), store/play/{kr,en}/*.png(1080×1920),
-//       store/play/{kr,en}/feature-graphic-1024x500.png, store/play/icon-512.png
+//       store/play/{kr,en}/feature-graphic-1024x500-{kr,en}.png (파일 이름 끝에 언어: 콘솔이 같은 이름을 같은 파일로 여겨 덮어씀), store/play/icon-512.png
 // 브라우저는 이 맥의 Google Chrome을 쓴다(scripts/demo.mjs와 같음).
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -103,7 +103,7 @@ async function scene(lang, name, meta, setup, viewport = { width: 405, height: 7
   // 레벨 업은 막아 둔 채 경험치 막대만 반쯤 찬 것으로
   // 떠 있는 알림 글씨(STRIKE! 등)는 서서히 사라지므로 가장 진한 순간(40%)에 멈춰 찍는다
   await page.evaluate(() => { window.__beforeShot?.(); const g = window.__demo.g; if (window.__need) g.xp = g.need * 0.55; for (const e of g.enemies) e.flash = 0; /* 맞은 순간 하얗게 번쩍임은 빼고 */ window.__demo.renderOnce(); if (window.__noToast) document.getElementById('toast').className = ''; else document.getAnimations().forEach((a) => { if (a.effect?.target?.id === 'toast') { a.pause(); a.currentTime = 360; } }); });
-  await page.screenshot({ path: path.join(out, `${name}.png`) });
+  await page.screenshot({ path: path.join(out, `${name}-${lang}.png`) });
   if (errors.length) console.warn(name, '페이지 오류:', errors);
   console.log('찍음:', `store/raw/${lang}/${name}.png`);
   await ctx.close();
@@ -261,7 +261,7 @@ async function compose(lang) {
           `<b style="position:absolute;left:50%;bottom:8px;transform:translateX(-50%);white-space:nowrap;padding:3px 10px;border-radius:99px;background:#fffaf0;color:#1d4c64;font-size:13px;font-weight:900;box-shadow:0 2px 0 #e8dcc4">${lang === 'kr' ? ko : en}</b></div>`))
         : `<div class="card" style="width:282px;height:501px"><img src="${raw(name)}"></div>`;
     await render(`${clouds}<div style="height:22px"></div><h1 data-fit style="font-size:36px;width:340px;white-space:nowrap;padding:0 4px 12px">${title}</h1>
-      <p data-fit style="font-size:16px;width:330px;white-space:nowrap;margin:-2px 0 16px">${sub}</p>${body}`, 360, 640, 3, path.join(out, `${name}.png`));
+      <p data-fit style="font-size:16px;width:330px;white-space:nowrap;margin:-2px 0 16px">${sub}</p>${body}`, 360, 640, 3, path.join(out, `${name}-${lang}.png`));
   }
   // 그래픽 이미지 1024×500: 배경은 섬 장면, 글씨는 가운데 안전 영역(가운데 약 700×300)에 크게
   const bg = raw('banner');
@@ -271,7 +271,7 @@ async function compose(lang) {
     <div style="position:absolute;left:110px;top:50%;width:540px;transform:translateY(-50%);text-align:center">
       <h1 style="font-size:${lang === 'kr' ? 120 : 104}px;letter-spacing:-3px;text-shadow:0 5px 0 #2c6e8f,0 10px 0 #1d4c64,0 18px 30px #0007">${BANNER[lang][0]}</h1>
       <p data-fit style="display:inline-block;max-width:540px;white-space:nowrap;margin-top:22px;font-size:28px;color:#1d4c64;background:#fffaf0;border-radius:40px;padding:10px 28px;box-shadow:0 5px 0 #e8dcc4">${BANNER[lang][1]}</p></div>`,
-    1024, 500, 1, path.join(out, 'feature-graphic-1024x500.png'));
+    1024, 500, 1, path.join(out, `feature-graphic-1024x500-${lang}.png`));
 }
 
 try {

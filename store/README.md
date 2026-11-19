@@ -1,11 +1,11 @@
 # 스토어 이미지 (Google Play)
 
-`kr` = 한국어 등록정보, `en` = 영어(기본 언어). 파일 번호 순서가 스토어에 올리는 순서입니다(1-strike가 맨 앞).
+`kr` = 한국어 등록정보, `en` = 영어(기본 언어). 파일 번호 순서가 스토어에 올리는 순서입니다(1-strike가 맨 앞). 파일 이름 끝에 언어(`-kr`·`-en`)를 붙입니다 — 이름이 같으면 Play 콘솔이 같은 파일로 여겨 다른 언어 쪽 이미지가 덮어써집니다.
 
 ```
 store/
   play/
-    kr/            휴대폰 스크린샷 1080×1920(9:16) 8장(`docs/STORE_LISTING.md` 6장 표 순서) + feature-graphic-1024x500.png
+    kr/            휴대폰 스크린샷 1080×1920(9:16) 8장(`docs/STORE_LISTING.md` 6장 표 순서) + feature-graphic-1024x500-kr.png (예: 1-strike-kr.png)
     en/            같은 구성(영어)
     icon-512.png   Play 고해상도 아이콘 512×512 (docs/art/icon.png를 줄인 것, 알파 없음)
   raw/             ↓ 위 이미지를 만드는 「원본 게임 캡처」(스토어에 직접 올리지 않음)
